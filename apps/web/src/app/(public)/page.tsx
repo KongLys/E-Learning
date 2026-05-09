@@ -4,226 +4,178 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { courseApi } from '@/lib/api/course.api';
 import { CourseGrid } from '@/components/course/CourseGrid';
-
-function VideoIcon() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="3" width="15" height="15" rx="2" />
-      <path d="M17 7l5-3v13l-5-3V7z" />
-    </svg>
-  );
-}
-
-function QuizIcon() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
-      <rect x="9" y="3" width="6" height="4" rx="2" />
-      <path d="M9 12h6M9 16h4" />
-    </svg>
-  );
-}
-
-function CommunityIcon() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-    </svg>
-  );
-}
+import { formatVND } from '@/lib/utils';
 
 function ArrowRightIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <path d="M5 12h14M12 5l7 7-7 7" />
     </svg>
   );
 }
 
-function CourseSection({
-  title,
-  courses,
-  loading,
-  href,
-  bg = 'bg-canvas',
-}: {
-  title: string;
-  courses: any[];
-  loading: boolean;
-  href: string;
-  bg?: string;
-}) {
+function CourseListIcon() {
   return (
-    <section className={`${bg} py-16`}>
-      <div className="max-w-300 mx-auto px-6">
-        <div className="flex items-end justify-between mb-8">
-          <h2 className="font-display text-3xl text-ink">{title}</h2>
-          <Link
-            href={href}
-            className="flex items-center gap-1.5 text-sm font-medium text-muted hover:text-ink transition-colors"
-          >
-            Xem tất cả
-            <ArrowRightIcon />
-          </Link>
-        </div>
-        <CourseGrid courses={courses} loading={loading} />
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+    </svg>
+  );
+}
+
+function CourseListItem({ course }: { course: any }) {
+  return (
+    <Link
+      href={`/courses/${course.slug}`}
+      className="flex items-center gap-4 py-4 group hover:bg-canvas-soft -mx-4 px-4 rounded-xl transition-colors"
+    >
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-surface-strong text-muted group-hover:bg-hairline transition-colors">
+        <CourseListIcon />
       </div>
-    </section>
+      <div className="flex-1 min-w-0">
+        <p className="text-[15px] font-medium text-ink truncate group-hover:text-emphasis transition-colors">
+          {course.title}
+        </p>
+        <p className="text-xs text-muted mt-0.5">
+          Bởi {course.instructor?.fullName ?? 'Giảng viên'}
+          {course.totalLessons ? ` • ${course.totalLessons} bài học` : ''}
+        </p>
+      </div>
+      <div className="shrink-0 text-sm font-semibold">
+        {Number(course.price) === 0 ? (
+          <span className="text-semantic-success">Miễn phí</span>
+        ) : (
+          <span className="text-ink">{formatVND(Number(course.price))}</span>
+        )}
+      </div>
+    </Link>
   );
 }
 
 export default function HomePage() {
   const { data: popularData, isLoading: loadingPopular } = useQuery({
     queryKey: ['courses-popular'],
-    queryFn: () => courseApi.getCourses({ sort: 'popular', limit: 6 }),
+    queryFn: () => courseApi.getCourses({ sort: 'popular', limit: 3 }),
   });
 
   const { data: newestData, isLoading: loadingNewest } = useQuery({
     queryKey: ['courses-newest'],
-    queryFn: () => courseApi.getCourses({ sort: 'newest', limit: 6 }),
-  });
-
-  const { data: freeData, isLoading: loadingFree } = useQuery({
-    queryKey: ['courses-free'],
-    queryFn: () => courseApi.getCourses({ price: 'free' as any, limit: 6 }),
+    queryFn: () => courseApi.getCourses({ sort: 'newest', limit: 5 }),
   });
 
   const popular = popularData?.data?.courses ?? [];
   const newest = newestData?.data?.courses ?? [];
-  const free = freeData?.data?.courses ?? [];
 
   return (
     <div className="flex flex-col">
-      {/* Hero */}
-      <section className="relative overflow-hidden bg-canvas py-24 md:py-32">
-        {/* Atmospheric gradient orbs — decoration only */}
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div
-            className="h-120 w-120 rounded-full opacity-40"
-            style={{ background: 'radial-gradient(ellipse at center, #a7e5d3 0%, transparent 70%)' }}
-          />
-        </div>
-        <div className="pointer-events-none absolute top-0 right-1/4 opacity-20">
-          <div
-            className="h-72 w-72 rounded-full"
-            style={{ background: 'radial-gradient(ellipse at center, #c8b8e0 0%, transparent 70%)' }}
-          />
-        </div>
-        <div className="pointer-events-none absolute bottom-0 left-1/4 opacity-20">
-          <div
-            className="h-64 w-64 rounded-full"
-            style={{ background: 'radial-gradient(ellipse at center, #f4c5a8 0%, transparent 70%)' }}
-          />
-        </div>
-
-        <div className="relative max-w-300 mx-auto px-6 text-center">
-          <span className="inline-flex items-center px-3 py-1 rounded-pill bg-surface-strong text-xs font-semibold uppercase tracking-widest text-muted mb-8">
-            Nền tảng học trực tuyến
+      {/* ── Hero ─────────────────────────────────────────────── */}
+      <section
+        className="relative overflow-hidden py-28 md:py-36"
+        style={{ background: 'linear-gradient(135deg, #cdd3ef 0%, #eec8b4 55%, #f5f5f5 100%)' }}
+      >
+        <div className="relative max-w-2xl mx-auto px-6 text-center">
+          <span className="inline-block text-[11px] font-semibold uppercase tracking-[0.2em] text-muted mb-6">
+            Kiến tạo tương lai của bạn
           </span>
-          <h1 className="font-display text-5xl md:text-6xl lg:text-7xl text-ink leading-[1.05] mb-6">
-            Học online cùng ELearn
+          <h1 className="font-display text-5xl md:text-6xl text-ink leading-[1.08] mb-6">
+            Mở khóa tiềm năng của bạn qua tri thức
           </h1>
-          <p className="text-base md:text-lg text-muted leading-relaxed max-w-xl mx-auto mb-10">
-            Hàng trăm khóa học chất lượng cao từ các chuyên gia hàng đầu.
-            Học mọi lúc, mọi nơi, theo nhịp của bạn.
+          <p className="text-base md:text-lg text-muted leading-relaxed max-w-lg mx-auto mb-10">
+            Trải nghiệm nền tảng học tập trực tuyến thế hệ mới với các khóa học từ những chuyên
+            gia hàng đầu, được thiết kế theo phong cách tối giản và tập trung vào hiệu quả.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
               href="/courses"
-              className="inline-flex h-11 items-center px-6 rounded-pill bg-emphasis text-white text-[15px] font-medium hover:bg-ink transition-colors"
+              className="inline-flex h-11 items-center gap-2 px-7 rounded-pill bg-surface-dark text-white text-[15px] font-medium hover:bg-ink transition-colors"
             >
-              Khám phá khóa học
+              Bắt đầu học ngay
+              <ArrowRightIcon />
             </Link>
             <Link
               href="/register"
-              className="inline-flex h-11 items-center px-6 rounded-pill border border-hairline-strong text-ink text-[15px] font-medium hover:bg-surface-strong transition-colors"
+              className="inline-flex h-11 items-center px-7 rounded-pill border border-hairline-strong bg-canvas/60 text-ink text-[15px] font-medium hover:bg-surface-card transition-colors"
             >
-              Đăng ký miễn phí
+              Tìm hiểu thêm
             </Link>
           </div>
         </div>
       </section>
 
-      {/* Benefits */}
-      <section className="bg-canvas-soft py-16">
+      {/* ── Khóa học nổi bật ────────────────────────────────── */}
+      <section className="bg-canvas py-16">
         <div className="max-w-300 mx-auto px-6">
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-            {[
-              {
-                icon: <VideoIcon />,
-                title: 'Video chất lượng cao',
-                desc: 'Nội dung được quay và dựng chuyên nghiệp, phát trực tuyến mượt mà trên mọi thiết bị.',
-              },
-              {
-                icon: <QuizIcon />,
-                title: 'Quiz tương tác',
-                desc: 'Kiểm tra kiến thức sau mỗi bài học với hệ thống bài tập và quiz đa dạng.',
-              },
-              {
-                icon: <CommunityIcon />,
-                title: 'Hỏi đáp trực tiếp',
-                desc: 'Đặt câu hỏi và nhận phản hồi từ giảng viên và cộng đồng học viên.',
-              },
-            ].map((f) => (
-              <div
-                key={f.title}
-                className="bg-surface-card rounded-2xl p-6 border border-hairline hover:shadow-[0_4px_16px_rgba(0,0,0,0.04)] transition-shadow"
-              >
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-strong text-muted mb-4">
-                  {f.icon}
-                </div>
-                <h3 className="text-[15px] font-semibold text-ink mb-2">{f.title}</h3>
-                <p className="text-sm text-muted leading-relaxed">{f.desc}</p>
-              </div>
-            ))}
+          <div className="flex items-end justify-between mb-8">
+            <div>
+              <h2 className="font-display text-3xl text-ink mb-1">Khóa học nổi bật</h2>
+              <p className="text-sm text-muted">Những nội dung được học viên đánh giá cao nhất</p>
+            </div>
+            <Link
+              href="/courses?sort=popular"
+              className="text-sm font-medium text-muted hover:text-ink transition-colors underline underline-offset-4"
+            >
+              Xem tất cả
+            </Link>
           </div>
+          <CourseGrid courses={popular} loading={loadingPopular} columns={3} />
         </div>
       </section>
 
-      {/* Popular courses */}
-      <CourseSection
-        title="Khóa học phổ biến"
-        courses={popular}
-        loading={loadingPopular}
-        href="/courses?sort=popular"
-        bg="bg-canvas"
-      />
+      {/* ── Khóa học mới nhất ────────────────────────────────── */}
+      <section className="bg-canvas-soft py-16">
+        <div className="max-w-300 mx-auto px-6">
+          <div className="grid grid-cols-1 gap-10 lg:grid-cols-3">
+            {/* Left editorial */}
+            <div className="flex flex-col gap-6">
+              <div>
+                <h2 className="font-display text-3xl text-ink mb-2">Khóa học mới nhất</h2>
+                <p className="text-sm text-muted leading-relaxed">
+                  Khám phá những tri thức mới nhất vừa được cập nhật trên nền tảng của chúng tôi hàng tuần.
+                </p>
+              </div>
+              <div
+                className="flex-1 min-h-40 rounded-2xl flex items-center justify-center p-8 text-center"
+                style={{ background: 'linear-gradient(135deg, #e6e0f5 0%, #d8d0ee 100%)' }}
+              >
+                <p className="font-display text-xl text-emphasis leading-snug">
+                  Bắt kịp xu hướng tri thức mới
+                </p>
+              </div>
+            </div>
 
-      {/* Newest courses */}
-      <CourseSection
-        title="Mới thêm gần đây"
-        courses={newest}
-        loading={loadingNewest}
-        href="/courses?sort=newest"
-        bg="bg-canvas-soft"
-      />
-
-      {/* Free courses — only shown when there's data */}
-      {(free.length > 0 || loadingFree) && (
-        <CourseSection
-          title="Học miễn phí"
-          courses={free}
-          loading={loadingFree}
-          href="/courses?price=free"
-          bg="bg-canvas"
-        />
-      )}
-
-      {/* CTA band */}
-      <section className="bg-surface-dark py-24">
-        <div className="max-w-2xl mx-auto px-6 text-center">
-          <h2 className="font-display text-4xl md:text-5xl text-white mb-6">
-            Bắt đầu hành trình học ngay hôm nay
-          </h2>
-          <p className="text-base text-white/60 mb-10">
-            Tham gia cùng hàng nghìn học viên đang học trên ELearn.
-          </p>
-          <Link
-            href="/register"
-            className="inline-flex h-11 items-center px-8 rounded-pill bg-white text-ink text-[15px] font-medium hover:bg-canvas transition-colors"
-          >
-            Tạo tài khoản miễn phí
-          </Link>
+            {/* Right list */}
+            <div className="lg:col-span-2">
+              {loadingNewest ? (
+                <div className="space-y-4">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="flex items-center gap-4 py-4 animate-pulse">
+                      <div className="h-11 w-11 rounded-xl bg-surface-strong shrink-0" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 bg-surface-strong rounded-lg w-3/4" />
+                        <div className="h-3 bg-surface-strong rounded-lg w-1/2" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : newest.length === 0 ? (
+                <p className="text-sm text-muted py-8 text-center">Chưa có khóa học nào</p>
+              ) : (
+                <div className="divide-y divide-hairline">
+                  {newest.map((course: any) => (
+                    <CourseListItem key={course.id} course={course} />
+                  ))}
+                </div>
+              )}
+              <div className="mt-6 text-right">
+                <Link
+                  href="/courses?sort=newest"
+                  className="text-sm font-medium text-muted hover:text-ink transition-colors underline underline-offset-4"
+                >
+                  Xem tất cả
+                </Link>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
     </div>
