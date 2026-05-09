@@ -1,0 +1,89 @@
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { randomUUID } from 'crypto';
+import { Client } from 'minio';
+import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../../prisma/prisma.service';
+import { StorageService } from '../../storage/storage.service';
+import { LessonService } from '../lesson.service';
+
+const MAX_PDF_SIZE = 100 * 1024 * 1024;
+
+@Injectable()
+export class DocumentService {
+  private minioClient: Client;
+
+  constructor(
+    private prisma: PrismaService,
+    private storage: StorageService,
+    private lessonService: LessonService,
+    private config: ConfigService,
+  ) {
+    this.minioClient = new Client({
+      endPoint: this.config.get<string>('MINIO_ENDPOINT', 'localhost'),
+      port: this.config.get<number>('MINIO_PORT', 9000),
+      useSSL: this.config.get<boolean>('MINIO_USE_SSL', false),
+      accessKey: this.config.get<string>('MINIO_ACCESS_KEY', 'minioadmin'),
+      secretKey: this.config.get<string>('MINIO_SECRET_KEY', 'minioadmin'),
+    });
+  }
+
+  async uploadDocument(lessonId: string, userId: string, userRole: string, file: Express.Multer.File) {
+    if (file.mimetype !== 'application/pdf') {
+      throw new BadRequestException('Only PDF files are allowed');
+    }
+    if (file.size > MAX_PDF_SIZE) {
+      throw new BadRequestException('File must not exceed 100MB');
+    }
+
+    const lesson = await this.prisma.lesson.findUnique({ where: { id: lessonId } });
+    if (!lesson) throw new NotFoundException('Lesson not found');
+    if (lesson.type !== 'document') throw new BadRequestException('Lesson is not a document type');
+
+    const section = await this.prisma.section.findUnique({ where: { id: lesson.sectionId }, include: { course: true } });
+    if (userRole !== 'admin' && section?.course.instructorId !== userId) throw new ForbiddenException('Access denied');
+
+    let pageCount = 0;
+    try {
+      const pdfParse = await import('pdf-parse') as unknown as (buf: Buffer) => Promise<{ numpages: number }>;
+      const parsed = await pdfParse(file.buffer);
+      pageCount = parsed.numpages;
+    } catch {
+      pageCount = 0;
+    }
+
+    const key = `docs/${lessonId}/${randomUUID()}.pdf`;
+    const existing = await this.prisma.documentAsset.findUnique({ where: { lessonId } });
+    if (existing?.fileUrl) await this.storage.deleteFile(this.storage.extractKeyFromUrl(existing.fileUrl));
+
+    const url = await this.storage.uploadFile(key, file.buffer, 'application/pdf');
+    const asset = await this.prisma.documentAsset.upsert({
+      where: { lessonId },
+      update: { fileUrl: url, fileType: 'pdf', pageCount, fileSize: BigInt(file.size) },
+      create: { lessonId, fileUrl: url, fileType: 'pdf', pageCount, fileSize: BigInt(file.size) },
+    });
+
+    return { ...asset, fileSize: asset.fileSize.toString() };
+  }
+
+  async getSignedDocumentUrl(lessonId: string, userId: string) {
+    const lesson = await this.prisma.lesson.findUnique({
+      where: { id: lessonId },
+      include: { documentAsset: true, section: { include: { course: true } } },
+    });
+    if (!lesson) throw new NotFoundException('Lesson not found');
+
+    if (!lesson.isPreview) {
+      const enrolled = await this.lessonService.isEnrolled(userId, lesson.section.courseId);
+      const isInstructor = lesson.section.course.instructorId === userId;
+      if (!enrolled && !isInstructor) throw new ForbiddenException('Not enrolled in this course');
+    }
+
+    if (!lesson.documentAsset?.fileUrl) throw new NotFoundException('Document not uploaded yet');
+    if (lesson.isPreview) return { url: lesson.documentAsset.fileUrl };
+
+    const key = this.storage.extractKeyFromUrl(lesson.documentAsset.fileUrl);
+    const bucket = this.config.get<string>('MINIO_BUCKET', 'elearning');
+    const signedUrl = await this.minioClient.presignedGetObject(bucket, key, 3600);
+    return { url: signedUrl };
+  }
+}
