@@ -42,8 +42,7 @@ export const useAuthStore = create<AuthState>()(
         try {
           const { data } = await authApi.login({ email, password });
           get().setTokens(data.accessToken, data.refreshToken);
-          const { data: user } = await authApi.me();
-          set({ user, isLoading: false });
+          set({ user: data.user, isLoading: false });
         } catch (err) {
           set({ isLoading: false });
           throw err;

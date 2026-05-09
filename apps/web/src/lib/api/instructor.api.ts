@@ -6,7 +6,7 @@ export const instructorApi = {
   updateCourse: (id: string, dto: any) => apiClient.patch(`/courses/${id}`, dto),
   uploadThumbnail: (id: string, file: File) => {
     const fd = new FormData();
-    fd.append('thumbnail', file);
+    fd.append('file', file);
     return apiClient.post(`/courses/${id}/thumbnail`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
   },
   publishCourse: (id: string) => apiClient.patch(`/courses/${id}/publish`),

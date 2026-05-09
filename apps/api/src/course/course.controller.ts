@@ -22,8 +22,9 @@ export class CourseController {
     @Query('level') level?: string,
     @Query('search') search?: string,
     @Query('sort') sort?: string,
+    @Query('price') price?: string,
   ) {
-    return this.courseService.listPublicCourses({ page: +page! || 1, limit: +limit! || 12, category, level, search, sort });
+    return this.courseService.listPublicCourses({ page: +page! || 1, limit: +limit! || 12, category, level, search, sort, price });
   }
 
   @Public()

@@ -123,7 +123,7 @@ export class CourseService {
 
   async listPublicCourses(query: {
     page?: number; limit?: number; category?: string;
-    level?: string; search?: string; sort?: string;
+    level?: string; search?: string; sort?: string; price?: string;
   }) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 12;
@@ -140,6 +140,8 @@ export class CourseService {
     if (query.category) {
       where.category = { slug: query.category };
     }
+    if (query.price === 'free') where.price = 0;
+    if (query.price === 'paid') where.price = { gt: 0 };
 
     const orderBy: Record<string, string> =
       query.sort === 'popular'
@@ -148,7 +150,7 @@ export class CourseService {
           ? { avgRating: 'desc' }
           : { createdAt: 'desc' };
 
-    const [data, total] = await Promise.all([
+    const [courses, total] = await Promise.all([
       this.prisma.course.findMany({
         where,
         skip,
@@ -159,7 +161,7 @@ export class CourseService {
       this.prisma.course.count({ where }),
     ]);
 
-    return { data, total, page, limit };
+    return { courses, total, page, limit };
   }
 
   async getCourseBySlug(slug: string) {
@@ -194,7 +196,7 @@ export class CourseService {
   async listAdminCourses(query: { status?: string; page?: number; limit?: number }) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
-    const [data, total] = await Promise.all([
+    const [courses, total] = await Promise.all([
       this.prisma.course.findMany({
         where: query.status ? { status: query.status as 'pending' } : undefined,
         skip: (page - 1) * limit,
@@ -210,7 +212,7 @@ export class CourseService {
       }),
       this.prisma.course.count({ where: query.status ? { status: query.status as 'pending' } : undefined }),
     ]);
-    return { data, total, page, limit };
+    return { courses, total, page, limit };
   }
 
   private async findOrFail(courseId: string) {

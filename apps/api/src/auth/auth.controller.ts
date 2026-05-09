@@ -39,7 +39,7 @@ export class AuthController {
   }
 
   @Get('me')
-  me(@CurrentUser() user: { userId: string; email: string; role: string }) {
-    return user;
+  me(@CurrentUser() user: { userId: string; email: string; role: string; fullName: string; avatarUrl: string | null }) {
+    return { id: user.userId, email: user.email, fullName: user.fullName, role: user.role, avatarUrl: user.avatarUrl };
   }
 }
