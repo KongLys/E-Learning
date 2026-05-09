@@ -18,30 +18,49 @@ export interface CourseCardData {
   totalStudents?: number;
 }
 
+const LEVEL_LABELS: Record<string, string> = {
+  beginner: 'Cơ bản',
+  intermediate: 'Trung cấp',
+  advanced: 'Nâng cao',
+};
+
 export function CourseCard({ course }: { course: CourseCardData }) {
   return (
-    <Link href={`/courses/${course.slug}`} className="group block rounded-xl border bg-white hover:shadow-md transition-shadow overflow-hidden">
-      <div className="relative h-44 bg-gray-100">
+    <Link
+      href={`/courses/${course.slug}`}
+      className="group block bg-surface-card rounded-2xl border border-hairline overflow-hidden hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] transition-shadow"
+    >
+      <div className="relative h-44 bg-surface-strong">
         {course.thumbnailUrl ? (
           <Image src={course.thumbnailUrl} alt={course.title} fill className="object-cover" />
         ) : (
-          <div className="flex h-full items-center justify-center text-gray-400 text-sm">No image</div>
+          <div className="flex h-full items-center justify-center text-muted-soft text-sm">
+            Chưa có ảnh
+          </div>
+        )}
+        {course.level && (
+          <span className="absolute top-3 left-3 inline-flex items-center px-2.5 py-0.5 rounded-pill bg-surface-card/90 text-xs font-semibold text-ink">
+            {LEVEL_LABELS[course.level] ?? course.level}
+          </span>
         )}
       </div>
+
       <div className="p-4">
-        <h3 className="font-semibold text-gray-900 line-clamp-2 mb-1 group-hover:text-blue-600">
+        <h3 className="text-[15px] font-semibold text-ink line-clamp-2 mb-1 group-hover:text-emphasis transition-colors">
           {course.title}
         </h3>
         {course.instructor && (
-          <p className="text-xs text-gray-500 mb-2">{course.instructor.fullName}</p>
+          <p className="text-xs text-muted mb-2">{course.instructor.fullName}</p>
         )}
         {course.averageRating !== undefined && (
-          <StarRating rating={course.averageRating} count={course.totalStudents} />
+          <div className="mb-2">
+            <StarRating rating={course.averageRating} count={course.totalStudents} />
+          </div>
         )}
-        <div className="mt-2 flex items-center justify-between">
+        <div className="flex items-center justify-between mt-3 pt-3 border-t border-hairline-soft">
           <PriceDisplay price={course.price} />
           {course.totalDurationSec !== undefined && (
-            <span className="text-xs text-gray-400">{formatDuration(course.totalDurationSec)}</span>
+            <span className="text-xs text-muted-soft">{formatDuration(course.totalDurationSec)}</span>
           )}
         </div>
       </div>

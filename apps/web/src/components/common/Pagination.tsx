@@ -12,21 +12,21 @@ export function Pagination({ page, total, limit, onPageChange }: PaginationProps
   if (totalPages <= 1) return null;
 
   return (
-    <div className="flex items-center gap-2 justify-center mt-6">
+    <div className="flex items-center gap-2 justify-center mt-10">
       <button
         disabled={page <= 1}
         onClick={() => onPageChange(page - 1)}
-        className="px-3 py-1.5 text-sm rounded border disabled:opacity-40 hover:bg-gray-50"
+        className="inline-flex h-9 items-center px-4 rounded-pill border border-hairline-strong text-sm font-medium text-muted hover:text-ink hover:border-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors bg-surface-card"
       >
         Trước
       </button>
-      <span className="text-sm text-gray-600">
-        Trang {page} / {totalPages}
+      <span className="text-sm text-muted px-2">
+        {page} / {totalPages}
       </span>
       <button
         disabled={page >= totalPages}
         onClick={() => onPageChange(page + 1)}
-        className="px-3 py-1.5 text-sm rounded border disabled:opacity-40 hover:bg-gray-50"
+        className="inline-flex h-9 items-center px-4 rounded-pill border border-hairline-strong text-sm font-medium text-muted hover:text-ink hover:border-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors bg-surface-card"
       >
         Sau
       </button>

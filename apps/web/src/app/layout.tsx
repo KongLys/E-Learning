@@ -1,9 +1,20 @@
 import type { Metadata } from 'next';
-import { Geist } from 'next/font/google';
+import { Inter, EB_Garamond } from 'next/font/google';
 import './globals.css';
 import { Providers } from '@/components/providers';
 
-const geist = Geist({ subsets: ['latin'], variable: '--font-geist-sans' });
+const inter = Inter({
+  subsets: ['latin', 'vietnamese'],
+  variable: '--font-inter',
+  display: 'swap',
+});
+
+const ebGaramond = EB_Garamond({
+  subsets: ['latin'],
+  weight: ['400', '500'],
+  variable: '--font-eb-garamond',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: 'ELearn — Học online mọi lúc mọi nơi',
@@ -12,8 +23,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="vi" className={`${geist.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-white text-gray-900">
+    <html lang="vi" className={`${inter.variable} ${ebGaramond.variable}`}>
+      <body className="min-h-screen flex flex-col bg-canvas text-ink font-sans antialiased">
         <Providers>{children}</Providers>
       </body>
     </html>

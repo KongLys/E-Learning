@@ -7,6 +7,22 @@ import { ProgressBar } from '@/components/ui/ProgressBar';
 import Link from 'next/link';
 import Image from 'next/image';
 
+function CheckIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+
+function ArrowRightIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 12h14M12 5l7 7-7 7" />
+    </svg>
+  );
+}
+
 export default function MyCoursesPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['my-enrollments'],
@@ -18,53 +34,84 @@ export default function MyCoursesPage() {
   if (isLoading) return <LoadingSpinner />;
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-10">
-      <h1 className="text-2xl font-bold mb-6">Khóa học của tôi</h1>
+    <div className="min-h-screen bg-canvas">
+      <div className="max-w-300 mx-auto px-6 py-10">
+        <h1 className="font-display text-4xl text-ink mb-8">Khóa học của tôi</h1>
 
-      {enrollments.length === 0 ? (
-        <div className="text-center py-16">
-          <p className="text-gray-500 mb-4">Bạn chưa đăng ký khóa học nào.</p>
-          <Link href="/courses" className="text-blue-600 hover:underline">Khám phá khóa học</Link>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {enrollments.map((enrollment: any) => {
-            const course = enrollment.course;
-            const progress = Math.round(enrollment.progressPercent ?? 0);
-            const isCompleted = enrollment.status === 'completed';
+        {enrollments.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24 text-center">
+            <div className="w-16 h-16 rounded-full bg-surface-strong flex items-center justify-center mb-5 text-muted">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+              </svg>
+            </div>
+            <p className="text-muted mb-5 text-base">Bạn chưa đăng ký khóa học nào.</p>
+            <Link
+              href="/courses"
+              className="inline-flex h-10 items-center gap-2 px-5 rounded-pill bg-emphasis text-white text-sm font-medium hover:bg-ink transition-colors"
+            >
+              Khám phá khóa học
+              <ArrowRightIcon />
+            </Link>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {enrollments.map((enrollment: any) => {
+              const course = enrollment.course;
+              const progress = Math.round(enrollment.progressPercent ?? 0);
+              const isCompleted = enrollment.status === 'completed';
+              const hasStarted = progress > 0;
 
-            return (
-              <div key={enrollment.enrollmentId} className="border rounded-xl overflow-hidden bg-white">
-                <div className="relative h-40 bg-gray-100">
-                  {course?.thumbnailUrl ? (
-                    <Image src={course.thumbnailUrl} alt={course.title} fill className="object-cover" />
-                  ) : (
-                    <div className="flex h-full items-center justify-center text-gray-400 text-sm">No image</div>
-                  )}
-                  {isCompleted && (
-                    <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full">
-                      Hoàn thành
-                    </div>
-                  )}
+              return (
+                <div
+                  key={enrollment.enrollmentId}
+                  className="bg-surface-card rounded-2xl border border-hairline overflow-hidden hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] transition-shadow"
+                >
+                  <div className="relative h-40 bg-surface-strong">
+                    {course?.thumbnailUrl ? (
+                      <Image
+                        src={course.thumbnailUrl}
+                        alt={course.title}
+                        fill
+                        className="object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-muted-soft text-sm">
+                        Chưa có ảnh
+                      </div>
+                    )}
+                    {isCompleted && (
+                      <span className="absolute top-3 right-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-pill bg-semantic-success text-white text-xs font-semibold">
+                        <CheckIcon />
+                        Hoàn thành
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="p-4">
+                    <h3 className="text-[15px] font-semibold text-ink line-clamp-2 mb-4">
+                      {course?.title}
+                    </h3>
+                    <ProgressBar value={progress} className="mb-1.5" />
+                    <p className="text-xs text-muted mb-4">{progress}% hoàn thành</p>
+                    <Link
+                      href={
+                        enrollment.lastLessonId
+                          ? `/learn/${enrollment.courseId}/${enrollment.lastLessonId}`
+                          : `/learn/${enrollment.courseId}`
+                      }
+                      className="w-full inline-flex h-9 items-center justify-center rounded-pill bg-emphasis text-white text-sm font-medium hover:bg-ink transition-colors"
+                    >
+                      {hasStarted ? 'Tiếp tục học' : 'Bắt đầu học'}
+                    </Link>
+                  </div>
                 </div>
-                <div className="p-4">
-                  <h3 className="font-semibold text-gray-900 line-clamp-2 mb-3">{course?.title}</h3>
-                  <ProgressBar value={progress} className="mb-1" />
-                  <p className="text-xs text-gray-500 mb-3">{progress}% hoàn thành</p>
-                  <Link
-                    href={enrollment.lastLessonId
-                      ? `/learn/${enrollment.courseId}/${enrollment.lastLessonId}`
-                      : `/learn/${enrollment.courseId}`}
-                    className="block text-center text-sm bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
-                  >
-                    {progress > 0 ? 'Tiếp tục học' : 'Bắt đầu học'}
-                  </Link>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
