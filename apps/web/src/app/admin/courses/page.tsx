@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
 import { adminApi } from '@/lib/api/admin.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { Play, FileText, PenLine, X } from 'lucide-react';
 
 type Tab = 'pending' | 'published' | 'all';
 
@@ -33,12 +34,20 @@ function RejectDialog({ courseName, onConfirm, onCancel }: { courseName: string;
 }
 
 function CoursePreviewModal({ course, onClose }: { course: any; onClose: () => void }) {
+  const lessonIcon = (type: string) => {
+    if (type === 'video') return <Play size={12} strokeWidth={1.75} />;
+    if (type === 'document') return <FileText size={12} strokeWidth={1.75} />;
+    return <PenLine size={12} strokeWidth={1.75} />;
+  };
+
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] overflow-y-auto">
         <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
           <h2 className="font-semibold text-gray-900">{course.title}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg">✕</button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X size={18} />
+          </button>
         </div>
         <div className="p-6 space-y-4">
           {course.thumbnailUrl && <img src={course.thumbnailUrl} alt="" className="w-full h-48 object-cover rounded-lg" />}
@@ -64,7 +73,7 @@ function CoursePreviewModal({ course, onClose }: { course: any; onClose: () => v
                     <ul className="divide-y text-sm">
                       {s.lessons?.map((l: any) => (
                         <li key={l.id} className="px-3 py-1.5 flex items-center gap-2 text-gray-600">
-                          <span className="text-xs">{l.type === 'video' ? '▶' : l.type === 'document' ? '📄' : '✏'}</span>
+                          <span className="text-gray-400">{lessonIcon(l.type)}</span>
                           {l.title}
                         </li>
                       ))}
@@ -79,6 +88,18 @@ function CoursePreviewModal({ course, onClose }: { course: any; onClose: () => v
     </div>
   );
 }
+
+const STATUS_LABEL: Record<string, string> = {
+  published: 'Đã xuất bản',
+  pending: 'Chờ duyệt',
+  rejected: 'Từ chối',
+};
+
+const STATUS_CLASS: Record<string, string> = {
+  published: 'bg-green-100 text-green-700',
+  pending: 'bg-amber-100 text-amber-700',
+  rejected: 'bg-red-100 text-red-700',
+};
 
 function AdminCoursesContent() {
   const qc = useQueryClient();
@@ -139,16 +160,20 @@ function AdminCoursesContent() {
       )}
 
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Khóa học</h1>
-        <span className="text-sm text-gray-500">{total} kết quả</span>
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900">Khóa học</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{total} kết quả</p>
+        </div>
       </div>
 
-      <div className="flex gap-1 border-b">
+      <div className="flex gap-1 border-b border-gray-200">
         {TABS.map(({ key, label }) => (
           <button
             key={key}
             onClick={() => { setTab(key); setPage(1); }}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${tab === key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              tab === key ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-400 hover:text-gray-700'
+            }`}
           >
             {label}
           </button>
@@ -156,40 +181,37 @@ function AdminCoursesContent() {
       </div>
 
       {isLoading ? <LoadingSpinner /> : (
-        <div className="bg-white rounded-xl border overflow-hidden">
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b">
+            <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Khóa học</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Giảng viên</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Trạng thái</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Ngày submit</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">Khóa học</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">Giảng viên</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">Trạng thái</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">Ngày submit</th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody className="divide-y divide-gray-100">
               {courses.length === 0 ? (
-                <tr><td colSpan={5} className="text-center py-10 text-gray-400">Không có dữ liệu</td></tr>
+                <tr><td colSpan={5} className="text-center py-12 text-gray-400 text-sm">Không có dữ liệu</td></tr>
               ) : courses.map((c: any) => (
                 <tr key={c.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-gray-800 font-medium">{c.title}</td>
-                  <td className="px-4 py-3 text-gray-600">{c.instructor?.fullName ?? '—'}</td>
+                  <td className="px-4 py-3 font-medium text-gray-800">{c.title}</td>
+                  <td className="px-4 py-3 text-gray-500">{c.instructor?.fullName ?? '—'}</td>
                   <td className="px-4 py-3">
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                      c.status === 'published' ? 'bg-green-100 text-green-700' :
-                      c.status === 'pending' ? 'bg-orange-100 text-orange-700' :
-                      c.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                      'bg-gray-100 text-gray-700'
-                    }`}>{c.status}</span>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_CLASS[c.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                      {STATUS_LABEL[c.status] ?? c.status}
+                    </span>
                   </td>
-                  <td className="px-4 py-3 text-gray-500">{c.updatedAt ? new Date(c.updatedAt).toLocaleDateString('vi-VN') : '—'}</td>
+                  <td className="px-4 py-3 text-gray-400 text-xs">{c.updatedAt ? new Date(c.updatedAt).toLocaleDateString('vi-VN') : '—'}</td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => setPreview(c)} className="text-xs text-blue-500 hover:text-blue-700">Xem</button>
+                    <div className="flex items-center gap-3">
+                      <button onClick={() => setPreview(c)} className="text-xs text-gray-500 hover:text-gray-900 font-medium">Xem</button>
                       {c.status === 'pending' && (
                         <>
                           <button onClick={() => setApproveConfirm(c)} className="text-xs text-green-600 hover:text-green-800 font-medium">Duyệt</button>
-                          <button onClick={() => setRejectTarget(c)} className="text-xs text-red-500 hover:text-red-700">Từ chối</button>
+                          <button onClick={() => setRejectTarget(c)} className="text-xs text-red-500 hover:text-red-700 font-medium">Từ chối</button>
                         </>
                       )}
                     </div>
@@ -204,7 +226,7 @@ function AdminCoursesContent() {
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2">
           <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="px-3 py-1.5 text-sm border rounded-lg disabled:opacity-40 hover:bg-gray-50">← Trước</button>
-          <span className="text-sm text-gray-600">{page} / {totalPages}</span>
+          <span className="text-sm text-gray-500">{page} / {totalPages}</span>
           <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)} className="px-3 py-1.5 text-sm border rounded-lg disabled:opacity-40 hover:bg-gray-50">Sau →</button>
         </div>
       )}

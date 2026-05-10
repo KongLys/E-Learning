@@ -8,33 +8,41 @@ import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api/admin.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import Link from 'next/link';
+import { LayoutDashboard, Users, BookOpen, ShoppingCart } from 'lucide-react';
 
 function AdminSidebar({ pendingCourses }: { pendingCourses: number }) {
   const pathname = usePathname();
   const nav = [
-    { href: '/admin', label: 'Dashboard', icon: '📊' },
-    { href: '/admin/users', label: 'Người dùng', icon: '👥' },
-    { href: '/admin/courses', label: 'Khóa học', icon: '📚', badge: pendingCourses },
-    { href: '/admin/orders', label: 'Đơn hàng', icon: '💳' },
+    { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/admin/users', label: 'Người dùng', icon: Users },
+    { href: '/admin/courses', label: 'Khóa học', icon: BookOpen, badge: pendingCourses },
+    { href: '/admin/orders', label: 'Đơn hàng', icon: ShoppingCart },
   ];
+
   return (
-    <aside className="w-56 shrink-0 border-r bg-white min-h-screen py-6">
-      <div className="px-4 mb-6">
-        <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Admin Portal</span>
+    <aside className="w-60 shrink-0 bg-gray-900 min-h-screen flex flex-col">
+      <div className="px-5 py-5 border-b border-gray-800">
+        <span className="text-white font-semibold text-sm tracking-wide">Admin Portal</span>
       </div>
-      <nav className="space-y-1 px-2">
-        {nav.map(({ href, label, icon, badge }) => {
+      <nav className="flex-1 px-3 py-4 space-y-0.5">
+        {nav.map(({ href, label, icon: Icon, badge }) => {
           const active = pathname === href || (href !== '/admin' && pathname.startsWith(href));
           return (
             <Link
               key={href}
               href={href}
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${active ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-100'}`}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                active
+                  ? 'bg-gray-800 text-white'
+                  : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+              }`}
             >
-              <span>{icon}</span>
+              <Icon size={16} strokeWidth={1.75} />
               <span className="flex-1">{label}</span>
               {badge ? (
-                <span className="bg-orange-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-4.5 text-center">{badge}</span>
+                <span className="bg-amber-500 text-white text-xs font-semibold rounded-full px-1.5 py-0.5 min-w-5 text-center leading-none">
+                  {badge}
+                </span>
               ) : null}
             </Link>
           );
@@ -68,7 +76,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <div className="flex min-h-screen bg-gray-50">
       <AdminSidebar pendingCourses={statsData?.data?.pendingCourses ?? 0} />
-      <main className="flex-1 p-8">{children}</main>
+      <div className="flex-1 flex flex-col">
+        <header className="h-12 bg-white border-b flex items-center px-6">
+          <span className="text-xs text-gray-400">{user.email}</span>
+        </header>
+        <main className="flex-1 p-7">{children}</main>
+      </div>
     </div>
   );
 }

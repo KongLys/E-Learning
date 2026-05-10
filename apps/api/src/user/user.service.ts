@@ -109,7 +109,7 @@ export class UserService {
       ];
     }
 
-    const [data, total] = await Promise.all([
+    const [users, total] = await Promise.all([
       this.prisma.user.findMany({
         where,
         skip,
@@ -120,7 +120,7 @@ export class UserService {
       this.prisma.user.count({ where }),
     ]);
 
-    return { data, total, page, limit };
+    return { users, total, page, limit };
   }
 
   async updateUserStatus(adminId: string, targetId: string, dto: UpdateUserStatusDto) {
