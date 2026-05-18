@@ -42,6 +42,13 @@ export const instructorApi = {
   updateQuizQuestion: (qId: string, dto: any) => apiClient.patch(`/quiz/questions/${qId}`, dto),
   deleteQuizQuestion: (qId: string) => apiClient.delete(`/quiz/questions/${qId}`),
 
+  // Statistics
+  getStatsOverview: () => apiClient.get('/instructor/stats/overview'),
+  getRevenueChart: (period: '30d' | '90d' | '1y') =>
+    apiClient.get(`/instructor/stats/revenue?period=${period}`),
+  getCourseStats: (courseId: string) =>
+    apiClient.get(`/instructor/courses/${courseId}/stats`),
+
   // Questions inbox
   getInbox: (courseId: string, status?: string) =>
     apiClient.get(`/instructor/courses/${courseId}/questions`, { params: { status } }),

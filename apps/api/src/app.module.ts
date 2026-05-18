@@ -23,6 +23,7 @@ import { QuickQuestionModule } from './quick-question/quick-question.module';
 import { AdminModule } from './admin/admin.module';
 import { CommunityModule } from './community/community.module';
 import { NotificationModule } from './notification/notification.module';
+import { InstructorStatsModule } from './instructor-stats/instructor-stats.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 
@@ -73,6 +74,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
     AdminModule,
     CommunityModule,
     NotificationModule,
+    InstructorStatsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

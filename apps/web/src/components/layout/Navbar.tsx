@@ -170,9 +170,14 @@ function UserMenu() {
               </Link>
             )}
             {user.role === 'instructor' && (
-              <Link href="/instructor/dashboard" onClick={() => setOpen(false)} className="block px-4 py-2 text-sm text-muted hover:text-ink hover:bg-canvas transition-colors">
-                Trang giảng viên
-              </Link>
+              <>
+                <Link href="/instructor/dashboard" onClick={() => setOpen(false)} className="block px-4 py-2 text-sm text-muted hover:text-ink hover:bg-canvas transition-colors">
+                  Trang giảng viên
+                </Link>
+                <Link href="/instructor/statistics" onClick={() => setOpen(false)} className="block px-4 py-2 text-sm text-muted hover:text-ink hover:bg-canvas transition-colors">
+                  Thống kê
+                </Link>
+              </>
             )}
             {user.role === 'admin' && (
               <Link href="/admin" onClick={() => setOpen(false)} className="block px-4 py-2 text-sm text-muted hover:text-ink hover:bg-canvas transition-colors">
@@ -230,16 +235,28 @@ export function Navbar() {
             </Link>
           )}
           {user?.role === 'instructor' && (
-            <Link
-              href="/instructor/dashboard"
-              className={`px-4 py-2 text-[15px] font-medium transition-colors ${
-                isActive('/instructor')
-                  ? 'text-ink border-b-2 border-ink pb-1.5'
-                  : 'text-muted hover:text-ink rounded-lg hover:bg-surface-strong'
-              }`}
-            >
-              Giảng dạy
-            </Link>
+            <>
+              <Link
+                href="/instructor/dashboard"
+                className={`px-4 py-2 text-[15px] font-medium transition-colors ${
+                  isActive('/instructor/dashboard') || isActive('/instructor/courses') || isActive('/instructor/questions')
+                    ? 'text-ink border-b-2 border-ink pb-1.5'
+                    : 'text-muted hover:text-ink rounded-lg hover:bg-surface-strong'
+                }`}
+              >
+                Giảng dạy
+              </Link>
+              <Link
+                href="/instructor/statistics"
+                className={`px-4 py-2 text-[15px] font-medium transition-colors ${
+                  isActive('/instructor/statistics')
+                    ? 'text-ink border-b-2 border-ink pb-1.5'
+                    : 'text-muted hover:text-ink rounded-lg hover:bg-surface-strong'
+                }`}
+              >
+                Thống kê
+              </Link>
+            </>
           )}
           {user?.role === 'admin' && (
             <Link

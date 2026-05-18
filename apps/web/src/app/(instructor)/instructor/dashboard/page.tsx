@@ -130,6 +130,12 @@ export default function InstructorDashboardPage() {
           >
             Câu hỏi học viên
           </Link>
+          <Link
+            href="/instructor/statistics"
+            className="inline-flex h-10 items-center px-5 rounded-pill border border-hairline-strong text-ink text-sm font-medium hover:bg-surface-strong transition-colors"
+          >
+            Thống kê
+          </Link>
         </div>
       </div>
     </div>
