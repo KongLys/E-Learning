@@ -107,6 +107,8 @@ model User {
   postComments    PostComment[]
   postVotes       PostVote[]
   notifications   Notification[]
+  studentChatRooms    ChatRoom[] @relation("StudentChatRooms")
+  instructorChatRooms ChatRoom[] @relation("InstructorChatRooms")
 
   @@map("users")
 }
@@ -153,6 +155,7 @@ model Course {
   orderItems      OrderItem[]
   reviews         Review[]
   communityPosts  CommunityPost[]
+  chatRooms       ChatRoom[]
 
   @@index([instructorId])
   @@index([categoryId])
@@ -537,4 +540,25 @@ model PostVote {
 
   @@unique([postId, userId])
   @@map("post_votes")
+}
+
+// ─── Chat ─────────────────────────────────────────────────────────────────────
+
+model ChatRoom {
+  id           String   @id @default(uuid())
+  studentId    String   @map("student_id")
+  instructorId String   @map("instructor_id")
+  courseId     String   @map("course_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  student      User     @relation("StudentChatRooms", fields: [studentId], references: [id], onDelete: Cascade)
+  instructor   User     @relation("InstructorChatRooms", fields: [instructorId], references: [id], onDelete: Cascade)
+  course       Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, instructorId, courseId])
+  @@index([studentId])
+  @@index([instructorId])
+  @@index([courseId])
+  @@map("chat_rooms")
 }

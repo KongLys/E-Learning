@@ -9,3 +9,4 @@ allowBuilds:
   prisma: true
   sharp: true
   unrs-resolver: true
+  mongoose: true

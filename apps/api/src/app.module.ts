@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { MongooseModule } from '@nestjs/mongoose';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import * as Joi from 'joi';
@@ -9,6 +10,7 @@ import { RedisModule } from './redis/redis.module';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
 import { StorageModule } from './storage/storage.module';
+import { ChatModule } from './chat/chat.module';
 import { UserModule } from './user/user.module';
 import { CourseModule } from './course/course.module';
 import { SectionModule } from './section/section.module';
@@ -51,9 +53,17 @@ import { RolesGuard } from './auth/guards/roles.guard';
         VNPAY_HASH_SECRET: Joi.string().default('testhashsecret'),
         VNPAY_URL: Joi.string().default('https://sandbox.vnpayment.vn/paymentv2/vpcpay.html'),
         VNPAY_API_URL: Joi.string().default('https://sandbox.vnpayment.vn/merchant_webapi/api/transaction'),
+        MONGODB_URI: Joi.string().default('mongodb://localhost:27017/elearning'),
       }),
     }),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
+    MongooseModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => ({
+        uri: configService.get('MONGODB_URI'),
+      }),
+      inject: [ConfigService],
+    }),
     PrismaModule,
     RedisModule,
     HealthModule,
@@ -75,6 +85,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
     CommunityModule,
     NotificationModule,
     InstructorStatsModule,
+    ChatModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

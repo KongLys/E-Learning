@@ -6,7 +6,7 @@ export function proxy(request: NextRequest) {
 
   const token = request.cookies.get('accessToken')?.value;
 
-  const isProtectedStudent = pathname.startsWith('/my-courses') || pathname.startsWith('/learn');
+  const isProtectedStudent = pathname.startsWith('/my-courses') || pathname.startsWith('/learn') || pathname.startsWith('/chat');
   const isProtectedInstructor = pathname.startsWith('/instructor');
   const isProtectedAdmin = pathname.startsWith('/admin');
   const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/register');
@@ -23,5 +23,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/my-courses/:path*', '/learn/:path*', '/instructor/:path*', '/admin/:path*', '/login', '/register'],
+  matcher: ['/my-courses/:path*', '/learn/:path*', '/chat/:path*', '/instructor/:path*', '/admin/:path*', '/login', '/register'],
 };
