@@ -96,19 +96,19 @@ model User {
   createdAt    DateTime   @default(now()) @map("created_at")
   updatedAt    DateTime   @updatedAt @map("updated_at")
 
-  courses         Course[]
-  enrollments     Enrollment[]
-  orders          Order[]
-  notes           Note[]
-  quickQuestions  QuickQuestion[]
-  questionReplies QuestionReply[]
-  reviews         Review[]
-  communityPosts  CommunityPost[]
-  postComments    PostComment[]
-  postVotes       PostVote[]
-  notifications   Notification[]
-  studentChatRooms    ChatRoom[] @relation("StudentChatRooms")
-  instructorChatRooms ChatRoom[] @relation("InstructorChatRooms")
+  courses             Course[]
+  enrollments         Enrollment[]
+  orders              Order[]
+  notes               Note[]
+  quickQuestions      QuickQuestion[]
+  questionReplies     QuestionReply[]
+  reviews             Review[]
+  communityPosts      CommunityPost[]
+  postComments        PostComment[]
+  postVotes           PostVote[]
+  notifications       Notification[]
+  studentChatRooms    ChatRoom[]      @relation("StudentChatRooms")
+  instructorChatRooms ChatRoom[]      @relation("InstructorChatRooms")
 
   @@map("users")
 }
@@ -148,14 +148,14 @@ model Course {
   createdAt        DateTime     @default(now()) @map("created_at")
   publishedAt      DateTime?    @map("published_at")
 
-  instructor  User         @relation(fields: [instructorId], references: [id])
-  category    Category?    @relation(fields: [categoryId], references: [id])
-  sections        Section[]
-  enrollments     Enrollment[]
-  orderItems      OrderItem[]
-  reviews         Review[]
-  communityPosts  CommunityPost[]
-  chatRooms       ChatRoom[]
+  instructor     User            @relation(fields: [instructorId], references: [id])
+  category       Category?       @relation(fields: [categoryId], references: [id])
+  sections       Section[]
+  enrollments    Enrollment[]
+  orderItems     OrderItem[]
+  reviews        Review[]
+  communityPosts CommunityPost[]
+  chatRooms      ChatRoom[]
 
   @@index([instructorId])
   @@index([categoryId])
@@ -229,11 +229,11 @@ model DocumentAsset {
 }
 
 model QuizLesson {
-  id          String @id @default(uuid())
-  lessonId    String @unique @map("lesson_id")
-  passingScore Int   @default(70) @map("passing_score")
-  timeLimit   Int?   @map("time_limit")
-  maxAttempts Int    @default(0) @map("max_attempts")
+  id           String @id @default(uuid())
+  lessonId     String @unique @map("lesson_id")
+  passingScore Int    @default(70) @map("passing_score")
+  timeLimit    Int?   @map("time_limit")
+  maxAttempts  Int    @default(0) @map("max_attempts")
 
   lesson    Lesson         @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   questions QuizQuestion[]
@@ -366,9 +366,9 @@ model QuickQuestion {
   createdAt     DateTime       @default(now()) @map("created_at")
   answeredAt    DateTime?      @map("answered_at")
 
-  student  User            @relation(fields: [studentId], references: [id])
-  lesson   Lesson          @relation(fields: [lessonId], references: [id])
-  replies  QuestionReply[]
+  student User            @relation(fields: [studentId], references: [id])
+  lesson  Lesson          @relation(fields: [lessonId], references: [id])
+  replies QuestionReply[]
 
   @@index([lessonId, status])
   @@map("quick_questions")
@@ -509,21 +509,21 @@ model CommunityPost {
 }
 
 model PostComment {
-  id          String              @id @default(uuid())
-  postId      String              @map("post_id")
-  authorId    String              @map("author_id")
-  parentId    String?             @map("parent_id")
-  body        String              @db.Text
-  status      CommunityPostStatus @default(active)
-  isSolution  Boolean             @default(false) @map("is_solution")
-  upvotes     Int                 @default(0)
-  createdAt   DateTime            @default(now()) @map("created_at")
-  updatedAt   DateTime            @updatedAt @map("updated_at")
+  id         String              @id @default(uuid())
+  postId     String              @map("post_id")
+  authorId   String              @map("author_id")
+  parentId   String?             @map("parent_id")
+  body       String              @db.Text
+  status     CommunityPostStatus @default(active)
+  isSolution Boolean             @default(false) @map("is_solution")
+  upvotes    Int                 @default(0)
+  createdAt  DateTime            @default(now()) @map("created_at")
+  updatedAt  DateTime            @updatedAt @map("updated_at")
 
-  post     CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
-  author   User          @relation(fields: [authorId], references: [id])
-  parent   PostComment?  @relation("CommentReplies", fields: [parentId], references: [id])
-  replies  PostComment[] @relation("CommentReplies")
+  post    CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author  User          @relation(fields: [authorId], references: [id])
+  parent  PostComment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies PostComment[] @relation("CommentReplies")
 
   @@index([postId])
   @@map("post_comments")
@@ -552,13 +552,32 @@ model ChatRoom {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  student      User     @relation("StudentChatRooms", fields: [studentId], references: [id], onDelete: Cascade)
-  instructor   User     @relation("InstructorChatRooms", fields: [instructorId], references: [id], onDelete: Cascade)
-  course       Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  student    User      @relation("StudentChatRooms", fields: [studentId], references: [id], onDelete: Cascade)
+  instructor User      @relation("InstructorChatRooms", fields: [instructorId], references: [id], onDelete: Cascade)
+  course     Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  messages   Message[]
 
   @@unique([studentId, instructorId, courseId])
   @@index([studentId])
   @@index([instructorId])
   @@index([courseId])
   @@map("chat_rooms")
+}
+
+model Message {
+  id          String   @id @default(uuid())
+  roomId      String   @map("room_id")
+  senderId    String   @map("sender_id")
+  senderName  String   @map("sender_name")
+  content     String
+  messageType String   @default("text") @map("message_type")
+  isRead      Boolean  @default(false) @map("is_read")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  room ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+  @@index([senderId])
+  @@map("messages")
 }

@@ -72,7 +72,7 @@ export class ChatController {
       dto,
     );
     return {
-      messageId: message._id.toString(),
+      messageId: message.id,
       roomId,
       senderId: message.senderId,
       content: message.content,

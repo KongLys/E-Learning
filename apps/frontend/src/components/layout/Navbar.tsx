@@ -7,6 +7,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { notificationApi } from '@/lib/api/notification.api';
+import { chatApi } from '@/lib/api/chat.api';
 
 function BellIcon() {
   return (
@@ -14,6 +15,41 @@ function BellIcon() {
       <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
       <path d="M13.73 21a2 2 0 0 1-3.46 0" />
     </svg>
+  );
+}
+
+function ChatIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
+function ChatLink() {
+  const { data: roomsData } = useQuery({
+    queryKey: ['chat-rooms-unread'],
+    queryFn: () => chatApi.getRooms(),
+    refetchInterval: 30000,
+  });
+
+  const rooms: any[] = Array.isArray(roomsData) ? roomsData : [];
+  const unreadCount = rooms.reduce((sum, r) => sum + (r.unreadCount ?? 0), 0);
+
+  return (
+    <Link
+      href="/chat"
+      className="relative flex h-9 w-9 items-center justify-center rounded-full text-muted hover:text-ink hover:bg-surface-strong transition-colors"
+      aria-label="Chat"
+      title="Chat"
+    >
+      <ChatIcon />
+      {unreadCount > 0 && (
+        <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-semantic-error text-white text-[10px] font-semibold leading-none">
+          {unreadCount > 9 ? '9+' : unreadCount}
+        </span>
+      )}
+    </Link>
   );
 }
 
@@ -276,6 +312,9 @@ export function Navbar() {
         <div className="flex items-center gap-2">
           {user ? (
             <>
+              {(user.role === 'student' || user.role === 'instructor') && (
+                <ChatLink />
+              )}
               <NotificationBell />
               <UserMenu />
             </>

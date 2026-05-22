@@ -8,7 +8,7 @@ import { useChatSocket } from '@/hooks/use-chat-socket';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { MessageCircle, Send } from 'lucide-react';
 
-export default function InstructorChatPage() {
+export default function ChatPage() {
   const { user, accessToken } = useAuthStore();
   const qc = useQueryClient();
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
@@ -17,6 +17,7 @@ export default function InstructorChatPage() {
   const [onlineUsers, setOnlineUsers] = useState(new Set<string>());
 
   const socket = useChatSocket(accessToken);
+  const isInstructor = user?.role === 'instructor';
 
   const roomsQuery = useQuery({
     queryKey: ['chat-rooms'],
@@ -56,6 +57,8 @@ export default function InstructorChatPage() {
         setMessages((prev) => [...prev, msg]);
         socket.markRead(selectedRoomId);
       }
+      qc.invalidateQueries({ queryKey: ['chat-rooms'] });
+      qc.invalidateQueries({ queryKey: ['chat-rooms-unread'] });
     });
 
     const unsubUserOnline = socket.onUserOnline((data) => {
@@ -75,7 +78,7 @@ export default function InstructorChatPage() {
       unsubUserOnline?.();
       unsubUserOffline?.();
     };
-  }, [selectedRoomId, socket]);
+  }, [selectedRoomId, socket, qc]);
 
   const handleSendMessage = () => {
     if (messageInput.trim() && !sendMessageMutation.isPending) {
@@ -89,43 +92,57 @@ export default function InstructorChatPage() {
   const rooms = (roomsQuery.data || []) as any[];
   const selectedRoom = rooms.find((r) => r.id === selectedRoomId);
 
+  const getOtherParty = (room: any) =>
+    isInstructor ? room.student : room.instructor;
+  const getOtherPartyId = (room: any) =>
+    isInstructor ? room.studentId : room.instructorId;
+
   return (
-    <div className="flex h-screen bg-canvas">
+    <div className="flex h-[calc(100vh-4rem)] bg-canvas">
       {/* Room List */}
       <div className="w-80 bg-surface-card border-r border-hairline overflow-y-auto">
         <div className="p-4 border-b border-hairline">
-          <h1 className="text-lg font-display font-semibold text-ink">Cuộc trò chuyện</h1>
+          <h1 className="text-lg font-display font-semibold text-ink">
+            {isInstructor ? 'Cuộc trò chuyện' : 'Chat'}
+          </h1>
         </div>
         <div className="space-y-2 p-2">
           {rooms.length === 0 ? (
             <div className="text-center py-8 text-muted">
               <MessageCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
-              <p>Chưa có cuộc trò chuyện nào</p>
+              <p>
+                {isInstructor
+                  ? 'Chưa có cuộc trò chuyện nào'
+                  : 'Chưa có đoạn chat nào'}
+              </p>
             </div>
           ) : (
-            rooms.map((room) => (
-              <button
-                key={room.id}
-                onClick={() => setSelectedRoomId(room.id)}
-                className={`w-full text-left p-3 rounded-lg transition-colors ${
-                  selectedRoomId === room.id
-                    ? 'bg-surface-strong'
-                    : 'hover:bg-surface-strong'
-                }`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <p className="font-medium text-ink">{room.student.fullName}</p>
-                    <p className="text-sm text-muted line-clamp-1">{room.course.title}</p>
+            rooms.map((room) => {
+              const other = getOtherParty(room);
+              return (
+                <button
+                  key={room.id}
+                  onClick={() => setSelectedRoomId(room.id)}
+                  className={`w-full text-left p-3 rounded-lg transition-colors ${
+                    selectedRoomId === room.id
+                      ? 'bg-surface-strong'
+                      : 'hover:bg-surface-strong'
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <p className="font-medium text-ink">{other.fullName}</p>
+                      <p className="text-sm text-muted line-clamp-1">{room.course.title}</p>
+                    </div>
+                    {room.unreadCount > 0 && (
+                      <span className="bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center shrink-0 ml-2">
+                        {room.unreadCount}
+                      </span>
+                    )}
                   </div>
-                  {room.unreadCount > 0 && (
-                    <span className="bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center flex-shrink-0 ml-2">
-                      {room.unreadCount}
-                    </span>
-                  )}
-                </div>
-              </button>
-            ))
+                </button>
+              );
+            })
           )}
         </div>
       </div>
@@ -137,12 +154,12 @@ export default function InstructorChatPage() {
           <div className="p-4 bg-surface-card border-b border-hairline flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div>
-                <p className="font-medium text-ink">{selectedRoom.student.fullName}</p>
+                <p className="font-medium text-ink">{getOtherParty(selectedRoom).fullName}</p>
                 <p className="text-sm text-muted">{selectedRoom.course.title}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {onlineUsers.has(selectedRoom.studentId) ? (
+              {onlineUsers.has(getOtherPartyId(selectedRoom)) ? (
                 <span className="flex items-center gap-1 text-xs text-green-600">
                   <span className="w-2 h-2 bg-green-600 rounded-full"></span>
                   Online
@@ -164,31 +181,35 @@ export default function InstructorChatPage() {
               </div>
             ) : messages.length === 0 ? (
               <div className="flex items-center justify-center h-full text-muted">
-                <p>Chưa có tin nhắn nào trong cuộc trò chuyện này</p>
+                <p>Không có tin nhắn. Hãy bắt đầu cuộc trò chuyện!</p>
               </div>
             ) : (
-              messages.map((msg, idx) => (
-                <div
-                  key={idx}
-                  className={`flex ${msg.sender.id === user?.id ? 'justify-end' : 'justify-start'}`}
-                >
+              messages.map((msg, idx) => {
+                const senderId = msg.sender?.id ?? msg.senderId;
+                const isOwn = senderId === user?.id;
+                return (
                   <div
-                    className={`max-w-xs px-4 py-2 rounded-lg ${
-                      msg.sender.id === user?.id
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-surface-strong text-ink'
-                    }`}
+                    key={msg.messageId || msg._id || idx}
+                    className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
                   >
-                    <p className="break-words">{msg.content}</p>
-                    <p className={`text-xs mt-1 ${msg.sender.id === user?.id ? 'text-blue-100' : 'text-muted'}`}>
-                      {new Date(msg.sentAt).toLocaleTimeString('vi-VN', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </p>
+                    <div
+                      className={`max-w-xs px-4 py-2 rounded-lg ${
+                        isOwn
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-surface-strong text-ink'
+                      }`}
+                    >
+                      <p className="wrap-break-word">{msg.content}</p>
+                      <p className={`text-xs mt-1 ${isOwn ? 'text-blue-100' : 'text-muted'}`}>
+                        {new Date(msg.sentAt || msg.createdAt).toLocaleTimeString('vi-VN', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
 
@@ -198,7 +219,7 @@ export default function InstructorChatPage() {
               type="text"
               value={messageInput}
               onChange={(e) => setMessageInput(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+              onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
               placeholder="Nhập tin nhắn..."
               className="flex-1 px-3 py-2 rounded-lg border border-hairline bg-canvas text-ink placeholder-muted focus:outline-none focus:border-blue-500"
               disabled={sendMessageMutation.isPending}
@@ -216,7 +237,11 @@ export default function InstructorChatPage() {
         <div className="flex-1 flex items-center justify-center bg-canvas text-muted">
           <div className="text-center">
             <MessageCircle className="w-16 h-16 mx-auto mb-4 opacity-50" />
-            <p>Chọn một cuộc trò chuyện để xem chi tiết</p>
+            <p>
+              {isInstructor
+                ? 'Chọn một cuộc trò chuyện để xem chi tiết'
+                : 'Chọn một cuộc trò chuyện để bắt đầu'}
+            </p>
           </div>
         </div>
       )}

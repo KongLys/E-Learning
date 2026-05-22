@@ -108,7 +108,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       );
 
       const event = {
-        messageId: message._id.toString(),
+        messageId: message.id,
         roomId,
         sender: { id: userId, name: userName },
         content: message.content,
@@ -118,7 +118,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       this.server.to(`room:${roomId}`).emit('new_message', event);
       client.emit('message_ack', {
-        messageId: message._id.toString(),
+        messageId: message.id,
         sentAt: message.createdAt,
       });
     } catch (error) {

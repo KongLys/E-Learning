@@ -6,6 +6,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import type { Express } from 'express';
 import * as bcrypt from 'bcrypt';
 import sharp from 'sharp';
 import { PrismaService } from '../prisma/prisma.service';

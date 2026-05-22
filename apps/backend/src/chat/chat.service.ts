@@ -1,10 +1,7 @@
 import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import { Redis } from 'ioredis';
 import { PrismaService } from '../prisma/prisma.service';
-import { Message } from './schemas/message.schema';
 import { CreateRoomDto } from './dto/create-room.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { GetMessagesDto } from './dto/get-messages.dto';
@@ -13,7 +10,6 @@ import { GetMessagesDto } from './dto/get-messages.dto';
 export class ChatService {
   constructor(
     private prisma: PrismaService,
-    @InjectModel(Message.name) private messageModel: Model<Message>,
     @InjectRedis() private redis: Redis,
   ) {}
 
@@ -42,10 +38,12 @@ export class ChatService {
       },
     });
 
-    const unreadCount = await this.messageModel.countDocuments({
-      roomId: room.id,
-      isRead: false,
-      senderId: { $ne: studentId },
+    const unreadCount = await this.prisma.message.count({
+      where: {
+        roomId: room.id,
+        isRead: false,
+        senderId: { not: studentId },
+      },
     });
 
     return { ...room, unreadCount };
@@ -67,10 +65,12 @@ export class ChatService {
 
     const roomsWithUnread = await Promise.all(
       rooms.map(async (room) => {
-        const unreadCount = await this.messageModel.countDocuments({
-          roomId: room.id,
-          isRead: false,
-          senderId: { $ne: userId },
+        const unreadCount = await this.prisma.message.count({
+          where: {
+            roomId: room.id,
+            isRead: false,
+            senderId: { not: userId },
+          },
         });
         return { ...room, unreadCount };
       }),
@@ -88,16 +88,14 @@ export class ChatService {
       throw new ForbiddenException('Access denied to this room');
     }
 
-    const query: any = { roomId };
-    if (dto.cursor) {
-      query._id = { $lt: dto.cursor };
-    }
-
-    const messages = await this.messageModel
-      .find(query)
-      .sort({ _id: -1 })
-      .limit(dto.limit)
-      .lean();
+    const messages = await this.prisma.message.findMany({
+      where: {
+        roomId,
+        ...(dto.cursor ? { createdAt: { lt: new Date(dto.cursor) } } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      take: dto.limit,
+    });
 
     return messages.reverse();
   }
@@ -111,13 +109,14 @@ export class ChatService {
       throw new ForbiddenException('Access denied to this room');
     }
 
-    const message = await this.messageModel.create({
-      roomId,
-      senderId,
-      senderName,
-      content: dto.content,
-      messageType: dto.messageType || 'text',
-      isRead: false,
+    const message = await this.prisma.message.create({
+      data: {
+        roomId,
+        senderId,
+        senderName,
+        content: dto.content,
+        messageType: dto.messageType || 'text',
+      },
     });
 
     await this.prisma.chatRoom.update({
@@ -137,10 +136,14 @@ export class ChatService {
       throw new ForbiddenException('Access denied to this room');
     }
 
-    await this.messageModel.updateMany(
-      { roomId, isRead: false, senderId: { $ne: userId } },
-      { isRead: true },
-    );
+    await this.prisma.message.updateMany({
+      where: {
+        roomId,
+        isRead: false,
+        senderId: { not: userId },
+      },
+      data: { isRead: true },
+    });
   }
 
   async setPresence(userId: string) {

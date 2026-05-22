@@ -1,9 +1,11 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { enrollmentApi } from '@/lib/api/course.api';
+import { chatApi } from '@/lib/api/chat.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ProgressBar } from '@/components/ui/ProgressBar';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -23,10 +25,27 @@ function ArrowRightIcon() {
   );
 }
 
+function ChatBubbleIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
 export default function MyCoursesPage() {
+  const router = useRouter();
   const { data, isLoading } = useQuery({
     queryKey: ['my-enrollments'],
     queryFn: () => enrollmentApi.getMyEnrollments(),
+  });
+
+  const startChatMutation = useMutation({
+    mutationFn: ({ instructorId, courseId }: { instructorId: string; courseId: string }) =>
+      chatApi.createRoom(instructorId, courseId),
+    onSuccess: () => {
+      router.push('/chat');
+    },
   });
 
   const enrollments: any[] = data?.data ?? [];
@@ -105,6 +124,21 @@ export default function MyCoursesPage() {
                     >
                       {hasStarted ? 'Tiếp tục học' : 'Bắt đầu học'}
                     </Link>
+                    {course?.instructor?.id && (
+                      <button
+                        onClick={() =>
+                          startChatMutation.mutate({
+                            instructorId: course.instructor.id,
+                            courseId: enrollment.courseId,
+                          })
+                        }
+                        disabled={startChatMutation.isPending}
+                        className="w-full inline-flex h-9 items-center justify-center gap-1.5 mt-2 rounded-pill border border-hairline-strong text-ink text-sm font-medium hover:bg-surface-strong transition-colors disabled:opacity-50"
+                      >
+                        <ChatBubbleIcon />
+                        Chat với giảng viên
+                      </button>
+                    )}
                   </div>
                 </div>
               );
