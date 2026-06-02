@@ -2,10 +2,14 @@ import { Module } from '@nestjs/common';
 import { CourseController } from './course.controller';
 import { AdminCourseController } from './admin-course.controller';
 import { CourseService } from './course.service';
+import { MaterialController } from './material/material.controller';
+import { MaterialService } from './material/material.service';
+import { AiModule } from '../ai/ai.module';
 
 @Module({
-  controllers: [CourseController, AdminCourseController],
-  providers: [CourseService],
+  imports: [AiModule],
+  controllers: [CourseController, AdminCourseController, MaterialController],
+  providers: [CourseService, MaterialService],
   exports: [CourseService],
 })
 export class CourseModule {}

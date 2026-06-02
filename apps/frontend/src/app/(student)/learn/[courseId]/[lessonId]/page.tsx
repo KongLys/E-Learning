@@ -73,6 +73,12 @@ export default function LearnPage() {
       <header className="border-b px-4 py-3 flex items-center gap-4 bg-white">
         <Link href={`/my-courses`} className="text-sm text-gray-500 hover:text-gray-700">← Khóa học</Link>
         <h1 className="font-semibold text-gray-900 flex-1 truncate">{lesson.title}</h1>
+        <Link
+          href={`/learn/${courseId}/ai`}
+          className="text-sm bg-purple-600 text-white px-3 py-1.5 rounded hover:bg-purple-700"
+        >
+          Hỏi AI
+        </Link>
         <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-sm border px-3 py-1.5 rounded">☰ Nội dung</button>
       </header>
 

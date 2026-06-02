@@ -25,6 +25,7 @@ import { AdminModule } from './admin/admin.module';
 import { CommunityModule } from './community/community.module';
 import { NotificationModule } from './notification/notification.module';
 import { InstructorStatsModule } from './instructor-stats/instructor-stats.module';
+import { AiModule } from './ai/ai.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 
@@ -52,6 +53,21 @@ import { RolesGuard } from './auth/guards/roles.guard';
         VNPAY_HASH_SECRET: Joi.string().default('testhashsecret'),
         VNPAY_URL: Joi.string().default('https://sandbox.vnpayment.vn/paymentv2/vpcpay.html'),
         VNPAY_API_URL: Joi.string().default('https://sandbox.vnpayment.vn/merchant_webapi/api/transaction'),
+        GEMINI_API_KEY: Joi.string().allow('').default(''),
+        GEMINI_CHAT_MODEL: Joi.string().default('gemini-1.5-flash'),
+        GEMINI_EMBED_MODEL: Joi.string().default('text-embedding-004'),
+        COHERE_API_KEY: Joi.string().allow('').default(''),
+        COHERE_RERANK_MODEL: Joi.string().default('rerank-multilingual-v3.0'),
+        LLAMA_CLOUD_API_KEY: Joi.string().allow('').default(''),
+        LLAMA_PARSE_BASE_URL: Joi.string().default('https://api.cloud.llamaindex.ai'),
+        LLAMA_PARSE_LANGUAGE: Joi.string().default('vi'),
+        LLAMA_PARSE_RESULT_TYPE: Joi.string().default('markdown'),
+        LLAMA_PARSE_POLL_INTERVAL_MS: Joi.number().default(5000),
+        LLAMA_PARSE_POLL_TIMEOUT_MS: Joi.number().default(300000),
+        RAG_CHUNK_SIZE: Joi.number().default(1000),
+        RAG_CHUNK_OVERLAP: Joi.number().default(200),
+        RAG_RETRIEVE_TOP: Joi.number().default(50),
+        RAG_RERANK_TOP: Joi.number().default(5),
       }),
     }),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
@@ -77,6 +93,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
     NotificationModule,
     InstructorStatsModule,
     ChatModule,
+    AiModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

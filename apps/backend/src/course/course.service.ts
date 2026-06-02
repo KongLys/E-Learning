@@ -88,6 +88,23 @@ export class CourseService {
     const lessonCount = await this.prisma.lesson.count({ where: { section: { courseId } } });
     if (lessonCount === 0) throw new BadRequestException('Course must have at least one lesson');
 
+    const materials = await this.prisma.courseMaterial.findMany({
+      where: { courseId },
+      select: { status: true },
+    });
+    const lessonDocCount = await this.prisma.documentAsset.count({
+      where: { lesson: { section: { courseId } } },
+    });
+    if (materials.length === 0 && lessonDocCount === 0) {
+      throw new BadRequestException(
+        'Course must have at least one AI knowledge document (upload via /courses/:id/materials or attach a document lesson)',
+      );
+    }
+    const stillProcessing = materials.some((m) => m.status === 'uploaded' || m.status === 'parsing' || m.status === 'parsed');
+    if (stillProcessing) {
+      throw new UnprocessableEntityException('Some materials are still being processed — wait until status=ready');
+    }
+
     return this.prisma.course.update({ where: { id: courseId }, data: { status: 'pending' } });
   }
 

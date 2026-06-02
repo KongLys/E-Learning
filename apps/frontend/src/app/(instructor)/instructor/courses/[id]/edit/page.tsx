@@ -66,13 +66,21 @@ export default function EditCoursePage() {
     <div className="max-w-3xl mx-auto px-6 py-8 space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Chỉnh sửa khóa học</h1>
-        <button
-          onClick={() => submitMutation.mutate()}
-          disabled={submitMutation.isPending}
-          className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
-        >
-          {submitMutation.isPending ? 'Đang gửi...' : 'Gửi duyệt'}
-        </button>
+        <div className="flex gap-2">
+          <a
+            href={`/instructor/courses/${id}/materials`}
+            className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-700"
+          >
+            Tài liệu AI
+          </a>
+          <button
+            onClick={() => submitMutation.mutate()}
+            disabled={submitMutation.isPending}
+            className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+          >
+            {submitMutation.isPending ? 'Đang gửi...' : 'Gửi duyệt'}
+          </button>
+        </div>
       </div>
 
       {error && <ErrorMessage message={error} />}

@@ -81,6 +81,14 @@ enum QuizOptionType {
   true_false
 }
 
+enum MaterialStatus {
+  uploaded
+  parsing
+  parsed
+  ready
+  failed
+}
+
 // ─── Models ──────────────────────────────────────────────────────────────────
 
 model User {
@@ -107,8 +115,9 @@ model User {
   postComments        PostComment[]
   postVotes           PostVote[]
   notifications       Notification[]
-  studentChatRooms    ChatRoom[]      @relation("StudentChatRooms")
-  instructorChatRooms ChatRoom[]      @relation("InstructorChatRooms")
+  studentChatRooms    ChatRoom[]       @relation("StudentChatRooms")
+  instructorChatRooms ChatRoom[]       @relation("InstructorChatRooms")
+  aiConversations     AiConversation[]
 
   @@map("users")
 }
@@ -148,14 +157,17 @@ model Course {
   createdAt        DateTime     @default(now()) @map("created_at")
   publishedAt      DateTime?    @map("published_at")
 
-  instructor     User            @relation(fields: [instructorId], references: [id])
-  category       Category?       @relation(fields: [categoryId], references: [id])
-  sections       Section[]
-  enrollments    Enrollment[]
-  orderItems     OrderItem[]
-  reviews        Review[]
-  communityPosts CommunityPost[]
-  chatRooms      ChatRoom[]
+  instructor      User             @relation(fields: [instructorId], references: [id])
+  category        Category?        @relation(fields: [categoryId], references: [id])
+  sections        Section[]
+  enrollments     Enrollment[]
+  orderItems      OrderItem[]
+  reviews         Review[]
+  communityPosts  CommunityPost[]
+  chatRooms       ChatRoom[]
+  materials       CourseMaterial[]
+  chunks          CourseChunk[]
+  aiConversations AiConversation[]
 
   @@index([instructorId])
   @@index([categoryId])
@@ -580,4 +592,82 @@ model Message {
   @@index([roomId])
   @@index([senderId])
   @@map("messages")
+}
+
+// ─── RAG / AI Knowledge Base ──────────────────────────────────────────────────
+
+model CourseMaterial {
+  id              String         @id @default(uuid())
+  courseId        String         @map("course_id")
+  fileName        String         @map("file_name")
+  fileUrl         String         @map("file_url")
+  markdownUrl     String?        @map("markdown_url")
+  fileType        String         @map("file_type")
+  fileSize        BigInt         @default(0) @map("file_size")
+  llamaParseJobId String?        @map("llama_parse_job_id")
+  status          MaterialStatus @default(uploaded)
+  errorMsg        String?        @map("error_msg")
+  chunkCount      Int            @default(0) @map("chunk_count")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  course Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  chunks CourseChunk[]
+
+  @@index([courseId])
+  @@map("course_materials")
+}
+
+model CourseChunk {
+  id           String                       @id @default(uuid())
+  courseId     String                       @map("course_id")
+  materialId   String?                      @map("material_id")
+  lessonId     String?                      @map("lesson_id")
+  sourceType   String                       @map("source_type")
+  sectionTitle String?                      @map("section_title")
+  pageNumber   Int?                         @map("page_number")
+  chunkIndex   Int                          @map("chunk_index")
+  content      String                       @db.Text
+  tokenCount   Int                          @default(0) @map("token_count")
+  metadata     Json                         @default("{}")
+  embedding    Unsupported("vector(768)")?
+  contentTsv   Unsupported("tsvector")?     @map("content_tsv")
+  createdAt    DateTime                     @default(now()) @map("created_at")
+
+  course   Course          @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  material CourseMaterial? @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+  @@index([courseId])
+  @@index([materialId])
+  @@map("course_chunks")
+}
+
+model AiConversation {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  courseId  String   @map("course_id")
+  title     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course   Course      @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  messages AiMessage[]
+
+  @@index([userId, courseId])
+  @@map("ai_conversations")
+}
+
+model AiMessage {
+  id             String   @id @default(uuid())
+  conversationId String   @map("conversation_id")
+  role           String
+  content        String   @db.Text
+  citations      Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  conversation AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("ai_messages")
 }
