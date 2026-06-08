@@ -17,6 +17,7 @@ export class GeminiService {
   private readonly client: GoogleGenerativeAI;
   private readonly chatModelName: string;
   private readonly embedModelName: string;
+  private readonly embedDimensions: number;
 
   constructor(config: ConfigService) {
     const apiKey = config.get<string>('GEMINI_API_KEY', '');
@@ -25,7 +26,9 @@ export class GeminiService {
     }
     this.client = new GoogleGenerativeAI(apiKey);
     this.chatModelName = config.get<string>('GEMINI_CHAT_MODEL', 'gemini-1.5-flash');
-    this.embedModelName = config.get<string>('GEMINI_EMBED_MODEL', 'text-embedding-004');
+    this.embedModelName = config.get<string>('GEMINI_EMBED_MODEL', 'gemini-embedding-001');
+    // Must match the pgvector column dimension (vector(768) in course_chunks).
+    this.embedDimensions = config.get<number>('GEMINI_EMBED_DIMENSIONS', 768);
   }
 
   async embedBatch(texts: string[]): Promise<number[][]> {
@@ -39,7 +42,10 @@ export class GeminiService {
         const res = await model.batchEmbedContents({
           requests: slice.map((text) => ({
             content: { role: 'user', parts: [{ text }] },
-          })),
+            // gemini-embedding-001 defaults to 3072 dims; pin to the column size.
+            // Field is valid in the REST API though absent from the SDK types.
+            outputDimensionality: this.embedDimensions,
+          })) as never,
         });
         for (const e of res.embeddings) {
           results.push(e.values);

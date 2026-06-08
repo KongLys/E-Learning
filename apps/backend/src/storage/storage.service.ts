@@ -34,6 +34,15 @@ export class StorageService implements OnModuleInit {
     return this.getPublicUrl(key);
   }
 
+  async downloadFile(key: string): Promise<Buffer> {
+    const stream = await this.client.getObject(this.bucket, key);
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) {
+      chunks.push(chunk as Buffer);
+    }
+    return Buffer.concat(chunks);
+  }
+
   async deleteFile(key: string): Promise<void> {
     await this.client.removeObject(this.bucket, key).catch(() => undefined);
   }

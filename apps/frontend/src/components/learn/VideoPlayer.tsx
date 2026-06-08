@@ -9,9 +9,11 @@ interface VideoPlayerProps {
   videoUrl: string;
   initialPositionSec?: number;
   onTimeUpdate?: (sec: number) => void;
+  onProgress?: (currentSec: number, durationSec: number) => void;
+  onEnded?: () => void;
 }
 
-export function VideoPlayer({ lessonId, videoUrl, initialPositionSec = 0, onTimeUpdate }: VideoPlayerProps) {
+export function VideoPlayer({ lessonId, videoUrl, initialPositionSec = 0, onTimeUpdate, onProgress, onEnded }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -52,15 +54,18 @@ export function VideoPlayer({ lessonId, videoUrl, initialPositionSec = 0, onTime
     const onTimeUpd = () => {
       setCurrentTime(video.currentTime);
       onTimeUpdate?.(video.currentTime);
+      onProgress?.(video.currentTime, video.duration || 0);
     };
     const onDuration = () => setDuration(video.duration);
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
+    const onEnd = () => onEnded?.();
 
     video.addEventListener('timeupdate', onTimeUpd);
     video.addEventListener('durationchange', onDuration);
     video.addEventListener('play', onPlay);
     video.addEventListener('pause', onPause);
+    video.addEventListener('ended', onEnd);
 
     const handleKey = (e: KeyboardEvent) => {
       if (e.code === 'Space' && e.target === document.body) {
@@ -77,9 +82,10 @@ export function VideoPlayer({ lessonId, videoUrl, initialPositionSec = 0, onTime
       video.removeEventListener('durationchange', onDuration);
       video.removeEventListener('play', onPlay);
       video.removeEventListener('pause', onPause);
+      video.removeEventListener('ended', onEnd);
       document.removeEventListener('keydown', handleKey);
     };
-  }, [isPlaying, onTimeUpdate]);
+  }, [isPlaying, onTimeUpdate, onProgress, onEnded]);
 
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60);

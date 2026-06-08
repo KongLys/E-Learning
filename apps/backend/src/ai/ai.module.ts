@@ -11,6 +11,11 @@ import { RagService } from './rag/rag.service';
 import { AiChatService } from './ai-chat.service';
 import { AiChatController } from './ai-chat.controller';
 import { MaterialProcessor, MATERIAL_QUEUE } from './processors/material.processor';
+import { LessonIndexProcessor, LESSON_INDEX_QUEUE } from './processors/lesson-index.processor';
+import { MindmapService } from './mindmap/mindmap.service';
+import { MindmapController } from './mindmap/mindmap.controller';
+import { MindmapProcessor } from './mindmap/mindmap.processor';
+import { MINDMAP_QUEUE } from './mindmap/mindmap.queue';
 import { ModerationModule } from '../moderation/moderation.module';
 
 @Module({
@@ -33,8 +38,10 @@ import { ModerationModule } from '../moderation/moderation.module';
       },
     }),
     BullModule.registerQueue({ name: MATERIAL_QUEUE }),
+    BullModule.registerQueue({ name: MINDMAP_QUEUE }),
+    BullModule.registerQueue({ name: LESSON_INDEX_QUEUE }),
   ],
-  controllers: [AiChatController],
+  controllers: [AiChatController, MindmapController],
   providers: [
     GeminiService,
     CohereService,
@@ -44,6 +51,9 @@ import { ModerationModule } from '../moderation/moderation.module';
     RagService,
     AiChatService,
     MaterialProcessor,
+    LessonIndexProcessor,
+    MindmapService,
+    MindmapProcessor,
   ],
   exports: [
     BullModule,

@@ -82,7 +82,7 @@ export default function CourseMaterialsPage() {
   return (
     <div className="max-w-3xl mx-auto px-6 py-8 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Tài liệu AI của khóa học</h1>
+        <h1 className="text-2xl font-bold">Tài liệu khóa học</h1>
         <p className="text-sm text-gray-600 mt-1">
           Upload các file PDF / DOCX. Hệ thống sẽ tự convert sang markdown,
           chunking và embed để học viên có thể hỏi AI dựa trên nội dung khóa học.

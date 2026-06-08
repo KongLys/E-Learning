@@ -41,8 +41,8 @@ export default function MyCoursesPage() {
   });
 
   const startChatMutation = useMutation({
-    mutationFn: ({ instructorId, courseId }: { instructorId: string; courseId: string }) =>
-      chatApi.createRoom(instructorId, courseId),
+    mutationFn: ({ instructorId }: { instructorId: string }) =>
+      chatApi.createConversation(instructorId),
     onSuccess: () => {
       router.push('/chat');
     },
@@ -129,7 +129,6 @@ export default function MyCoursesPage() {
                         onClick={() =>
                           startChatMutation.mutate({
                             instructorId: course.instructor.id,
-                            courseId: enrollment.courseId,
                           })
                         }
                         disabled={startChatMutation.isPending}

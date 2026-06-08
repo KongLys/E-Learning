@@ -129,4 +129,8 @@ export class VectorStoreService {
   async deleteByMaterial(materialId: string): Promise<void> {
     await this.prisma.courseChunk.deleteMany({ where: { materialId } });
   }
+
+  async deleteByLesson(lessonId: string): Promise<void> {
+    await this.prisma.courseChunk.deleteMany({ where: { lessonId } });
+  }
 }

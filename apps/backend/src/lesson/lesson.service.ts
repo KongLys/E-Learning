@@ -5,17 +5,33 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { CreateLessonDto } from './dto/create-lesson.dto';
 import { UpdateLessonDto } from './dto/update-lesson.dto';
+import { VectorStoreService } from '../ai/vector/vector-store.service';
+import { LESSON_INDEX_QUEUE, IndexLessonJob } from '../ai/processors/lesson-index.processor';
 
 @Injectable()
 export class LessonService {
   constructor(
     private prisma: PrismaService,
     private storage: StorageService,
+    private vector: VectorStoreService,
+    @InjectQueue(LESSON_INDEX_QUEUE) private lessonIndexQueue: Queue<IndexLessonJob>,
   ) {}
+
+  /** Đẩy bài học vào hàng đợi vector hóa; lỗi hàng đợi không làm hỏng thao tác lưu. */
+  async enqueueLessonIndex(lessonId: string) {
+    try {
+      await this.lessonIndexQueue.add('index', { lessonId }, { removeOnComplete: true, removeOnFail: 50 });
+    } catch (err) {
+      // best-effort: chỉ log, không ném lỗi
+      console.error(`[LessonIndex] enqueue failed for ${lessonId}:`, (err as Error).message);
+    }
+  }
 
   async createLesson(sectionId: string, userId: string, userRole: string, dto: CreateLessonDto) {
     await this.assertSectionOwner(sectionId, userId, userRole);
@@ -44,10 +60,13 @@ export class LessonService {
   async updateLesson(lessonId: string, userId: string, userRole: string, dto: UpdateLessonDto) {
     const lesson = await this.findLessonOrFail(lessonId);
     await this.assertCourseOwnerBySection(lesson.sectionId, userId, userRole);
-    return this.prisma.lesson.update({
+    const updated = await this.prisma.lesson.update({
       where: { id: lessonId },
       data: { title: dto.title, description: dto.description, isPreview: dto.isPreview },
     });
+    // Mô tả có thể đổi → vector hóa lại nội dung chương
+    if (dto.description !== undefined) await this.enqueueLessonIndex(lessonId);
+    return updated;
   }
 
   async deleteLesson(lessonId: string, userId: string, userRole: string) {
@@ -68,6 +87,7 @@ export class LessonService {
     }
 
     await this.prisma.lesson.delete({ where: { id: lessonId } });
+    await this.vector.deleteByLesson(lessonId);
     await this.updateCourseStats(lesson.sectionId);
     return { message: 'Lesson deleted' };
   }

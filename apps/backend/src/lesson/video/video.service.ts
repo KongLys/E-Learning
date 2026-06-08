@@ -64,6 +64,26 @@ export class VideoService {
     return asset;
   }
 
+  async configVideo(
+    lessonId: string,
+    userId: string,
+    userRole: string,
+    dto: { completionMode: 'percent_90' | 'ended_autonext' },
+  ) {
+    const lesson = await this.prisma.lesson.findUnique({ where: { id: lessonId } });
+    if (!lesson) throw new NotFoundException('Lesson not found');
+    if (lesson.type !== 'video') throw new BadRequestException('Lesson is not a video type');
+
+    const section = await this.prisma.section.findUnique({ where: { id: lesson.sectionId }, include: { course: true } });
+    if (userRole !== 'admin' && section?.course.instructorId !== userId) throw new ForbiddenException('Access denied');
+
+    return this.prisma.videoAsset.upsert({
+      where: { lessonId },
+      update: { completionMode: dto.completionMode },
+      create: { lessonId, completionMode: dto.completionMode },
+    });
+  }
+
   async getSignedVideoUrl(lessonId: string, userId: string) {
     const lesson = await this.prisma.lesson.findUnique({
       where: { id: lessonId },

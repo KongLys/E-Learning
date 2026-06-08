@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { instructorApi } from '@/lib/api/instructor.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorMessage } from '@/components/common/ErrorMessage';
+import { LessonEditorModal } from '@/components/instructor/LessonEditorModal';
 
 type LessonType = 'video' | 'document' | 'quiz';
 
@@ -17,7 +18,7 @@ export default function EditCoursePage() {
   const [addingSectionId, setAddingSectionId] = useState<string | null>(null);
   const [newLessonTitle, setNewLessonTitle] = useState('');
   const [newLessonType, setNewLessonType] = useState<LessonType>('video');
-  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+  const [editingLesson, setEditingLesson] = useState<{ id: string; title: string; type: LessonType } | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['course-edit', id],
@@ -48,12 +49,6 @@ export default function EditCoursePage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['course-edit', id] }),
   });
 
-  const uploadVideoMutation = useMutation({
-    mutationFn: ({ lessonId, file }: { lessonId: string; file: File }) =>
-      instructorApi.uploadVideo(lessonId, file, (pct) => setUploadProgress((p) => ({ ...p, [lessonId]: pct }))),
-    onSuccess: (_, { lessonId }) => setUploadProgress((p) => ({ ...p, [lessonId]: 100 })),
-  });
-
   const submitMutation = useMutation({
     mutationFn: () => instructorApi.submitCourse(id),
     onSuccess: () => alert('Khóa học đã được gửi để duyệt!'),
@@ -71,7 +66,7 @@ export default function EditCoursePage() {
             href={`/instructor/courses/${id}/materials`}
             className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-700"
           >
-            Tài liệu AI
+            Tài liệu khóa học
           </a>
           <button
             onClick={() => submitMutation.mutate()}
@@ -120,25 +115,19 @@ export default function EditCoursePage() {
             {section.lessons?.map((lesson: any) => (
               <li key={lesson.id} className="px-4 py-3 flex items-center gap-3">
                 <span className="text-xs text-gray-400">{lesson.type === 'video' ? '▶' : lesson.type === 'document' ? '📄' : '✏'}</span>
-                <span className="flex-1 text-sm">{lesson.title}</span>
+                <button
+                  onClick={() => setEditingLesson({ id: lesson.id, title: lesson.title, type: lesson.type })}
+                  className="flex-1 text-left text-sm hover:text-blue-600"
+                >
+                  {lesson.title}
+                </button>
 
-                {lesson.type === 'video' && (
-                  <label className="cursor-pointer">
-                    <span className="text-xs text-blue-500 hover:underline">
-                      {uploadProgress[lesson.id] ? `${uploadProgress[lesson.id]}%` : 'Upload video'}
-                    </span>
-                    <input
-                      type="file"
-                      accept="video/mp4,video/webm"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) uploadVideoMutation.mutate({ lessonId: lesson.id, file });
-                      }}
-                    />
-                  </label>
-                )}
-
+                <button
+                  onClick={() => setEditingLesson({ id: lesson.id, title: lesson.title, type: lesson.type })}
+                  className="text-xs text-blue-500 hover:underline"
+                >
+                  Chi tiết
+                </button>
                 <button onClick={() => deleteLessonMutation.mutate(lesson.id)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
               </li>
             ))}
@@ -183,6 +172,14 @@ export default function EditCoursePage() {
           )}
         </div>
       ))}
+
+      {editingLesson && (
+        <LessonEditorModal
+          courseId={id}
+          lesson={editingLesson}
+          onClose={() => setEditingLesson(null)}
+        />
+      )}
     </div>
   );
 }

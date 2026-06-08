@@ -3,14 +3,18 @@
 import { useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { MessageSquare, Network } from 'lucide-react';
 import {
   aiChatApi,
+  mindmapApi,
   streamAsk,
   type AiConversation,
   type AiMessage,
+  type MindmapMaterial,
 } from '@/lib/api/ai.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorMessage } from '@/components/common/ErrorMessage';
+import { MindMapViewer } from '@/components/learn/MindMapViewer';
 
 type Citation = NonNullable<AiMessage['citations']>[number];
 
@@ -23,6 +27,7 @@ interface PendingMessage {
 export default function CourseAiChatPage() {
   const { courseId } = useParams<{ courseId: string }>();
   const qc = useQueryClient();
+  const [tab, setTab] = useState<'chat' | 'mindmap'>('chat');
   const [activeId, setActiveId] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
@@ -113,7 +118,34 @@ export default function CourseAiChatPage() {
   ];
 
   return (
-    <div className="flex h-[calc(100vh-4rem)]">
+    <div className="flex flex-col h-[calc(100vh-4rem)]">
+      <div className="flex gap-1 border-b bg-white px-3 pt-2">
+        <button
+          onClick={() => setTab('chat')}
+          className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 ${
+            tab === 'chat'
+              ? 'border-blue-600 text-blue-700'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <MessageSquare className="w-4 h-4" /> Hỏi AI
+        </button>
+        <button
+          onClick={() => setTab('mindmap')}
+          className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 ${
+            tab === 'mindmap'
+              ? 'border-blue-600 text-blue-700'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <Network className="w-4 h-4" /> Sơ đồ tư duy
+        </button>
+      </div>
+
+      {tab === 'mindmap' ? (
+        <MindMapTab courseId={courseId} />
+      ) : (
+    <div className="flex flex-1 min-h-0">
       <aside className="w-64 border-r bg-gray-50 flex flex-col">
         <div className="p-3 border-b">
           <button
@@ -189,6 +221,8 @@ export default function CourseAiChatPage() {
         </div>
       </main>
     </div>
+      )}
+    </div>
   );
 }
 
@@ -214,6 +248,138 @@ function MessageBubble({ m }: { m: AiMessage | PendingMessage }) {
                 {c.pageNumber ? <span> · trang {c.pageNumber}</span> : null}
               </div>
             ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MindMapTab({ courseId }: { courseId: string }) {
+  const [selected, setSelected] = useState<string | null>(null);
+  const [triggered, setTriggered] = useState(false);
+
+  const materialsQuery = useQuery({
+    queryKey: ['mindmap-materials', courseId],
+    queryFn: async () => (await mindmapApi.listMaterials(courseId)).data,
+  });
+
+  // Default to the first available material.
+  useEffect(() => {
+    if (!selected && (materialsQuery.data?.length ?? 0) > 0) {
+      setSelected(materialsQuery.data![0].id);
+    }
+  }, [selected, materialsQuery.data]);
+
+  const mindmapQuery = useQuery({
+    queryKey: ['mindmap', courseId, selected],
+    queryFn: async () =>
+      selected ? (await mindmapApi.get(courseId, selected)).data : null,
+    enabled: !!selected,
+    refetchInterval: (query) => {
+      const s = query.state.data?.status;
+      if (s === 'generating') return 2000;
+      if (s === 'pending' && triggered) return 2000;
+      return false;
+    },
+  });
+
+  const status = mindmapQuery.data?.status;
+  useEffect(() => {
+    if (status === 'ready' || status === 'failed') setTriggered(false);
+  }, [status]);
+
+  const generate = useMutation({
+    mutationFn: (force: boolean) =>
+      mindmapApi.generate(courseId, selected!, force),
+    onSuccess: () => {
+      setTriggered(true);
+      mindmapQuery.refetch();
+    },
+  });
+
+  if (materialsQuery.isLoading) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    );
+  }
+
+  const materials = materialsQuery.data ?? [];
+  if (materials.length === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-8">
+        <p className="text-center text-gray-500 text-sm">
+          Chưa có tài liệu nào đã xử lý xong để tạo sơ đồ tư duy.
+        </p>
+      </div>
+    );
+  }
+
+  const busy = status === 'generating' || (status === 'pending' && triggered) || generate.isPending;
+  const ready = status === 'ready';
+
+  return (
+    <div className="flex-1 flex flex-col min-h-0 p-4 gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          value={selected ?? ''}
+          onChange={(e) => {
+            setSelected(e.target.value);
+            setTriggered(false);
+          }}
+          className="border rounded-lg px-3 py-2 text-sm max-w-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          {materials.map((m: MindmapMaterial) => (
+            <option key={m.id} value={m.id}>
+              {m.fileName}
+            </option>
+          ))}
+        </select>
+        <button
+          onClick={() => generate.mutate(ready)}
+          disabled={busy || !selected}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+        >
+          {busy ? 'Đang tạo…' : ready ? 'Tạo lại' : 'Tạo sơ đồ tư duy'}
+        </button>
+        {ready && mindmapQuery.data?.updatedAt && (
+          <span className="text-xs text-gray-400">
+            Cập nhật: {new Date(mindmapQuery.data.updatedAt).toLocaleString('vi-VN')}
+          </span>
+        )}
+      </div>
+
+      <div className="flex-1 min-h-0">
+        {busy ? (
+          <div className="h-full flex flex-col items-center justify-center gap-3 text-gray-500">
+            <LoadingSpinner />
+            <p className="text-sm">Đang phân tích tài liệu và tạo sơ đồ tư duy…</p>
+          </div>
+        ) : status === 'failed' ? (
+          <div className="h-full flex flex-col items-center justify-center gap-3">
+            <ErrorMessage
+              message={mindmapQuery.data?.errorMsg || 'Tạo sơ đồ tư duy thất bại'}
+            />
+            <button
+              onClick={() => generate.mutate(true)}
+              className="text-sm text-blue-600 hover:underline"
+            >
+              Thử lại
+            </button>
+          </div>
+        ) : ready && mindmapQuery.data?.markmap ? (
+          <MindMapViewer
+            markmap={mindmapQuery.data.markmap}
+            title={mindmapQuery.data.title}
+            structure={mindmapQuery.data.structure}
+          />
+        ) : (
+          <div className="h-full flex items-center justify-center p-8">
+            <p className="text-center text-gray-500 text-sm">
+              Chọn tài liệu rồi bấm <span className="font-medium">“Tạo sơ đồ tư duy”</span> để bắt đầu.
+            </p>
           </div>
         )}
       </div>

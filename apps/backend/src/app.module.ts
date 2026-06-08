@@ -77,7 +77,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
         MODERATION_DEBUG: Joi.string().valid('true', 'false').default('false'),
       }),
     }),
-    ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 80 }]),
     PrismaModule,
     RedisModule,
     HealthModule,

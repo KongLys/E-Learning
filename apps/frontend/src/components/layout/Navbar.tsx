@@ -27,14 +27,14 @@ function ChatIcon() {
 }
 
 function ChatLink() {
-  const { data: roomsData } = useQuery({
+  const { data: convData } = useQuery({
     queryKey: ['chat-rooms-unread'],
-    queryFn: () => chatApi.getRooms(),
+    queryFn: () => chatApi.getConversations(),
     refetchInterval: 30000,
   });
 
-  const rooms: any[] = Array.isArray(roomsData) ? roomsData : [];
-  const unreadCount = rooms.reduce((sum, r) => sum + (r.unreadCount ?? 0), 0);
+  const conversations = Array.isArray(convData) ? convData : [];
+  const unreadCount = conversations.reduce((sum, c) => sum + (c.unreadCount ?? 0), 0);
 
   return (
     <Link

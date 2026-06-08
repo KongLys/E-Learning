@@ -8,21 +8,26 @@ import {
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { ChatService } from './chat.service';
-import { SendMessageDto } from './dto/send-message.dto';
+import { MessageType } from '@prisma/client';
+import { ChatService, MessagePayload } from './chat.service';
 
 @WebSocketGateway({ cors: { origin: '*' }, namespace: '/chat' })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
-  private userRooms = new Map<string, Set<string>>();
+  // userId -> set of conversationIds the user has joined (for offline broadcast)
+  private userConversations = new Map<string, Set<string>>();
 
   constructor(
     private jwtService: JwtService,
     private configService: ConfigService,
     private chatService: ChatService,
   ) {}
+
+  private room(conversationId: string): string {
+    return `conversation:${conversationId}`;
+  }
 
   async handleConnection(client: Socket) {
     try {
@@ -40,12 +45,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       });
 
       client.data.userId = payload.sub;
-      client.data.name = payload.name || 'Anonymous';
-
       await this.chatService.setPresence(payload.sub);
 
-      if (!this.userRooms.has(payload.sub)) {
-        this.userRooms.set(payload.sub, new Set());
+      if (!this.userConversations.has(payload.sub)) {
+        this.userConversations.set(payload.sub, new Set());
       }
     } catch {
       client.disconnect();
@@ -57,66 +60,71 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (!userId) return;
 
     await this.chatService.removePresence(userId);
-    const rooms = this.userRooms.get(userId);
-    if (rooms) {
-      rooms.forEach((roomId) => {
-        this.server.to(`room:${roomId}`).emit('user_offline', { userId });
+    const conversations = this.userConversations.get(userId);
+    if (conversations) {
+      conversations.forEach((conversationId) => {
+        this.server
+          .to(this.room(conversationId))
+          .emit('user_offline', { userId });
       });
-      this.userRooms.delete(userId);
+      this.userConversations.delete(userId);
     }
   }
 
-  @SubscribeMessage('join_room')
-  async handleJoinRoom(
+  @SubscribeMessage('join_conversation')
+  async handleJoinConversation(
     client: Socket,
-    payload: { roomId: string },
+    payload: { conversationId: string },
   ): Promise<void> {
     const userId = client.data.userId;
-    const { roomId } = payload;
+    const { conversationId } = payload;
+    if (!userId || !conversationId) return;
 
-    const userRooms = this.userRooms.get(userId);
-    if (!userRooms) return;
+    let participants;
+    try {
+      participants = await this.chatService.assertParticipant(
+        conversationId,
+        userId,
+      );
+    } catch {
+      return; // not a participant — ignore silently
+    }
 
-    userRooms.add(roomId);
-    client.join(`room:${roomId}`);
+    this.userConversations.get(userId)?.add(conversationId);
+    client.join(this.room(conversationId));
 
-    const isOnline = await this.chatService.isOnline(userId);
-    if (isOnline) {
-      this.server.to(`room:${roomId}`).emit('user_online', { userId });
+    // Announce my presence to the other party already in the room.
+    client.to(this.room(conversationId)).emit('user_online', { userId });
+
+    // Sync back the other participant's current presence (fixes asymmetric join).
+    const otherId =
+      participants.user1Id === userId
+        ? participants.user2Id
+        : participants.user1Id;
+    if (await this.chatService.isOnline(otherId)) {
+      client.emit('user_online', { userId: otherId });
     }
   }
 
   @SubscribeMessage('send_message')
   async handleSendMessage(
     client: Socket,
-    payload: { roomId: string; content: string; messageType?: string },
+    payload: { conversationId: string; content: string; messageType?: string },
   ): Promise<void> {
     const userId = client.data.userId;
-    const userName = client.data.name;
-    const { roomId, content, messageType = 'text' } = payload;
+    const { conversationId, content, messageType } = payload;
 
     try {
-      const dto = new SendMessageDto();
-      dto.content = content;
-      dto.messageType = messageType as 'text' | 'image';
-
-      const message = await this.chatService.sendMessage(
-        roomId,
+      const message = await this.chatService.createMessage(
+        conversationId,
         userId,
-        userName,
-        dto,
+        {
+          content,
+          messageType: (messageType as MessageType) ?? MessageType.text,
+        },
       );
 
-      const event = {
-        messageId: message.id,
-        roomId,
-        sender: { id: userId, name: userName },
-        content: message.content,
-        messageType: message.messageType,
-        sentAt: message.createdAt,
-      };
-
-      this.server.to(`room:${roomId}`).emit('new_message', event);
+      this.broadcastMessage(conversationId, message);
       client.emit('message_ack', {
         messageId: message.id,
         sentAt: message.createdAt,
@@ -126,18 +134,106 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  /** Public: also used by the REST upload endpoint to broadcast attachment messages. */
+  broadcastMessage(conversationId: string, message: MessagePayload): void {
+    this.server.to(this.room(conversationId)).emit('new_message', message);
+  }
+
+  @SubscribeMessage('typing')
+  handleTyping(
+    client: Socket,
+    payload: { conversationId: string; isTyping: boolean },
+  ): void {
+    const userId = client.data.userId;
+    if (!userId) return;
+    const { conversationId, isTyping } = payload;
+    client.to(this.room(conversationId)).emit('user_typing', {
+      conversationId,
+      userId,
+      isTyping,
+    });
+  }
+
   @SubscribeMessage('mark_read')
   async handleMarkRead(
     client: Socket,
-    payload: { roomId: string },
+    payload: { conversationId: string },
   ): Promise<void> {
     const userId = client.data.userId;
-    const { roomId } = payload;
-
     try {
-      await this.chatService.markRead(roomId, userId);
+      const result = await this.chatService.markRead(
+        payload.conversationId,
+        userId,
+      );
+      if (result) {
+        // Notify the other party that we've read up to this message.
+        client.to(this.room(payload.conversationId)).emit('message_read', result);
+      }
     } catch (error) {
       client.emit('mark_read_error', { error: error.message });
+    }
+  }
+
+  @SubscribeMessage('edit_message')
+  async handleEditMessage(
+    client: Socket,
+    payload: { messageId: string; content: string },
+  ): Promise<void> {
+    const userId = client.data.userId;
+    try {
+      const message = await this.chatService.editMessage(
+        payload.messageId,
+        userId,
+        payload.content,
+      );
+      this.server
+        .to(this.room(message.conversationId))
+        .emit('message_edited', message);
+    } catch (error) {
+      client.emit('message_error', { error: error.message });
+    }
+  }
+
+  @SubscribeMessage('delete_message')
+  async handleDeleteMessage(
+    client: Socket,
+    payload: { messageId: string },
+  ): Promise<void> {
+    const userId = client.data.userId;
+    try {
+      const message = await this.chatService.deleteMessage(
+        payload.messageId,
+        userId,
+      );
+      this.server
+        .to(this.room(message.conversationId))
+        .emit('message_deleted', message);
+    } catch (error) {
+      client.emit('message_error', { error: error.message });
+    }
+  }
+
+  @SubscribeMessage('react')
+  async handleReact(
+    client: Socket,
+    payload: { messageId: string; emoji: string; action: 'add' | 'remove' },
+  ): Promise<void> {
+    const userId = client.data.userId;
+    try {
+      const result = await this.chatService.setReaction(
+        payload.messageId,
+        userId,
+        payload.emoji,
+        payload.action,
+      );
+      this.server
+        .to(this.room(result.conversationId))
+        .emit('reaction_updated', {
+          messageId: result.messageId,
+          reactions: result.reactions,
+        });
+    } catch (error) {
+      client.emit('message_error', { error: error.message });
     }
   }
 

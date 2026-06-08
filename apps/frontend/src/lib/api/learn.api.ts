@@ -6,6 +6,7 @@ export const learnApi = {
   getDocumentUrl: (lessonId: string) => apiClient.get(`/lessons/${lessonId}/document-url`),
   getQuiz: (lessonId: string) => apiClient.get(`/lessons/${lessonId}/quiz`),
   getCourseProgress: (courseId: string) => apiClient.get(`/enrollments/${courseId}/progress`),
+  getCourseSections: (courseId: string) => apiClient.get(`/courses/${courseId}/sections`),
   updateProgress: (lessonId: string, lastPositionSec: number, watchTimeSec: number) =>
     apiClient.patch('/progress', { lessonId, lastPositionSec, watchTimeSec }),
   markComplete: (lessonId: string) => apiClient.post('/progress/complete', { lessonId }),

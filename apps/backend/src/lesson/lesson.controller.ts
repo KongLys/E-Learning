@@ -11,6 +11,8 @@ import { CreateLessonDto } from './dto/create-lesson.dto';
 import { UpdateLessonDto } from './dto/update-lesson.dto';
 import { QuizConfigDto } from './dto/quiz-config.dto';
 import { CreateQuestionDto } from './dto/create-question.dto';
+import { DocumentConfigDto } from './dto/document-config.dto';
+import { VideoConfigDto } from './dto/video-config.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 
@@ -77,6 +79,15 @@ export class LessonController {
     return this.videoService.getSignedVideoUrl(id, u.userId);
   }
 
+  @Post('lessons/:id/video/config')
+  configVideo(
+    @CurrentUser() u: { userId: string; role: string },
+    @Param('id') id: string,
+    @Body() dto: VideoConfigDto,
+  ) {
+    return this.videoService.configVideo(id, u.userId, u.role, dto);
+  }
+
   // Document
   @Post('lessons/:id/document')
   @UseInterceptors(FileInterceptor('document'))
@@ -91,6 +102,15 @@ export class LessonController {
   @Get('lessons/:id/document-url')
   getDocumentUrl(@CurrentUser() u: { userId: string }, @Param('id') id: string) {
     return this.documentService.getSignedDocumentUrl(id, u.userId);
+  }
+
+  @Post('lessons/:id/document/config')
+  configDocument(
+    @CurrentUser() u: { userId: string; role: string },
+    @Param('id') id: string,
+    @Body() dto: DocumentConfigDto,
+  ) {
+    return this.documentService.configDocument(id, u.userId, u.role, dto);
   }
 
   // Quiz

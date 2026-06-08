@@ -2,167 +2,192 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
+import type { ChatMessage, ChatReaction } from '@/lib/api/chat.api';
 
-interface ChatMessage {
-  messageId: string;
-  roomId: string;
-  sender: { id: string; name: string };
-  content: string;
-  messageType: string;
-  sentAt: string;
+interface TypingEvent {
+  conversationId: string;
+  userId: string;
+  isTyping: boolean;
 }
 
-interface UseChatSocketReturn {
-  joinRoom: (roomId: string) => void;
-  sendMessage: (roomId: string, content: string, messageType?: string) => void;
-  markRead: (roomId: string) => void;
-  onNewMessage: (callback: (msg: ChatMessage) => void) => () => void;
-  onMessageAck: (callback: (ack: { messageId: string; sentAt: string }) => void) => () => void;
-  onUserOnline: (callback: (data: { userId: string }) => void) => () => void;
-  onUserOffline: (callback: (data: { userId: string }) => void) => () => void;
+interface ReadEvent {
+  conversationId: string;
+  userId: string;
+  lastReadMessageId: string;
+}
+
+interface ReactionEvent {
+  messageId: string;
+  reactions: ChatReaction[];
+}
+
+type Handler<T> = (data: T) => void;
+
+interface Callbacks {
+  onNewMessage: Handler<ChatMessage>[];
+  onMessageAck: Handler<{ messageId: string; sentAt: string }>[];
+  onMessageEdited: Handler<ChatMessage>[];
+  onMessageDeleted: Handler<ChatMessage>[];
+  onReactionUpdated: Handler<ReactionEvent>[];
+  onUserTyping: Handler<TypingEvent>[];
+  onUserOnline: Handler<{ userId: string }>[];
+  onUserOffline: Handler<{ userId: string }>[];
+  onMessageRead: Handler<ReadEvent>[];
+}
+
+export interface UseChatSocketReturn {
   isConnected: boolean;
+  joinConversation: (conversationId: string) => void;
+  sendMessage: (conversationId: string, content: string, messageType?: string) => void;
+  sendTyping: (conversationId: string, isTyping: boolean) => void;
+  markRead: (conversationId: string) => void;
+  editMessage: (messageId: string, content: string) => void;
+  deleteMessage: (messageId: string) => void;
+  react: (messageId: string, emoji: string, action: 'add' | 'remove') => void;
+  onNewMessage: (cb: Handler<ChatMessage>) => () => void;
+  onMessageAck: (cb: Handler<{ messageId: string; sentAt: string }>) => () => void;
+  onMessageEdited: (cb: Handler<ChatMessage>) => () => void;
+  onMessageDeleted: (cb: Handler<ChatMessage>) => () => void;
+  onReactionUpdated: (cb: Handler<ReactionEvent>) => () => void;
+  onUserTyping: (cb: Handler<TypingEvent>) => () => void;
+  onUserOnline: (cb: Handler<{ userId: string }>) => () => void;
+  onUserOffline: (cb: Handler<{ userId: string }>) => () => void;
+  onMessageRead: (cb: Handler<ReadEvent>) => () => void;
 }
 
 export function useChatSocket(accessToken: string | null): UseChatSocketReturn {
   const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const callbacksRef = useRef<{
-    onNewMessage: ((msg: ChatMessage) => void)[];
-    onMessageAck: ((ack: any) => void)[];
-    onUserOnline: ((data: any) => void)[];
-    onUserOffline: ((data: any) => void)[];
-  }>({
+  const callbacksRef = useRef<Callbacks>({
     onNewMessage: [],
     onMessageAck: [],
+    onMessageEdited: [],
+    onMessageDeleted: [],
+    onReactionUpdated: [],
+    onUserTyping: [],
     onUserOnline: [],
     onUserOffline: [],
+    onMessageRead: [],
   });
 
   useEffect(() => {
     if (!accessToken) return;
 
-    const socket = io(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/chat`, {
-      auth: { token: accessToken },
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      reconnectionAttempts: 5,
-    });
+    const socket = io(
+      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/chat`,
+      {
+        auth: { token: accessToken },
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        reconnectionAttempts: 5,
+      },
+    );
 
-    socket.on('connect', () => {
-      setIsConnected(true);
-      console.log('Chat connected');
-    });
+    socket.on('connect', () => setIsConnected(true));
+    socket.on('disconnect', () => setIsConnected(false));
 
-    socket.on('disconnect', () => {
-      setIsConnected(false);
-      console.log('Chat disconnected');
-    });
-
-    socket.on('new_message', (msg: ChatMessage) => {
-      callbacksRef.current.onNewMessage.forEach((cb) => cb(msg));
-    });
-
-    socket.on('message_ack', (ack) => {
-      callbacksRef.current.onMessageAck.forEach((cb) => cb(ack));
-    });
-
-    socket.on('user_online', (data) => {
-      callbacksRef.current.onUserOnline.forEach((cb) => cb(data));
-    });
-
-    socket.on('user_offline', (data) => {
-      callbacksRef.current.onUserOffline.forEach((cb) => cb(data));
-    });
+    const cb = callbacksRef.current;
+    socket.on('new_message', (m) => cb.onNewMessage.forEach((f) => f(m)));
+    socket.on('message_ack', (m) => cb.onMessageAck.forEach((f) => f(m)));
+    socket.on('message_edited', (m) => cb.onMessageEdited.forEach((f) => f(m)));
+    socket.on('message_deleted', (m) => cb.onMessageDeleted.forEach((f) => f(m)));
+    socket.on('reaction_updated', (m) => cb.onReactionUpdated.forEach((f) => f(m)));
+    socket.on('user_typing', (m) => cb.onUserTyping.forEach((f) => f(m)));
+    socket.on('user_online', (m) => cb.onUserOnline.forEach((f) => f(m)));
+    socket.on('user_offline', (m) => cb.onUserOffline.forEach((f) => f(m)));
+    socket.on('message_read', (m) => cb.onMessageRead.forEach((f) => f(m)));
 
     socketRef.current = socket;
 
-    const heartbeatInterval = setInterval(() => {
-      if (socket.connected) {
-        socket.emit('heartbeat');
-      }
+    const heartbeat = setInterval(() => {
+      if (socket.connected) socket.emit('heartbeat');
     }, 20000);
 
     return () => {
-      clearInterval(heartbeatInterval);
+      clearInterval(heartbeat);
       socket.disconnect();
     };
   }, [accessToken]);
 
-  const joinRoom = useCallback((roomId: string) => {
-    if (socketRef.current?.connected) {
-      socketRef.current.emit('join_room', { roomId });
-    }
+  const emit = useCallback((event: string, payload: unknown) => {
+    if (socketRef.current?.connected) socketRef.current.emit(event, payload);
   }, []);
 
-  const sendMessage = useCallback((roomId: string, content: string, messageType = 'text') => {
-    if (socketRef.current?.connected) {
-      socketRef.current.emit('send_message', { roomId, content, messageType });
-    }
-  }, []);
+  const joinConversation = useCallback(
+    (conversationId: string) => emit('join_conversation', { conversationId }),
+    [emit],
+  );
+  const sendMessage = useCallback(
+    (conversationId: string, content: string, messageType = 'text') =>
+      emit('send_message', { conversationId, content, messageType }),
+    [emit],
+  );
+  const sendTyping = useCallback(
+    (conversationId: string, isTyping: boolean) =>
+      emit('typing', { conversationId, isTyping }),
+    [emit],
+  );
+  const markRead = useCallback(
+    (conversationId: string) => emit('mark_read', { conversationId }),
+    [emit],
+  );
+  const editMessage = useCallback(
+    (messageId: string, content: string) =>
+      emit('edit_message', { messageId, content }),
+    [emit],
+  );
+  const deleteMessage = useCallback(
+    (messageId: string) => emit('delete_message', { messageId }),
+    [emit],
+  );
+  const react = useCallback(
+    (messageId: string, emoji: string, action: 'add' | 'remove') =>
+      emit('react', { messageId, emoji, action }),
+    [emit],
+  );
 
-  const markRead = useCallback((roomId: string) => {
-    if (socketRef.current?.connected) {
-      socketRef.current.emit('mark_read', { roomId });
-    }
-  }, []);
-
-  const onNewMessage = useCallback(
-    (callback: (msg: ChatMessage) => void): (() => void) => {
-      callbacksRef.current.onNewMessage.push(callback);
-      return () => {
-        callbacksRef.current.onNewMessage = callbacksRef.current.onNewMessage.filter(
-          (cb) => cb !== callback,
-        );
-      };
-    },
+  // Generic subscribe helper
+  const subscribe = useCallback(
+    <K extends keyof Callbacks>(key: K) =>
+      (cb: Callbacks[K][number]): (() => void) => {
+        (callbacksRef.current[key] as Callbacks[K][number][]).push(cb);
+        return () => {
+          callbacksRef.current[key] = (
+            callbacksRef.current[key] as Callbacks[K][number][]
+          ).filter((f) => f !== cb) as Callbacks[K];
+        };
+      },
     [],
   );
 
-  const onMessageAck = useCallback(
-    (callback: (ack: any) => void): (() => void) => {
-      callbacksRef.current.onMessageAck.push(callback);
-      return () => {
-        callbacksRef.current.onMessageAck = callbacksRef.current.onMessageAck.filter(
-          (cb) => cb !== callback,
-        );
-      };
-    },
-    [],
-  );
-
-  const onUserOnline = useCallback(
-    (callback: (data: any) => void): (() => void) => {
-      callbacksRef.current.onUserOnline.push(callback);
-      return () => {
-        callbacksRef.current.onUserOnline = callbacksRef.current.onUserOnline.filter(
-          (cb) => cb !== callback,
-        );
-      };
-    },
-    [],
-  );
-
-  const onUserOffline = useCallback(
-    (callback: (data: any) => void): (() => void) => {
-      callbacksRef.current.onUserOffline.push(callback);
-      return () => {
-        callbacksRef.current.onUserOffline = callbacksRef.current.onUserOffline.filter(
-          (cb) => cb !== callback,
-        );
-      };
-    },
-    [],
-  );
+  const onNewMessage = useCallback(subscribe('onNewMessage'), [subscribe]);
+  const onMessageAck = useCallback(subscribe('onMessageAck'), [subscribe]);
+  const onMessageEdited = useCallback(subscribe('onMessageEdited'), [subscribe]);
+  const onMessageDeleted = useCallback(subscribe('onMessageDeleted'), [subscribe]);
+  const onReactionUpdated = useCallback(subscribe('onReactionUpdated'), [subscribe]);
+  const onUserTyping = useCallback(subscribe('onUserTyping'), [subscribe]);
+  const onUserOnline = useCallback(subscribe('onUserOnline'), [subscribe]);
+  const onUserOffline = useCallback(subscribe('onUserOffline'), [subscribe]);
+  const onMessageRead = useCallback(subscribe('onMessageRead'), [subscribe]);
 
   return {
-    joinRoom,
+    isConnected,
+    joinConversation,
     sendMessage,
+    sendTyping,
     markRead,
+    editMessage,
+    deleteMessage,
+    react,
     onNewMessage,
     onMessageAck,
+    onMessageEdited,
+    onMessageDeleted,
+    onReactionUpdated,
+    onUserTyping,
     onUserOnline,
     onUserOffline,
-    isConnected,
+    onMessageRead,
   };
 }

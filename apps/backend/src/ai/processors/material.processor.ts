@@ -48,7 +48,9 @@ export class MaterialProcessor extends WorkerHost {
 
       // Step 1: download file from MinIO and submit to LlamaParse
       await this.updateStatus(materialId, 'parsing');
-      const fileBuf = await this.downloadFromUrl(material.fileUrl);
+      const fileBuf = await this.storage.downloadFile(
+        this.storage.extractKeyFromUrl(material.fileUrl),
+      );
       const mimeType =
         material.fileType === 'pdf'
           ? 'application/pdf'
@@ -196,11 +198,5 @@ export class MaterialProcessor extends WorkerHost {
       where: { id: materialId },
       data: { status },
     });
-  }
-
-  private async downloadFromUrl(url: string): Promise<Buffer> {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Cannot download file (${res.status})`);
-    return Buffer.from(await res.arrayBuffer());
   }
 }

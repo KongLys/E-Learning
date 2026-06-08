@@ -32,11 +32,20 @@ export const instructorApi = {
       onUploadProgress: (e) => { if (e.total) onProgress?.(Math.round((e.loaded / e.total) * 100)); },
     });
   },
-  uploadDocument: (lessonId: string, file: File) => {
+  uploadDocument: (lessonId: string, file: File, onProgress?: (pct: number) => void) => {
     const fd = new FormData();
     fd.append('document', file);
-    return apiClient.post(`/lessons/${lessonId}/document`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+    return apiClient.post(`/lessons/${lessonId}/document`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: (e) => { if (e.total) onProgress?.(Math.round((e.loaded / e.total) * 100)); },
+    });
   },
+  getLesson: (lessonId: string) => apiClient.get(`/lessons/${lessonId}`),
+  configVideo: (lessonId: string, dto: { completionMode: 'percent_90' | 'ended_autonext' }) =>
+    apiClient.post(`/lessons/${lessonId}/video/config`, dto),
+  configDocument: (lessonId: string, dto: { contentHtml?: string; minReadTimeSec?: number }) =>
+    apiClient.post(`/lessons/${lessonId}/document/config`, dto),
+  getQuiz: (lessonId: string) => apiClient.get(`/lessons/${lessonId}/quiz`),
   configQuiz: (lessonId: string, dto: any) => apiClient.post(`/lessons/${lessonId}/quiz/config`, dto),
   addQuizQuestion: (lessonId: string, dto: any) => apiClient.post(`/lessons/${lessonId}/quiz/questions`, dto),
   updateQuizQuestion: (qId: string, dto: any) => apiClient.patch(`/quiz/questions/${qId}`, dto),

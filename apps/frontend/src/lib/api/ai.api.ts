@@ -105,6 +105,45 @@ export const aiChatApi = {
     apiClient.get<AiMessage[]>(`/ai/conversations/${conversationId}/messages`),
 };
 
+// ─── Mind map ────────────────────────────────────────────────────────────────
+
+export interface MindmapNode {
+  title: string;
+  summary?: string;
+  keywords?: string[];
+  children?: MindmapNode[];
+}
+
+export interface MindmapResult {
+  status: 'pending' | 'generating' | 'ready' | 'failed';
+  title?: string;
+  structure?: MindmapNode & {
+    formats?: { mermaid?: string; xmind?: unknown };
+  };
+  markmap?: string;
+  errorMsg?: string | null;
+  cached?: boolean;
+  updatedAt?: string;
+}
+
+export interface MindmapMaterial {
+  id: string;
+  fileName: string;
+  chunkCount: number;
+  mindmapStatus: 'pending' | 'generating' | 'ready' | 'failed' | null;
+}
+
+export const mindmapApi = {
+  listMaterials: (courseId: string) =>
+    apiClient.get<MindmapMaterial[]>(`/courses/${courseId}/mindmap/materials`),
+  generate: (courseId: string, materialId: string, force = false) =>
+    apiClient.post<MindmapResult>(
+      `/courses/${courseId}/materials/${materialId}/mindmap${force ? '?force=true' : ''}`,
+    ),
+  get: (courseId: string, materialId: string) =>
+    apiClient.get<MindmapResult>(`/courses/${courseId}/materials/${materialId}/mindmap`),
+};
+
 export interface AskStreamHandlers {
   onCitations?: (citations: AiMessage['citations']) => void;
   onToken?: (text: string) => void;
