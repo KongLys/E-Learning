@@ -2,6 +2,8 @@ import {
   Body, Controller, Delete, Get, Param, Patch, Post, UploadedFile, UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { tmpdir } from 'os';
 import type { Express } from 'express';
 import { LessonService } from './lesson.service';
 import { VideoService } from './video/video.service';
@@ -15,6 +17,11 @@ import { DocumentConfigDto } from './dto/document-config.dto';
 import { VideoConfigDto } from './dto/video-config.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
+
+// Disk-backed multer storage: large uploads stream to a temp file instead of
+// being buffered whole in RAM (the service then streams the temp file to R2).
+const VIDEO_UPLOAD = { storage: diskStorage({ destination: tmpdir() }), limits: { fileSize: 2 * 1024 * 1024 * 1024 } };
+const DOCUMENT_UPLOAD = { storage: diskStorage({ destination: tmpdir() }), limits: { fileSize: 100 * 1024 * 1024 } };
 
 @Controller()
 export class LessonController {
@@ -65,7 +72,7 @@ export class LessonController {
 
   // Video
   @Post('lessons/:id/video')
-  @UseInterceptors(FileInterceptor('video'))
+  @UseInterceptors(FileInterceptor('video', VIDEO_UPLOAD))
   uploadVideo(
     @CurrentUser() u: { userId: string; role: string },
     @Param('id') id: string,
@@ -90,7 +97,7 @@ export class LessonController {
 
   // Document
   @Post('lessons/:id/document')
-  @UseInterceptors(FileInterceptor('document'))
+  @UseInterceptors(FileInterceptor('document', DOCUMENT_UPLOAD))
   uploadDocument(
     @CurrentUser() u: { userId: string; role: string },
     @Param('id') id: string,

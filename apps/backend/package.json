@@ -22,6 +22,9 @@
     "prisma:seed": "ts-node prisma/seed.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1063.0",
+    "@aws-sdk/lib-storage": "^3.1063.0",
+    "@aws-sdk/s3-request-presigner": "^3.1063.0",
     "@google/generative-ai": "^0.24.1",
     "@nestjs-modules/ioredis": "^2.2.1",
     "@nestjs/bullmq": "^11.0.4",
@@ -45,7 +48,6 @@
     "gpt-tokenizer": "^3.4.0",
     "ioredis": "^5.10.1",
     "joi": "^18.2.1",
-    "minio": "^8.0.7",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pdf-parse": "^2.4.5",

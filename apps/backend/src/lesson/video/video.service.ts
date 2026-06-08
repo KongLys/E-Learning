@@ -1,33 +1,24 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import { createReadStream } from 'fs';
+import { unlink } from 'fs/promises';
 import type { Express } from 'express';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../storage/storage.service';
 import { LessonService } from '../lesson.service';
-import { Client } from 'minio';
-import { ConfigService } from '@nestjs/config';
 
 const ALLOWED_VIDEO = ['video/mp4', 'video/webm'];
 const MAX_VIDEO_SIZE = 2 * 1024 * 1024 * 1024;
+// Presigned video URL TTL — long enough that a lengthy lecture won't expire mid-playback.
+const VIDEO_URL_TTL = 4 * 60 * 60;
 
 @Injectable()
 export class VideoService {
-  private minioClient: Client;
-
   constructor(
     private prisma: PrismaService,
     private storage: StorageService,
     private lessonService: LessonService,
-    private config: ConfigService,
-  ) {
-    this.minioClient = new Client({
-      endPoint: this.config.get<string>('MINIO_ENDPOINT', 'localhost'),
-      port: this.config.get<number>('MINIO_PORT', 9000),
-      useSSL: this.config.get<boolean>('MINIO_USE_SSL', false),
-      accessKey: this.config.get<string>('MINIO_ACCESS_KEY', 'minioadmin'),
-      secretKey: this.config.get<string>('MINIO_SECRET_KEY', 'minioadmin'),
-    });
-  }
+  ) {}
 
   async uploadVideo(lessonId: string, userId: string, userRole: string, file: Express.Multer.File) {
     if (!ALLOWED_VIDEO.includes(file.mimetype)) {
@@ -50,7 +41,13 @@ export class VideoService {
     const existing = await this.prisma.videoAsset.findUnique({ where: { lessonId } });
     if (existing?.videoUrl) await this.storage.deleteFile(this.storage.extractKeyFromUrl(existing.videoUrl));
 
-    const url = await this.storage.uploadFile(key, file.buffer, file.mimetype);
+    // Stream the temp file to storage (multipart) instead of buffering the whole video in RAM.
+    let url: string;
+    try {
+      url = await this.storage.uploadFile(key, createReadStream(file.path), file.mimetype);
+    } finally {
+      await unlink(file.path).catch(() => undefined);
+    }
 
     const asset = await this.prisma.videoAsset.upsert({
       where: { lessonId },
@@ -101,8 +98,7 @@ export class VideoService {
     if (lesson.isPreview) return { url: lesson.videoAsset.videoUrl };
 
     const key = this.storage.extractKeyFromUrl(lesson.videoAsset.videoUrl);
-    const bucket = this.config.get<string>('MINIO_BUCKET', 'elearning');
-    const signedUrl = await this.minioClient.presignedGetObject(bucket, key, 15 * 60);
+    const signedUrl = await this.storage.getSignedUrl(key, VIDEO_URL_TTL);
     return { url: signedUrl };
   }
 }

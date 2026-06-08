@@ -84,7 +84,7 @@ export class InstructorStatsService {
         SELECT DATE(o."paid_at") as date, SUM(oi.price) as amount
         FROM "order_items" oi
         JOIN "orders" o ON o.id = oi."order_id"
-        WHERE oi."course_id" = ANY(${courseIds}::uuid[])
+        WHERE oi."course_id"::text = ANY(${courseIds})
           AND o.status = 'paid'
           AND o."paid_at" >= ${startDate}
         GROUP BY DATE(o."paid_at")

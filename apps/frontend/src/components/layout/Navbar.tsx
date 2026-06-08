@@ -200,6 +200,11 @@ function UserMenu() {
             <p className="text-xs text-muted truncate">{user.email}</p>
           </div>
           <div className="py-1">
+            <Link href="/settings/profile" onClick={() => setOpen(false)} className="block px-4 py-2 text-sm text-muted hover:text-ink hover:bg-canvas transition-colors">
+              Cài đặt tài khoản
+            </Link>
+          </div>
+          <div className="py-1">
             {user.role === 'student' && (
               <Link href="/my-courses" onClick={() => setOpen(false)} className="block px-4 py-2 text-sm text-muted hover:text-ink hover:bg-canvas transition-colors">
                 Khóa học của tôi

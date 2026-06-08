@@ -1,8 +1,8 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import { createReadStream } from 'fs';
+import { readFile, unlink } from 'fs/promises';
 import type { Express } from 'express';
-import { Client } from 'minio';
-import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../storage/storage.service';
 import { LessonService } from '../lesson.service';
@@ -11,25 +11,15 @@ import { sanitizeRichText } from '../../common/sanitize-html.util';
 const MAX_PDF_SIZE = 100 * 1024 * 1024;
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const ALLOWED_DOC = ['application/pdf', DOCX_MIME];
+const DOCUMENT_URL_TTL = 60 * 60;
 
 @Injectable()
 export class DocumentService {
-  private minioClient: Client;
-
   constructor(
     private prisma: PrismaService,
     private storage: StorageService,
     private lessonService: LessonService,
-    private config: ConfigService,
-  ) {
-    this.minioClient = new Client({
-      endPoint: this.config.get<string>('MINIO_ENDPOINT', 'localhost'),
-      port: this.config.get<number>('MINIO_PORT', 9000),
-      useSSL: this.config.get<boolean>('MINIO_USE_SSL', false),
-      accessKey: this.config.get<string>('MINIO_ACCESS_KEY', 'minioadmin'),
-      secretKey: this.config.get<string>('MINIO_SECRET_KEY', 'minioadmin'),
-    });
-  }
+  ) {}
 
   async uploadDocument(lessonId: string, userId: string, userRole: string, file: Express.Multer.File) {
     if (!ALLOWED_DOC.includes(file.mimetype)) {
@@ -53,7 +43,8 @@ export class DocumentService {
     if (isPdf) {
       try {
         const pdfParse = await import('pdf-parse') as unknown as (buf: Buffer) => Promise<{ numpages: number }>;
-        const parsed = await pdfParse(file.buffer);
+        const buf = await readFile(file.path);
+        const parsed = await pdfParse(buf);
         pageCount = parsed.numpages;
       } catch {
         pageCount = 0;
@@ -64,7 +55,12 @@ export class DocumentService {
     const existing = await this.prisma.documentAsset.findUnique({ where: { lessonId } });
     if (existing?.fileUrl) await this.storage.deleteFile(this.storage.extractKeyFromUrl(existing.fileUrl));
 
-    const url = await this.storage.uploadFile(key, file.buffer, file.mimetype);
+    let url: string;
+    try {
+      url = await this.storage.uploadFile(key, createReadStream(file.path), file.mimetype);
+    } finally {
+      await unlink(file.path).catch(() => undefined);
+    }
     const asset = await this.prisma.documentAsset.upsert({
       where: { lessonId },
       update: { fileUrl: url, fileType, pageCount, fileSize: BigInt(file.size) },
@@ -118,8 +114,7 @@ export class DocumentService {
     if (lesson.isPreview) return { url: lesson.documentAsset.fileUrl };
 
     const key = this.storage.extractKeyFromUrl(lesson.documentAsset.fileUrl);
-    const bucket = this.config.get<string>('MINIO_BUCKET', 'elearning');
-    const signedUrl = await this.minioClient.presignedGetObject(bucket, key, 3600);
+    const signedUrl = await this.storage.getSignedUrl(key, DOCUMENT_URL_TTL);
     return { url: signedUrl };
   }
 }

@@ -4,7 +4,9 @@ import { VideoService } from './video.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../storage/storage.service';
 import { LessonService } from '../lesson.service';
-import { ConfigService } from '@nestjs/config';
+
+jest.mock('fs', () => ({ ...jest.requireActual('fs'), createReadStream: jest.fn().mockReturnValue('stream') }));
+jest.mock('fs/promises', () => ({ ...jest.requireActual('fs/promises'), unlink: jest.fn().mockResolvedValue(undefined) }));
 
 const mockPrisma = {
   lesson: { findUnique: jest.fn(), update: jest.fn() },
@@ -15,26 +17,13 @@ const mockPrisma = {
 const mockStorage = {
   uploadFile: jest.fn(),
   deleteFile: jest.fn(),
+  getSignedUrl: jest.fn(),
   extractKeyFromUrl: jest.fn().mockReturnValue('some/key'),
 };
 
 const mockLessonService = {
   isEnrolled: jest.fn(),
   updateCourseStats: jest.fn(),
-};
-
-const mockConfig = {
-  get: jest.fn().mockImplementation((key: string, def: unknown) => {
-    const vals: Record<string, unknown> = {
-      MINIO_ENDPOINT: 'localhost',
-      MINIO_PORT: 9000,
-      MINIO_USE_SSL: false,
-      MINIO_ACCESS_KEY: 'minioadmin',
-      MINIO_SECRET_KEY: 'minioadmin',
-      MINIO_BUCKET: 'elearning',
-    };
-    return vals[key] ?? def;
-  }),
 };
 
 describe('VideoService', () => {
@@ -47,7 +36,6 @@ describe('VideoService', () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: StorageService, useValue: mockStorage },
         { provide: LessonService, useValue: mockLessonService },
-        { provide: ConfigService, useValue: mockConfig },
       ],
     }).compile();
 
@@ -56,7 +44,7 @@ describe('VideoService', () => {
   });
 
   describe('uploadVideo', () => {
-    const validFile = { mimetype: 'video/mp4', size: 1024, buffer: Buffer.from('') } as Express.Multer.File;
+    const validFile = { mimetype: 'video/mp4', size: 1024, path: '/tmp/upload-123' } as Express.Multer.File;
     const lesson = { id: 'lesson-1', sectionId: 'section-1', type: 'video' };
     const section = { course: { instructorId: 'instructor-1' } };
 

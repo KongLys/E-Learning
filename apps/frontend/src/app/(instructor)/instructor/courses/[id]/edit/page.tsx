@@ -7,6 +7,7 @@ import { instructorApi } from '@/lib/api/instructor.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorMessage } from '@/components/common/ErrorMessage';
 import { LessonEditorModal } from '@/components/instructor/LessonEditorModal';
+import { CourseThumbnailUpload } from '@/components/instructor/CourseThumbnailUpload';
 
 type LessonType = 'video' | 'document' | 'quiz';
 
@@ -79,6 +80,9 @@ export default function EditCoursePage() {
       </div>
 
       {error && <ErrorMessage message={error} />}
+
+      {/* Thumbnail */}
+      <CourseThumbnailUpload courseId={id} />
 
       {/* Add section */}
       <div className="flex gap-2">
