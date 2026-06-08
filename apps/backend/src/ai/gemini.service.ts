@@ -18,6 +18,9 @@ export class GeminiService {
   private readonly chatModelName: string;
   private readonly embedModelName: string;
   private readonly embedDimensions: number;
+  private readonly embedProvider: 'gemini' | 'ollama';
+  private readonly ollamaBaseUrl: string;
+  private readonly ollamaEmbedModel: string;
 
   constructor(config: ConfigService) {
     const apiKey = config.get<string>('GEMINI_API_KEY', '');
@@ -27,12 +30,17 @@ export class GeminiService {
     this.client = new GoogleGenerativeAI(apiKey);
     this.chatModelName = config.get<string>('GEMINI_CHAT_MODEL', 'gemini-1.5-flash');
     this.embedModelName = config.get<string>('GEMINI_EMBED_MODEL', 'gemini-embedding-001');
-    // Must match the pgvector column dimension (vector(768) in course_chunks).
     this.embedDimensions = config.get<number>('GEMINI_EMBED_DIMENSIONS', 768);
+    this.embedProvider =
+      config.get<string>('EMBED_PROVIDER', 'gemini') === 'ollama' ? 'ollama' : 'gemini';
+    this.ollamaBaseUrl = config.get<string>('OLLAMA_BASE_URL', 'http://localhost:11434');
+    this.ollamaEmbedModel = config.get<string>('OLLAMA_EMBED_MODEL', 'nomic-embed-text');
   }
 
   async embedBatch(texts: string[]): Promise<number[][]> {
     if (texts.length === 0) return [];
+    if (this.embedProvider === 'ollama') return this.embedBatchOllama(texts);
+
     const model = this.client.getGenerativeModel({ model: this.embedModelName });
     const BATCH = 100;
     const results: number[][] = [];
@@ -42,8 +50,6 @@ export class GeminiService {
         const res = await model.batchEmbedContents({
           requests: slice.map((text) => ({
             content: { role: 'user', parts: [{ text }] },
-            // gemini-embedding-001 defaults to 3072 dims; pin to the column size.
-            // Field is valid in the REST API though absent from the SDK types.
             outputDimensionality: this.embedDimensions,
           })) as never,
         });
@@ -61,6 +67,33 @@ export class GeminiService {
   async embedQuery(text: string): Promise<number[]> {
     const [vec] = await this.embedBatch([text]);
     return vec;
+  }
+
+  private async embedBatchOllama(texts: string[]): Promise<number[][]> {
+    const results: number[][] = [];
+    const BATCH = 64;
+    for (let i = 0; i < texts.length; i += BATCH) {
+      const input = texts.slice(i, i + BATCH);
+      try {
+        const res = await fetch(`${this.ollamaBaseUrl}/api/embed`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: this.ollamaEmbedModel, input }),
+        });
+        if (!res.ok) {
+          throw new Error(`Ollama responded ${res.status}: ${await res.text()}`);
+        }
+        const data = (await res.json()) as { embeddings?: number[][] };
+        if (!data.embeddings || data.embeddings.length !== input.length) {
+          throw new Error('Ollama returned no/incomplete embeddings');
+        }
+        results.push(...data.embeddings);
+      } catch (err) {
+        this.logger.error(`Ollama embedding batch failed: ${(err as Error).message}`);
+        throw new ServiceUnavailableException('Embedding service unavailable');
+      }
+    }
+    return results;
   }
 
   async generate(prompt: string, opts: GenerateOpts = {}): Promise<string> {
