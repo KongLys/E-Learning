@@ -1,5 +1,12 @@
 import { apiClient } from './axios';
 
+export type ModerationStatus =
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'appealing'
+  | 'locked';
+
 export interface CourseMaterial {
   id: string;
   courseId: string;
@@ -13,6 +20,12 @@ export interface CourseMaterial {
   chunkCount: number;
   createdAt: string;
   updatedAt: string;
+  moderationStatus: ModerationStatus;
+  moderationLabel: string | null;
+  moderationScore: number | null;
+  moderationReason: string | null;
+  appealReason: string | null;
+  moderatedAt: string | null;
 }
 
 export interface AiConversation {
@@ -56,6 +69,29 @@ export const materialsApi = {
     apiClient.delete(`/courses/${courseId}/materials/${materialId}`),
   retry: (courseId: string, materialId: string) =>
     apiClient.post(`/courses/${courseId}/materials/${materialId}/retry`),
+  appeal: (courseId: string, materialId: string, reason?: string) =>
+    apiClient.post(`/courses/${courseId}/materials/${materialId}/moderation/appeal`, { reason }),
+};
+
+export const moderationApi = {
+  appealCourse: (courseId: string, reason?: string) =>
+    apiClient.post(`/courses/${courseId}/moderation/appeal`, { reason }),
+};
+
+export const MODERATION_LABELS: Record<ModerationStatus, string> = {
+  pending: 'Chờ kiểm duyệt',
+  approved: 'Đã duyệt',
+  rejected: 'Không phù hợp',
+  appealing: 'Đang kiến nghị',
+  locked: 'Đã khóa',
+};
+
+export const MODERATION_COLORS: Record<ModerationStatus, string> = {
+  pending: 'bg-gray-100 text-gray-700',
+  approved: 'bg-green-100 text-green-700',
+  rejected: 'bg-red-100 text-red-700',
+  appealing: 'bg-amber-100 text-amber-800',
+  locked: 'bg-zinc-200 text-zinc-700',
 };
 
 export const aiChatApi = {

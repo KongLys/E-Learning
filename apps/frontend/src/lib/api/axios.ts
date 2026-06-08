@@ -67,8 +67,14 @@ apiClient.interceptors.response.use(
       } catch {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
+        // Also clear the persisted Zustand auth state (user) so guards like
+        // AuthLayout don't bounce a tokenless session back to '/', which would
+        // re-trigger a 401 and create an infinite /login <-> / redirect loop.
+        localStorage.removeItem('auth-storage');
         Cookies.remove('accessToken', { path: '/' });
-        window.location.href = '/login';
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
         return Promise.reject(error);
       } finally {
         isRefreshing = false;

@@ -26,6 +26,7 @@ import { CommunityModule } from './community/community.module';
 import { NotificationModule } from './notification/notification.module';
 import { InstructorStatsModule } from './instructor-stats/instructor-stats.module';
 import { AiModule } from './ai/ai.module';
+import { ModerationModule } from './moderation/moderation.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 
@@ -68,6 +69,12 @@ import { RolesGuard } from './auth/guards/roles.guard';
         RAG_CHUNK_OVERLAP: Joi.number().default(200),
         RAG_RETRIEVE_TOP: Joi.number().default(50),
         RAG_RERANK_TOP: Joi.number().default(5),
+        MODERATION_ENABLED: Joi.string().valid('true', 'false').default('true'),
+        MODERATION_SERVICE_URL: Joi.string().default('http://localhost:8000'),
+        MODERATION_API_KEY: Joi.string().allow('').default(''),
+        MODERATION_TIMEOUT_MS: Joi.number().default(15000),
+        MODERATION_FAIL_OPEN: Joi.string().valid('true', 'false').default('true'),
+        MODERATION_DEBUG: Joi.string().valid('true', 'false').default('false'),
       }),
     }),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
@@ -94,6 +101,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
     InstructorStatsModule,
     ChatModule,
     AiModule,
+    ModerationModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

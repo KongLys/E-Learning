@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
+import { OnEvent } from '@nestjs/event-emitter';
 import { Queue } from 'bullmq';
 import { randomUUID } from 'crypto';
 import type { Express } from 'express';
@@ -107,6 +108,20 @@ export class MaterialService {
     return { id: materialId, status: 'uploaded' };
   }
 
+  /**
+   * Re-run the processing pipeline after an admin approves a previously
+   * rejected/pending material. The material's moderationStatus is already
+   * 'approved', so the processor skips classification and indexes directly.
+   */
+  @OnEvent('moderation.material.reindex')
+  async onReindex(payload: { materialId: string }) {
+    await this.prisma.courseMaterial.update({
+      where: { id: payload.materialId },
+      data: { status: 'uploaded', errorMsg: null, chunkCount: 0 },
+    });
+    await this.enqueue(payload.materialId);
+  }
+
   private async enqueue(materialId: string) {
     await this.queue.add(
       'process',
@@ -145,6 +160,12 @@ export class MaterialService {
     chunkCount: number;
     createdAt: Date;
     updatedAt: Date;
+    moderationStatus: string;
+    moderationLabel: string | null;
+    moderationScore: number | null;
+    moderationReason: string | null;
+    appealReason: string | null;
+    moderatedAt: Date | null;
   }) {
     return {
       id: m.id,
@@ -159,6 +180,12 @@ export class MaterialService {
       chunkCount: m.chunkCount,
       createdAt: m.createdAt,
       updatedAt: m.updatedAt,
+      moderationStatus: m.moderationStatus,
+      moderationLabel: m.moderationLabel,
+      moderationScore: m.moderationScore,
+      moderationReason: m.moderationReason,
+      appealReason: m.appealReason,
+      moderatedAt: m.moderatedAt,
     };
   }
 }

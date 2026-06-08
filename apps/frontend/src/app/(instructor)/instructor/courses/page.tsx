@@ -1,7 +1,13 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { instructorApi } from '@/lib/api/instructor.api';
+import {
+  moderationApi,
+  MODERATION_COLORS,
+  MODERATION_LABELS,
+  type ModerationStatus,
+} from '@/lib/api/ai.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { PriceDisplay } from '@/components/ui/PriceDisplay';
 import Link from 'next/link';
@@ -15,9 +21,17 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function InstructorCoursesPage() {
+  const qc = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ['instructor-courses'],
     queryFn: () => instructorApi.getCourses(),
+  });
+
+  const appealMutation = useMutation({
+    mutationFn: (courseId: string) => moderationApi.appealCourse(courseId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['instructor-courses'] }),
+    onError: (err: { response?: { data?: { message?: string } } }) =>
+      alert(err?.response?.data?.message ?? 'Gửi kiến nghị thất bại'),
   });
 
   const courses: any[] = data?.data?.courses ?? data?.data ?? [];
@@ -48,6 +62,7 @@ export default function InstructorCoursesPage() {
               <tr>
                 <th className="px-4 py-3 text-left font-medium text-gray-600">Khóa học</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600">Trạng thái</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">Kiểm duyệt</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600">Giá</th>
                 <th className="px-4 py-3 text-right font-medium text-gray-600">Thao tác</th>
               </tr>
@@ -65,9 +80,33 @@ export default function InstructorCoursesPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
+                    {course.moderationStatus && course.moderationStatus !== 'approved' ? (
+                      <span
+                        title={course.moderationReason ?? ''}
+                        className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${MODERATION_COLORS[course.moderationStatus as ModerationStatus]}`}
+                      >
+                        {MODERATION_LABELS[course.moderationStatus as ModerationStatus]}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-400">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
                     <PriceDisplay price={Number(course.price)} />
                   </td>
                   <td className="px-4 py-3 text-right">
+                    {course.moderationStatus === 'rejected' && (
+                      <button
+                        onClick={() => {
+                          if (confirm(`Gửi kiến nghị duyệt lại khóa học "${course.title}"?`))
+                            appealMutation.mutate(course.id);
+                        }}
+                        disabled={appealMutation.isPending}
+                        className="text-amber-600 hover:underline text-xs mr-3 disabled:opacity-50"
+                      >
+                        Kiến nghị
+                      </button>
+                    )}
                     <Link href={`/instructor/courses/${course.id}/edit`} className="text-blue-600 hover:underline text-xs mr-3">Sửa</Link>
                     <Link href={`/courses/${course.slug}`} className="text-gray-500 hover:text-gray-700 text-xs">Xem</Link>
                   </td>

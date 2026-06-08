@@ -8,7 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api/admin.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import Link from 'next/link';
-import { LayoutDashboard, Users, BookOpen, ShoppingCart } from 'lucide-react';
+import { LayoutDashboard, Users, BookOpen, ShoppingCart, ShieldCheck } from 'lucide-react';
 
 function AdminSidebar({ pendingCourses }: { pendingCourses: number }) {
   const pathname = usePathname();
@@ -16,6 +16,7 @@ function AdminSidebar({ pendingCourses }: { pendingCourses: number }) {
     { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/admin/users', label: 'Người dùng', icon: Users },
     { href: '/admin/courses', label: 'Khóa học', icon: BookOpen, badge: pendingCourses },
+    { href: '/admin/moderation', label: 'Kiểm duyệt', icon: ShieldCheck },
     { href: '/admin/orders', label: 'Đơn hàng', icon: ShoppingCart },
   ];
 

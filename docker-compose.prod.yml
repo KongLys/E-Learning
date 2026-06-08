@@ -22,7 +22,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: apps/api/Dockerfile
+      dockerfile: apps/backend/Dockerfile
     environment:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
@@ -41,17 +41,40 @@ services:
       VNPAY_HASH_SECRET: ${VNPAY_HASH_SECRET}
       VNPAY_URL: ${VNPAY_URL}
       VNPAY_API_URL: ${VNPAY_API_URL}
+      MODERATION_ENABLED: ${MODERATION_ENABLED:-true}
+      MODERATION_SERVICE_URL: http://moderation:8000
+      MODERATION_API_KEY: ${MODERATION_API_KEY}
+      MODERATION_TIMEOUT_MS: ${MODERATION_TIMEOUT_MS:-15000}
+      MODERATION_FAIL_OPEN: ${MODERATION_FAIL_OPEN:-true}
     depends_on:
       redis:
         condition: service_healthy
+      # service_started (not service_healthy): a missing/slow-loading moderation
+      # model must not block the whole backend. With MODERATION_FAIL_OPEN=true,
+      # moderation calls degrade to 'pending' instead of taking the API down.
+      moderation:
+        condition: service_started
     ports:
       - '3001:3001'
+    restart: unless-stopped
+
+  moderation:
+    build:
+      context: ./apps/moderation
+    environment:
+      MODERATION_API_KEY: ${MODERATION_API_KEY}
+      MODEL_MAX_LENGTH: ${MODEL_MAX_LENGTH:-256}
+      # LABEL_MAP: '{"LABEL_0":"spam_toxic","LABEL_1":"it","LABEL_2":"others"}'
+    volumes:
+      # Mount the trained model dir; weights are NOT baked into the image.
+      - ./apps/moderation/models:/app/models:ro
+    mem_limit: 1500m
     restart: unless-stopped
 
   web:
     build:
       context: .
-      dockerfile: apps/web/Dockerfile
+      dockerfile: apps/frontend/Dockerfile
     environment:
       NEXT_PUBLIC_API_URL: ${API_URL:-http://localhost:3001}
       BUILD_STANDALONE: 'true'

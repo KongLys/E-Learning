@@ -18,4 +18,11 @@ export const adminApi = {
   getOrders: (params?: { status?: string; page?: number; limit?: number }) =>
     apiClient.get('/admin/orders', { params }),
   refundOrder: (id: string) => apiClient.post(`/admin/orders/${id}/refund`),
+
+  getModeration: (params?: { status?: string; type?: 'course' | 'material' }) =>
+    apiClient.get('/admin/moderation', { params }),
+  approveModeration: (type: 'course' | 'material', id: string) =>
+    apiClient.post(`/admin/moderation/${type}/${id}/approve`),
+  rejectModeration: (type: 'course' | 'material', id: string, reason?: string) =>
+    apiClient.post(`/admin/moderation/${type}/${id}/reject`, { reason }),
 };

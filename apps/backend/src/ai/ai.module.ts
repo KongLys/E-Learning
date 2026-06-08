@@ -11,10 +11,12 @@ import { RagService } from './rag/rag.service';
 import { AiChatService } from './ai-chat.service';
 import { AiChatController } from './ai-chat.controller';
 import { MaterialProcessor, MATERIAL_QUEUE } from './processors/material.processor';
+import { ModerationModule } from '../moderation/moderation.module';
 
 @Module({
   imports: [
     StorageModule,
+    ModerationModule,
     BullModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {

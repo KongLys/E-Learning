@@ -89,6 +89,14 @@ enum MaterialStatus {
   failed
 }
 
+enum ModerationStatus {
+  pending   // chờ/đang phân lớp
+  approved  // hợp lệ (it) hoặc admin duyệt lại OK
+  rejected  // model từ chối — còn được kiến nghị
+  appealing // user đã kiến nghị — chờ admin
+  locked    // admin xác nhận từ chối — không kiến nghị lại được
+}
+
 // ─── Models ──────────────────────────────────────────────────────────────────
 
 model User {
@@ -157,6 +165,13 @@ model Course {
   createdAt        DateTime     @default(now()) @map("created_at")
   publishedAt      DateTime?    @map("published_at")
 
+  moderationStatus ModerationStatus @default(pending) @map("moderation_status")
+  moderationLabel  String?          @map("moderation_label")
+  moderationScore  Float?           @map("moderation_score")
+  moderationReason String?          @map("moderation_reason")
+  appealReason     String?          @map("appeal_reason")
+  moderatedAt      DateTime?        @map("moderated_at")
+
   instructor      User             @relation(fields: [instructorId], references: [id])
   category        Category?        @relation(fields: [categoryId], references: [id])
   sections        Section[]
@@ -172,6 +187,7 @@ model Course {
   @@index([instructorId])
   @@index([categoryId])
   @@index([status])
+  @@index([moderationStatus])
   @@map("courses")
 }
 
@@ -611,10 +627,18 @@ model CourseMaterial {
   createdAt       DateTime       @default(now()) @map("created_at")
   updatedAt       DateTime       @updatedAt @map("updated_at")
 
+  moderationStatus ModerationStatus @default(pending) @map("moderation_status")
+  moderationLabel  String?          @map("moderation_label")
+  moderationScore  Float?           @map("moderation_score")
+  moderationReason String?          @map("moderation_reason")
+  appealReason     String?          @map("appeal_reason")
+  moderatedAt      DateTime?        @map("moderated_at")
+
   course Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
   chunks CourseChunk[]
 
   @@index([courseId])
+  @@index([moderationStatus])
   @@map("course_materials")
 }
 

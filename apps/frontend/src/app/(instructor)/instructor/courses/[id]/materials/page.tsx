@@ -5,6 +5,8 @@ import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   materialsApi,
+  MODERATION_COLORS,
+  MODERATION_LABELS,
   type CourseMaterial,
 } from '@/lib/api/ai.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -38,10 +40,19 @@ export default function CourseMaterialsPage() {
     refetchInterval: (q) => {
       const items = q.state.data as CourseMaterial[] | undefined;
       const hasProcessing = items?.some(
-        (m) => m.status === 'uploaded' || m.status === 'parsing' || m.status === 'parsed',
+        (m) =>
+          (m.status === 'uploaded' || m.status === 'parsing') ||
+          (m.status === 'parsed' && m.moderationStatus === 'pending'),
       );
       return hasProcessing ? 4000 : false;
     },
+  });
+
+  const appealMutation = useMutation({
+    mutationFn: (materialId: string) => materialsApi.appeal(id, materialId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['course-materials', id] }),
+    onError: (err: { response?: { data?: { message?: string } } }) =>
+      setError(err?.response?.data?.message ?? 'Gửi kiến nghị thất bại'),
   });
 
   const uploadMutation = useMutation({
@@ -113,15 +124,23 @@ export default function CourseMaterialsPage() {
                   {m.fileType}
                 </span>
               </div>
-              <div className="flex items-center gap-3 text-xs text-gray-600 mb-2">
+              <div className="flex items-center gap-3 text-xs text-gray-600 mb-2 flex-wrap">
                 <span>{(Number(m.fileSize) / 1024 / 1024).toFixed(2)} MB</span>
                 {m.chunkCount > 0 && <span>{m.chunkCount} chunks</span>}
                 <span className={`px-2 py-0.5 rounded ${STATUS_COLOR[m.status]}`}>
                   {STATUS_LABEL[m.status]}
                 </span>
+                {m.moderationStatus !== 'approved' && (
+                  <span className={`px-2 py-0.5 rounded ${MODERATION_COLORS[m.moderationStatus]}`}>
+                    {MODERATION_LABELS[m.moderationStatus]}
+                  </span>
+                )}
               </div>
               {m.errorMsg && (
                 <p className="text-xs text-red-600 mt-1">Lỗi: {m.errorMsg}</p>
+              )}
+              {m.moderationReason && m.moderationStatus !== 'approved' && (
+                <p className="text-xs text-red-600 mt-1">Kiểm duyệt: {m.moderationReason}</p>
               )}
             </div>
             <div className="flex flex-col gap-2 shrink-0">
@@ -131,6 +150,18 @@ export default function CourseMaterialsPage() {
                   className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700"
                 >
                   Thử lại
+                </button>
+              )}
+              {m.moderationStatus === 'rejected' && (
+                <button
+                  onClick={() => {
+                    if (confirm(`Gửi kiến nghị duyệt lại tài liệu "${m.fileName}"?`))
+                      appealMutation.mutate(m.id);
+                  }}
+                  disabled={appealMutation.isPending}
+                  className="text-xs bg-amber-500 text-white px-3 py-1.5 rounded hover:bg-amber-600 disabled:opacity-50"
+                >
+                  Kiến nghị duyệt lại
                 </button>
               )}
               <button

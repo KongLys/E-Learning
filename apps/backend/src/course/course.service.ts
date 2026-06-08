@@ -10,6 +10,7 @@ import type { Express } from 'express';
 import slugify from 'slugify';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
+import { ModerationService } from '../moderation/moderation.service';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
 
@@ -21,11 +22,12 @@ export class CourseService {
   constructor(
     private prisma: PrismaService,
     private storage: StorageService,
+    private moderation: ModerationService,
   ) {}
 
   async createCourse(instructorId: string, dto: CreateCourseDto) {
     const slug = await this.generateUniqueSlug(dto.title);
-    return this.prisma.course.create({
+    const course = await this.prisma.course.create({
       data: {
         instructorId,
         slug,
@@ -39,6 +41,8 @@ export class CourseService {
         categoryId: dto.categoryId,
       },
     });
+    await this.moderation.moderateCourse(course.id, instructorId, course.title, course.description);
+    return this.prisma.course.findUnique({ where: { id: course.id } });
   }
 
   async updateCourse(courseId: string, userId: string, userRole: string, dto: UpdateCourseDto) {
@@ -47,7 +51,7 @@ export class CourseService {
     if (!EDITABLE_STATUSES.includes(course.status)) {
       throw new UnprocessableEntityException(`Course cannot be edited in status: ${course.status}`);
     }
-    return this.prisma.course.update({
+    const updated = await this.prisma.course.update({
       where: { id: courseId },
       data: {
         ...(dto.title && { title: dto.title, slug: await this.generateUniqueSlug(dto.title, courseId) }),
@@ -60,6 +64,12 @@ export class CourseService {
         categoryId: dto.categoryId,
       },
     });
+    // Re-moderate when the moderated text fields change.
+    if (dto.title !== undefined || dto.description !== undefined) {
+      await this.moderation.moderateCourse(courseId, updated.instructorId, updated.title, updated.description);
+      return this.prisma.course.findUnique({ where: { id: courseId } });
+    }
+    return updated;
   }
 
   async uploadThumbnail(courseId: string, userId: string, userRole: string, file: Express.Multer.File) {
@@ -80,6 +90,12 @@ export class CourseService {
     this.assertOwnerOrAdmin(course, userId, 'instructor');
     if (!SUBMIT_VALID_STATUSES.includes(course.status)) {
       throw new UnprocessableEntityException('Only draft or rejected courses can be submitted');
+    }
+
+    if (course.moderationStatus !== 'approved') {
+      throw new UnprocessableEntityException(
+        'Nội dung khóa học chưa được kiểm duyệt hoặc bị từ chối — không thể gửi duyệt',
+      );
     }
 
     const sectionCount = await this.prisma.section.count({ where: { courseId } });

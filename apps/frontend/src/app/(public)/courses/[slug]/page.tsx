@@ -1,6 +1,7 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { courseApi, enrollmentApi, orderApi } from '@/lib/api/course.api';
 import { useAuthStore } from '@/store/auth.store';
@@ -249,6 +250,16 @@ export default function CourseDetailPage() {
                 >
                   {checkoutMutation.isPending ? 'Đang xử lý...' : 'Mua ngay'}
                 </button>
+              )}
+
+              {/* Community is enrollment-gated (backend enforces it too). */}
+              {isEnrolled && (
+                <Link
+                  href={`/courses/${slug}/community`}
+                  className="w-full inline-flex h-11 items-center justify-center rounded-pill border border-hairline text-ink text-[15px] font-medium hover:bg-canvas transition-colors"
+                >
+                  Cộng đồng khóa học
+                </Link>
               )}
 
               <div className="pt-2 border-t border-hairline space-y-2 text-sm text-muted">
