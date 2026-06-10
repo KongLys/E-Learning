@@ -22,6 +22,8 @@ export const instructorApi = {
 
   // Lessons
   addLesson: (sectionId: string, dto: any) => apiClient.post(`/sections/${sectionId}/lessons`, dto),
+  reorderLessons: (sectionId: string, ids: string[]) =>
+    apiClient.patch(`/sections/${sectionId}/lessons/reorder`, { lessonIds: ids }),
   updateLesson: (id: string, dto: any) => apiClient.patch(`/lessons/${id}`, dto),
   deleteLesson: (id: string) => apiClient.delete(`/lessons/${id}`),
   uploadVideo: (lessonId: string, file: File, onProgress?: (pct: number) => void) => {

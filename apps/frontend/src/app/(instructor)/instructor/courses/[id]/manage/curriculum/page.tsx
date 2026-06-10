@@ -1,16 +1,254 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { instructorApi } from '@/lib/api/instructor.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorMessage } from '@/components/common/ErrorMessage';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { AddLessonModal } from '@/components/instructor/AddLessonModal';
-import { AddSectionModal } from '@/components/instructor/AddSectionModal';
 import { LessonTypeIcon, type LessonType } from '@/components/instructor/lessonTypeMeta';
 import Link from 'next/link';
-import { FileText, Plus } from 'lucide-react';
+import { Check, ChevronDown, FileText, GripVertical, Pencil, Plus, Trash2, X } from 'lucide-react';
+import {
+  DndContext,
+  KeyboardSensor,
+  MeasuringStrategy,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import type { ButtonHTMLAttributes } from 'react';
+
+interface Lesson {
+  id: string;
+  title: string;
+  type: LessonType;
+}
+
+interface Section {
+  id: string;
+  title: string;
+  lessons?: Lesson[];
+}
+
+type ConfirmDeleteState =
+  | { kind: 'section'; id: string; title: string; lessonCount: number }
+  | { kind: 'lesson'; id: string; title: string }
+  | null;
+
+type ApiErrorShape = { response?: { data?: { message?: string } } };
+
+/** Hình dạng tối thiểu của cache query ['course-edit', id] (axios response). */
+type SectionsCache = { data: Section[] };
+
+/**
+ * Bọc một phần để kéo thả đổi vị trí bằng dnd-kit.
+ * `children` nhận props để gắn vào nút cầm kéo (drag handle) và cờ isDragging.
+ */
+function SortableSection({
+  id,
+  disabled,
+  children,
+}: {
+  id: string;
+  disabled?: boolean;
+  children: (
+    handleProps: ButtonHTMLAttributes<HTMLButtonElement>,
+    isDragging: boolean,
+  ) => ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+    disabled,
+  });
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={isDragging ? 'relative z-10' : undefined}
+    >
+      {children(
+        { ...attributes, ...listeners } as ButtonHTMLAttributes<HTMLButtonElement>,
+        isDragging,
+      )}
+    </div>
+  );
+}
+
+/** Bọc một bài học (li) để kéo thả đổi vị trí trong phần. */
+function SortableLessonRow({
+  id,
+  disabled,
+  children,
+}: {
+  id: string;
+  disabled?: boolean;
+  children: (
+    handleProps: ButtonHTMLAttributes<HTMLButtonElement>,
+    isDragging: boolean,
+  ) => ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+    disabled,
+  });
+  return (
+    <li
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={`flex items-center gap-2 px-3 py-2.5 ${
+        isDragging ? 'relative z-10 bg-blue-50/60 shadow-md ring-1 ring-blue-200' : ''
+      }`}
+    >
+      {children(
+        { ...attributes, ...listeners } as ButtonHTMLAttributes<HTMLButtonElement>,
+        isDragging,
+      )}
+    </li>
+  );
+}
+
+/** DndContext riêng cho danh sách bài học của một phần (sắp xếp trong nội bộ phần). */
+function LessonsDnd({
+  items,
+  onReorder,
+  children,
+}: {
+  items: string[];
+  onReorder: (ids: string[]) => void;
+  children: ReactNode;
+}) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={(e: DragEndEvent) => {
+        const { active, over } = e;
+        if (!over || active.id === over.id) return;
+        const oldIdx = items.indexOf(String(active.id));
+        const newIdx = items.indexOf(String(over.id));
+        if (oldIdx < 0 || newIdx < 0) return;
+        onReorder(arrayMove(items, oldIdx, newIdx));
+      }}
+    >
+      <SortableContext items={items} strategy={verticalListSortingStrategy}>
+        {children}
+      </SortableContext>
+    </DndContext>
+  );
+}
+
+/** Nút icon nhỏ cho các thao tác trên phần/bài học. */
+function IconButton({
+  label,
+  danger,
+  disabled,
+  onClick,
+  children,
+}: {
+  label: string;
+  danger?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      disabled={disabled}
+      onClick={onClick}
+      className={`rounded-lg p-1.5 transition-colors disabled:opacity-25 ${
+        danger
+          ? 'text-gray-400 hover:bg-red-50 hover:text-red-600'
+          : 'text-gray-400 hover:bg-gray-200/70 hover:text-gray-700'
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** Form nhập tiêu đề inline (thêm phần / đổi tên): Enter để lưu, Esc để hủy. */
+function InlineTitleForm({
+  initialValue = '',
+  placeholder,
+  saveLabel,
+  isPending,
+  autoSelect,
+  onSave,
+  onCancel,
+}: {
+  initialValue?: string;
+  placeholder: string;
+  saveLabel: string;
+  isPending?: boolean;
+  autoSelect?: boolean;
+  onSave: (title: string) => void;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState(initialValue);
+  const trimmed = value.trim();
+  const canSave = trimmed.length >= 2 && !isPending;
+
+  return (
+    <div className="min-w-0 flex-1">
+      <div className="flex items-center gap-2">
+        <input
+          autoFocus
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onFocus={(e) => {
+            if (autoSelect) e.target.select();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && canSave) onSave(trimmed);
+            if (e.key === 'Escape') onCancel();
+          }}
+          placeholder={placeholder}
+          className="min-w-0 flex-1 rounded-xl bg-white px-3 py-2 text-sm outline-none ring-1 ring-gray-200 focus:ring-2 focus:ring-blue-400"
+        />
+        <button
+          type="button"
+          onClick={() => onSave(trimmed)}
+          disabled={!canSave}
+          className="flex shrink-0 items-center gap-1 rounded-full bg-blue-600 px-3.5 py-2 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+        >
+          <Check size={13} />
+          {isPending ? 'Đang lưu...' : saveLabel}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="flex shrink-0 items-center gap-1 rounded-full px-3 py-2 text-xs text-gray-500 transition-colors hover:bg-gray-100"
+        >
+          <X size={13} />
+          Hủy
+        </button>
+      </div>
+      {trimmed.length > 0 && trimmed.length < 2 && (
+        <p className="mt-1 text-xs text-amber-600">Tiêu đề cần ít nhất 2 ký tự.</p>
+      )}
+    </div>
+  );
+}
 
 export default function CourseCurriculumPage() {
   const { id } = useParams<{ id: string }>();
@@ -18,52 +256,192 @@ export default function CourseCurriculumPage() {
   const [error, setError] = useState('');
   const [addSectionAt, setAddSectionAt] = useState<'top' | 'bottom' | null>(null);
   const [addLessonForSection, setAddLessonForSection] = useState<string | null>(null);
+  const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
+  const [editingLessonId, setEditingLessonId] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [confirmDelete, setConfirmDelete] = useState<ConfirmDeleteState>(null);
+  // Phần đang được kéo — khi khác null, mọi phần được thu gọn tạm để dễ thả vào vị trí mới
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   const { data, isLoading } = useQuery({
     queryKey: ['course-edit', id],
     queryFn: () => instructorApi.getSections(id),
   });
 
-  const sections: any[] = data?.data ?? [];
+  const sections: Section[] = data?.data ?? [];
+  const totalLessons = sections.reduce((sum, s) => sum + (s.lessons?.length ?? 0), 0);
+  const allCollapsed = sections.length > 0 && sections.every((s) => collapsed.has(s.id));
 
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['course-edit', id] });
+  const onErr = (err: unknown) =>
+    setError((err as ApiErrorShape).response?.data?.message ?? 'Có lỗi xảy ra, vui lòng thử lại.');
+
+  // ----- Sections -----
   const addSectionMutation = useMutation({
     mutationFn: async ({ title, position }: { title: string; position: 'top' | 'bottom' }) => {
       const res = await instructorApi.addSection(id, { title });
       if (position === 'top') {
         const newId = res?.data?.id;
-        const ids = [newId, ...sections.map((s: any) => s.id)].filter(Boolean);
+        const ids = [newId, ...sections.map((s) => s.id)].filter(Boolean);
         await instructorApi.reorderSections(id, ids);
       }
       return res;
     },
+    onMutate: () => setError(''),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['course-edit', id] });
+      invalidate();
       setAddSectionAt(null);
     },
-    onError: (err: any) => setError(err?.response?.data?.message ?? 'Lỗi'),
+    onError: onErr,
+  });
+
+  const renameSectionMutation = useMutation({
+    mutationFn: ({ sectionId, title }: { sectionId: string; title: string }) =>
+      instructorApi.updateSection(id, sectionId, { title }),
+    onMutate: () => setError(''),
+    onSuccess: () => {
+      invalidate();
+      setEditingSectionId(null);
+    },
+    onError: onErr,
   });
 
   const deleteSectionMutation = useMutation({
     mutationFn: (sectionId: string) => instructorApi.deleteSection(id, sectionId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['course-edit', id] }),
-    onError: (err: any) => setError(err?.response?.data?.message ?? 'Lỗi'),
+    onMutate: () => setError(''),
+    onSuccess: () => {
+      invalidate();
+      setConfirmDelete(null);
+    },
+    onError: (err) => {
+      onErr(err);
+      setConfirmDelete(null);
+    },
   });
 
-  const addLessonMutation = useMutation({
-    mutationFn: ({ sectionId, ...dto }: { sectionId: string; title: string; type: LessonType; description: string }) =>
-      instructorApi.addLesson(sectionId, dto),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['course-edit', id] });
-      setAddLessonForSection(null);
+  // Cập nhật lạc quan để danh sách đổi chỗ ngay lập tức, lỗi thì khôi phục
+  const reorderSectionsMutation = useMutation({
+    mutationFn: (ids: string[]) => instructorApi.reorderSections(id, ids),
+    onMutate: async (ids) => {
+      setError('');
+      await qc.cancelQueries({ queryKey: ['course-edit', id] });
+      const prev = qc.getQueryData<SectionsCache>(['course-edit', id]);
+      qc.setQueryData<SectionsCache>(
+        ['course-edit', id],
+        (old) =>
+          old && {
+            ...old,
+            data: ids
+              .map((sid) => old.data.find((s) => s.id === sid))
+              .filter((s): s is Section => s !== undefined),
+          },
+      );
+      return { prev };
     },
-    onError: (err: any) => setError(err?.response?.data?.message ?? 'Lỗi'),
+    onError: (err, _ids, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['course-edit', id], ctx.prev);
+      onErr(err);
+    },
+    onSettled: invalidate,
+  });
+
+  // ----- Lessons -----
+  const addLessonMutation = useMutation({
+    mutationFn: ({
+      sectionId,
+      ...dto
+    }: {
+      sectionId: string;
+      title: string;
+      type: LessonType;
+      description: string;
+    }) => instructorApi.addLesson(sectionId, dto),
+    onSuccess: invalidate,
+  });
+
+  const renameLessonMutation = useMutation({
+    mutationFn: ({ lessonId, title }: { lessonId: string; title: string }) =>
+      instructorApi.updateLesson(lessonId, { title }),
+    onMutate: () => setError(''),
+    onSuccess: () => {
+      invalidate();
+      setEditingLessonId(null);
+    },
+    onError: onErr,
   });
 
   const deleteLessonMutation = useMutation({
     mutationFn: (lessonId: string) => instructorApi.deleteLesson(lessonId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['course-edit', id] }),
-    onError: (err: any) => setError(err?.response?.data?.message ?? 'Lỗi'),
+    onMutate: () => setError(''),
+    onSuccess: () => {
+      invalidate();
+      setConfirmDelete(null);
+    },
+    onError: (err) => {
+      onErr(err);
+      setConfirmDelete(null);
+    },
   });
+
+  const reorderLessonsMutation = useMutation({
+    mutationFn: ({ sectionId, ids }: { sectionId: string; ids: string[] }) =>
+      instructorApi.reorderLessons(sectionId, ids),
+    onMutate: async ({ sectionId, ids }) => {
+      setError('');
+      await qc.cancelQueries({ queryKey: ['course-edit', id] });
+      const prev = qc.getQueryData<SectionsCache>(['course-edit', id]);
+      qc.setQueryData<SectionsCache>(
+        ['course-edit', id],
+        (old) =>
+          old && {
+            ...old,
+            data: old.data.map((s) =>
+              s.id !== sectionId
+                ? s
+                : {
+                    ...s,
+                    lessons: ids
+                      .map((lid) => s.lessons?.find((l) => l.id === lid))
+                      .filter((l): l is Lesson => l !== undefined),
+                  },
+            ),
+          },
+      );
+      return { prev };
+    },
+    onError: (err, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['course-edit', id], ctx.prev);
+      onErr(err);
+    },
+    onSettled: invalidate,
+  });
+
+  const handleSectionDragEnd = (e: DragEndEvent) => {
+    setActiveDragId(null);
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const ids = sections.map((s) => s.id);
+    const oldIdx = ids.indexOf(String(active.id));
+    const newIdx = ids.indexOf(String(over.id));
+    if (oldIdx < 0 || newIdx < 0) return;
+    reorderSectionsMutation.mutate(arrayMove(ids, oldIdx, newIdx));
+  };
+
+  const toggleCollapse = (sectionId: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(sectionId)) {
+        next.delete(sectionId);
+      } else {
+        next.add(sectionId);
+      }
+      return next;
+    });
 
   if (isLoading) return <LoadingSpinner />;
 
@@ -73,7 +451,8 @@ export default function CourseCurriculumPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Khung chương trình</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Tạo khóa học theo từng chương, mỗi chương tập trung vào một mục tiêu học tập. Sau đó thêm nội dung, hoạt động thực hành và bài kiểm tra.
+            Tạo khóa học theo từng chương, mỗi chương tập trung vào một mục tiêu học tập. Sau đó
+            thêm nội dung, hoạt động thực hành và bài kiểm tra.
           </p>
         </div>
         <Link
@@ -87,82 +466,311 @@ export default function CourseCurriculumPage() {
 
       {error && <ErrorMessage message={error} />}
 
-      {/* Thêm phần ở trên cùng (khung nét đứt) */}
-      <button
-        onClick={() => setAddSectionAt('top')}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-gray-200 py-3 text-sm text-gray-400 hover:border-blue-400 hover:text-blue-600"
-      >
-        <Plus size={16} />
-        Thêm phần lên đầu
-      </button>
-
-      {/* Sections */}
-      {sections.map((section: any, idx: number) => (
-        <div key={section.id} className="rounded-2xl border border-gray-100 overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 bg-slate-50">
-            <span className="font-medium text-sm">Phần {idx + 1}: {section.title}</span>
-            <button
-              onClick={() => deleteSectionMutation.mutate(section.id)}
-              className="text-red-400 hover:text-red-600 text-xs"
-            >
-              Xóa phần
-            </button>
-          </div>
-
-          {/* Lessons */}
-          <ul className="divide-y divide-gray-100">
-            {section.lessons?.map((lesson: any) => (
-              <li key={lesson.id} className="px-4 py-3 flex items-center gap-3">
-                <LessonTypeIcon type={lesson.type} size={15} className="text-gray-400 shrink-0" />
-                <Link
-                  href={`/instructor/courses/${id}/curriculum/${lesson.id}`}
-                  className="flex-1 text-left text-sm hover:text-blue-600"
-                >
-                  {lesson.title}
-                </Link>
-                <Link
-                  href={`/instructor/courses/${id}/curriculum/${lesson.id}`}
-                  className="text-xs text-blue-600 hover:underline"
-                >
-                  Chi tiết
-                </Link>
-                <button onClick={() => deleteLessonMutation.mutate(lesson.id)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
-              </li>
-            ))}
-          </ul>
-
-          {/* Add lesson */}
+      {/* Tổng quan + thu gọn/mở rộng */}
+      {sections.length > 0 && (
+        <div className="flex items-center justify-between text-xs text-gray-500">
+          <span>
+            {sections.length} phần &bull; {totalLessons} bài học
+          </span>
           <button
-            onClick={() => setAddLessonForSection(section.id)}
-            className="w-full px-4 py-2 text-xs text-blue-600 hover:bg-blue-50 text-left"
+            onClick={() =>
+              setCollapsed(allCollapsed ? new Set() : new Set(sections.map((s) => s.id)))
+            }
+            className="font-medium text-blue-600 hover:underline"
           >
-            + Thêm bài học
+            {allCollapsed ? 'Mở rộng tất cả' : 'Thu gọn tất cả'}
           </button>
         </div>
-      ))}
+      )}
+
+      {/* Thêm phần ở trên cùng */}
+      {sections.length > 0 &&
+        (addSectionAt === 'top' ? (
+          <div className="rounded-2xl border-2 border-dashed border-blue-300 bg-blue-50/40 p-3">
+            <InlineTitleForm
+              placeholder="Nhập tên phần mới..."
+              saveLabel="Thêm phần"
+              isPending={addSectionMutation.isPending}
+              onSave={(title) => addSectionMutation.mutate({ title, position: 'top' })}
+              onCancel={() => setAddSectionAt(null)}
+            />
+          </div>
+        ) : (
+          <button
+            onClick={() => setAddSectionAt('top')}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-gray-200 py-3 text-sm text-gray-400 hover:border-blue-400 hover:text-blue-600"
+          >
+            <Plus size={16} />
+            Thêm phần lên đầu
+          </button>
+        ))}
+
+      {sections.length === 0 && (
+        <div className="rounded-2xl border-2 border-dashed border-gray-200 py-10 text-center">
+          <p className="text-sm text-gray-500">
+            Chưa có phần nào. Hãy tạo phần đầu tiên cho khóa học của bạn.
+          </p>
+        </div>
+      )}
+
+      {/* Sections — kéo thả bằng nút cầm ở đầu mỗi phần */}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
+        onDragStart={(e) => setActiveDragId(String(e.active.id))}
+        onDragCancel={() => setActiveDragId(null)}
+        onDragEnd={handleSectionDragEnd}
+      >
+        <SortableContext items={sections.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+          {sections.map((section, idx) => {
+            const lessons = section.lessons ?? [];
+            // Khi đang kéo, thu gọn tạm mọi phần để danh sách ngắn lại, dễ thả đúng chỗ
+            const isCollapsed = activeDragId !== null || collapsed.has(section.id);
+            const isEditingSection = editingSectionId === section.id;
+
+            return (
+              <SortableSection
+                key={section.id}
+                id={section.id}
+                disabled={editingSectionId !== null || reorderSectionsMutation.isPending}
+              >
+                {(handleProps, isDragging) => (
+                  <div
+                    className={`overflow-hidden rounded-2xl border bg-white ${
+                      isDragging
+                        ? 'border-blue-300 shadow-lg ring-2 ring-blue-200'
+                        : 'border-gray-100'
+                    }`}
+                  >
+                    {/* Header phần */}
+                    <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-2.5">
+                      <button
+                        type="button"
+                        {...handleProps}
+                        title="Kéo để đổi vị trí phần (hoặc nhấn Space rồi dùng phím mũi tên)"
+                        aria-label="Kéo để đổi vị trí phần"
+                        className="shrink-0 cursor-grab touch-none rounded-lg p-1.5 text-gray-300 transition-colors hover:bg-gray-200/70 hover:text-gray-600 active:cursor-grabbing"
+                      >
+                        <GripVertical size={15} />
+                      </button>
+                      <IconButton
+                        label={isCollapsed ? 'Mở rộng phần' : 'Thu gọn phần'}
+                        onClick={() => toggleCollapse(section.id)}
+                      >
+                        <ChevronDown
+                          size={16}
+                          className={`transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+                        />
+                      </IconButton>
+
+                      {isEditingSection ? (
+                        <InlineTitleForm
+                          initialValue={section.title}
+                          placeholder="Tên phần..."
+                          saveLabel="Lưu"
+                          autoSelect
+                          isPending={renameSectionMutation.isPending}
+                          onSave={(title) =>
+                            renameSectionMutation.mutate({ sectionId: section.id, title })
+                          }
+                          onCancel={() => setEditingSectionId(null)}
+                        />
+                      ) : (
+                        <>
+                          <span className="min-w-0 flex-1 truncate text-sm font-medium text-gray-900">
+                            <span className="text-gray-400">Phần {idx + 1}:</span> {section.title}
+                            <span className="ml-2 text-xs font-normal text-gray-400">
+                              {lessons.length} bài học
+                            </span>
+                          </span>
+                          <div className="flex shrink-0 items-center gap-0.5">
+                            <IconButton
+                              label="Đổi tên phần"
+                              onClick={() => setEditingSectionId(section.id)}
+                            >
+                              <Pencil size={14} />
+                            </IconButton>
+                            <IconButton
+                              danger
+                              label="Xóa phần"
+                              onClick={() =>
+                                setConfirmDelete({
+                                  kind: 'section',
+                                  id: section.id,
+                                  title: section.title,
+                                  lessonCount: lessons.length,
+                                })
+                              }
+                            >
+                              <Trash2 size={14} />
+                            </IconButton>
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {!isCollapsed && (
+                      <>
+                        {/* Lessons */}
+                        <ul className="divide-y divide-gray-100">
+                          <LessonsDnd
+                            items={lessons.map((l) => l.id)}
+                            onReorder={(ids) =>
+                              reorderLessonsMutation.mutate({ sectionId: section.id, ids })
+                            }
+                          >
+                            {lessons.map((lesson, li) => (
+                              <SortableLessonRow
+                                key={lesson.id}
+                                id={lesson.id}
+                                disabled={
+                                  editingLessonId !== null || reorderLessonsMutation.isPending
+                                }
+                              >
+                                {(lessonHandle) =>
+                                  editingLessonId === lesson.id ? (
+                                    <InlineTitleForm
+                                      initialValue={lesson.title}
+                                      placeholder="Tên bài học..."
+                                      saveLabel="Lưu"
+                                      autoSelect
+                                      isPending={renameLessonMutation.isPending}
+                                      onSave={(title) =>
+                                        renameLessonMutation.mutate({ lessonId: lesson.id, title })
+                                      }
+                                      onCancel={() => setEditingLessonId(null)}
+                                    />
+                                  ) : (
+                                    <>
+                                      <button
+                                        type="button"
+                                        {...lessonHandle}
+                                        title="Kéo để đổi vị trí bài học (hoặc nhấn Space rồi dùng phím mũi tên)"
+                                        aria-label="Kéo để đổi vị trí bài học"
+                                        className="shrink-0 cursor-grab touch-none rounded-lg p-1 text-gray-300 transition-colors hover:bg-gray-200/70 hover:text-gray-600 active:cursor-grabbing"
+                                      >
+                                        <GripVertical size={14} />
+                                      </button>
+                                      <span className="w-4 shrink-0 text-right text-xs text-gray-400">
+                                        {li + 1}.
+                                      </span>
+                                      <LessonTypeIcon
+                                        type={lesson.type}
+                                        size={15}
+                                        className="shrink-0 text-gray-400"
+                                      />
+                                      <Link
+                                        href={`/instructor/courses/${id}/curriculum/${lesson.id}`}
+                                        title="Mở trang soạn nội dung bài học"
+                                        className="min-w-0 flex-1 truncate text-sm text-gray-800 hover:text-blue-600"
+                                      >
+                                        {lesson.title}
+                                      </Link>
+                                      <div className="flex shrink-0 items-center gap-0.5">
+                                        <IconButton
+                                          label="Đổi tên bài học"
+                                          onClick={() => setEditingLessonId(lesson.id)}
+                                        >
+                                          <Pencil size={14} />
+                                        </IconButton>
+                                        <IconButton
+                                          danger
+                                          label="Xóa bài học"
+                                          onClick={() =>
+                                            setConfirmDelete({
+                                              kind: 'lesson',
+                                              id: lesson.id,
+                                              title: lesson.title,
+                                            })
+                                          }
+                                        >
+                                          <Trash2 size={14} />
+                                        </IconButton>
+                                      </div>
+                                    </>
+                                  )
+                                }
+                              </SortableLessonRow>
+                            ))}
+                          </LessonsDnd>
+                          {lessons.length === 0 && (
+                            <li className="px-4 py-3 text-xs text-gray-400">
+                              Chưa có bài học nào trong phần này.
+                            </li>
+                          )}
+                        </ul>
+
+                        {/* Thêm bài học */}
+                        <button
+                          onClick={() => setAddLessonForSection(section.id)}
+                          className="flex w-full items-center gap-1.5 border-t border-gray-100 px-4 py-2.5 text-xs font-medium text-blue-600 hover:bg-blue-50"
+                        >
+                          <Plus size={14} />
+                          Thêm bài học
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </SortableSection>
+            );
+          })}
+        </SortableContext>
+      </DndContext>
 
       {/* Thêm phần ở cuối */}
-      <button
-        onClick={() => setAddSectionAt('bottom')}
-        className="w-full rounded-full bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
-      >
-        + Thêm phần mới
-      </button>
-
-      {addSectionAt && (
-        <AddSectionModal
-          position={addSectionAt}
-          isPending={addSectionMutation.isPending}
-          onClose={() => setAddSectionAt(null)}
-          onSubmit={(title) => addSectionMutation.mutate({ title, position: addSectionAt })}
-        />
+      {addSectionAt === 'bottom' ? (
+        <div className="rounded-2xl border-2 border-dashed border-blue-300 bg-blue-50/40 p-3">
+          <InlineTitleForm
+            placeholder="Nhập tên phần mới..."
+            saveLabel="Thêm phần"
+            isPending={addSectionMutation.isPending}
+            onSave={(title) => addSectionMutation.mutate({ title, position: 'bottom' })}
+            onCancel={() => setAddSectionAt(null)}
+          />
+        </div>
+      ) : (
+        <button
+          onClick={() => setAddSectionAt('bottom')}
+          className="w-full rounded-full bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+        >
+          + Thêm phần mới
+        </button>
       )}
 
       {addLessonForSection && (
         <AddLessonModal
+          sectionTitle={sections.find((s) => s.id === addLessonForSection)?.title}
           isPending={addLessonMutation.isPending}
           onClose={() => setAddLessonForSection(null)}
-          onSubmit={(dto) => addLessonMutation.mutate({ sectionId: addLessonForSection, ...dto })}
+          onSubmit={(dto) =>
+            addLessonMutation.mutateAsync({ sectionId: addLessonForSection, ...dto })
+          }
+        />
+      )}
+
+      {confirmDelete && (
+        <ConfirmDialog
+          title={confirmDelete.kind === 'section' ? 'Xóa phần này?' : 'Xóa bài học này?'}
+          message={
+            confirmDelete.kind === 'section'
+              ? `Phần "${confirmDelete.title}"${
+                  confirmDelete.lessonCount > 0
+                    ? ` cùng ${confirmDelete.lessonCount} bài học bên trong`
+                    : ''
+                } sẽ bị xóa vĩnh viễn.`
+              : `Bài học "${confirmDelete.title}" cùng toàn bộ nội dung sẽ bị xóa vĩnh viễn.`
+          }
+          isPending={deleteSectionMutation.isPending || deleteLessonMutation.isPending}
+          onCancel={() => setConfirmDelete(null)}
+          onConfirm={() => {
+            if (confirmDelete.kind === 'section') {
+              deleteSectionMutation.mutate(confirmDelete.id);
+            } else {
+              deleteLessonMutation.mutate(confirmDelete.id);
+            }
+          }}
         />
       )}
     </div>
