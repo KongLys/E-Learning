@@ -111,7 +111,7 @@ export function VideoPlayer({ lessonId, videoUrl, initialPositionSec = 0, onTime
   };
 
   return (
-    <div className="bg-black rounded-xl overflow-hidden">
+    <div className="bg-black rounded-2xl overflow-hidden shadow-sm ring-1 ring-black/5">
       <video ref={videoRef} className="w-full aspect-video" />
       <div className="bg-gray-900 text-white px-4 py-3 space-y-2">
         <input

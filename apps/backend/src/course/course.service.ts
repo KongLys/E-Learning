@@ -254,11 +254,22 @@ export class CourseService {
   }
 
   async getInstructorCourses(instructorId: string) {
-    return this.prisma.course.findMany({
+    const courses = await this.prisma.course.findMany({
       where: { instructorId },
       orderBy: { createdAt: 'desc' },
       include: { category: true },
     });
+
+    // `Course.totalStudents` is not denormalized, so derive live enrollment
+    // counts (active + completed, i.e. everyone not cancelled) per course.
+    const enrollmentCounts = await this.prisma.enrollment.groupBy({
+      by: ['courseId'],
+      where: { courseId: { in: courses.map((c) => c.id) }, status: { not: 'cancelled' } },
+      _count: { _all: true },
+    });
+    const countByCourse = new Map(enrollmentCounts.map((g) => [g.courseId, g._count._all]));
+
+    return courses.map((c) => ({ ...c, totalStudents: countByCourse.get(c.id) ?? 0 }));
   }
 
   async listAdminCourses(query: { status?: string; page?: number; limit?: number }) {

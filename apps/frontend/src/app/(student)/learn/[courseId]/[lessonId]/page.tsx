@@ -6,6 +6,7 @@ import { learnApi } from '@/lib/api/learn.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { VideoPlayer } from '@/components/learn/VideoPlayer';
 import { NotesPanel } from '@/components/learn/NotesPanel';
+import { QuestionsPanel } from '@/components/learn/QuestionsPanel';
 import { QuizUI } from '@/components/learn/QuizUI';
 import { LearnSidebar } from '@/components/learn/LearnSidebar';
 import { SafeHtml } from '@/components/common/SafeHtml';
@@ -17,7 +18,10 @@ export default function LearnPage() {
   const router = useRouter();
   const qc = useQueryClient();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [outlineCollapsed, setOutlineCollapsed] = useState(false);
   const [tab, setTab] = useState<'notes' | 'questions'>('notes');
+  const [qaOpen, setQaOpen] = useState(false);
+  const [noteAddSignal, setNoteAddSignal] = useState(0);
   const videoTimeRef = useRef(0);
   const completedRef = useRef(false);
 
@@ -107,26 +111,55 @@ export default function LearnPage() {
   const videoCompletionMode: 'percent_90' | 'ended_autonext' = lesson.videoAsset?.completionMode ?? 'percent_90';
   const docReadEnough = readSec >= minReadTime;
 
+  const jumpToVideo = (pos: number) => {
+    const video = document.querySelector('video');
+    if (video) { video.currentTime = pos; video.play().catch(() => {}); }
+  };
+
+  const notePositionType = lesson.type === 'video' ? 'video_timestamp' : lesson.type === 'document' ? 'document_page' : 'none';
+  const courseTitle: string | undefined = lesson?.section?.course?.title;
+  const saveNote = () => { setTab('notes'); setNoteAddSignal((n) => n + 1); };
+  const TABS: [typeof tab, string][] = [['notes', 'Ghi chú'], ['questions', 'Hỏi đáp']];
+
   return (
     <div className="flex flex-col h-screen">
       {/* Top bar */}
-      <header className="border-b px-4 py-3 flex items-center gap-4 bg-white">
-        <Link href={`/my-courses`} className="text-sm text-gray-500 hover:text-gray-700">← Khóa học</Link>
-        <h1 className="font-semibold text-gray-900 flex-1 truncate">{lesson.title}</h1>
+      <header className="border-b border-gray-100 px-4 py-3 flex items-center gap-3 bg-white shrink-0">
+        <button
+          onClick={() => { setOutlineCollapsed((v) => !v); setSidebarOpen(true); }}
+          className="text-gray-600 hover:text-gray-900 text-xl leading-none px-1"
+          aria-label="Mở/đóng nội dung khóa học"
+        >
+          ☰
+        </button>
+        <Link href={`/my-courses`} className="font-medium text-gray-700 hover:text-gray-900 flex-1 truncate" title="Quay lại khóa học của tôi">
+          {courseTitle ?? '← Khóa học của tôi'}
+        </Link>
         <Link
           href={`/learn/${courseId}/ai`}
           className="text-sm bg-purple-600 text-white px-3 py-1.5 rounded hover:bg-purple-700"
         >
-          Hỏi AI
+          ✦ Hỏi AI
         </Link>
-        <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-sm border px-3 py-1.5 rounded">☰ Nội dung</button>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Main content */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-4">
-          {lesson.description && <p className="text-sm text-gray-600">{lesson.description}</p>}
+        {/* Course outline (left) */}
+        <LearnSidebar
+          courseId={courseId}
+          courseTitle={courseTitle}
+          currentLessonId={lessonId}
+          sections={sections}
+          lessonProgress={lessonProgress}
+          progressPercent={progress?.progressPercent ?? 0}
+          isOpen={sidebarOpen}
+          collapsed={outlineCollapsed}
+          onClose={() => { setSidebarOpen(false); setOutlineCollapsed(true); }}
+        />
 
+        {/* Main content */}
+        <main className="flex-1 overflow-y-auto p-4 lg:p-6">
+          <div className="max-w-4xl mx-auto space-y-5">
           {lesson.type === 'video' && videoUrlData?.data?.url && (
             <VideoPlayer
               lessonId={lessonId}
@@ -148,27 +181,27 @@ export default function LearnPage() {
             <div className="space-y-4">
               {/* Nội dung rich text */}
               {lesson.documentAsset?.contentHtml && (
-                <SafeHtml html={lesson.documentAsset.contentHtml} className="prose prose-sm max-w-none border rounded-xl p-4" />
+                <SafeHtml html={lesson.documentAsset.contentHtml} className="prose prose-sm max-w-none rounded-2xl bg-slate-50 p-6" />
               )}
 
               {/* File đính kèm */}
               {docUrlData?.data?.url ? (
                 lesson.documentAsset?.fileType === 'pdf' ? (
-                  <iframe src={docUrlData.data.url} className="w-full h-150 border rounded-xl" title="PDF" />
+                  <iframe src={docUrlData.data.url} className="w-full h-150 rounded-2xl ring-1 ring-gray-100" title="PDF" />
                 ) : (
-                  <div className="text-center text-gray-600 py-8 border rounded-xl">
+                  <div className="text-center text-gray-600 py-10 rounded-2xl bg-slate-50">
                     <p className="mb-3">Tài liệu Word (.docx)</p>
-                    <a href={docUrlData.data.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">Tải về để đọc</a>
+                    <a href={docUrlData.data.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline font-medium">Tải về để đọc</a>
                   </div>
                 )
               ) : (
-                !lesson.documentAsset?.contentHtml && <div className="text-center py-8 text-gray-400">Tài liệu chưa được tải lên</div>
+                !lesson.documentAsset?.contentHtml && <div className="text-center py-10 text-gray-400">Tài liệu chưa được tải lên</div>
               )}
 
               <button
                 onClick={completeDocument}
                 disabled={!docReadEnough || completeMutation.isPending}
-                className="w-full border border-green-500 text-green-600 py-2.5 rounded-lg text-sm font-medium hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`w-full py-3 rounded-full text-sm font-semibold transition-colors disabled:cursor-not-allowed ${docReadEnough ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-slate-100 text-gray-400'}`}
               >
                 {completeMutation.isPending
                   ? 'Đang lưu...'
@@ -187,50 +220,80 @@ export default function LearnPage() {
             />
           )}
 
-          {/* Tabs: notes / questions */}
-          <div className="border rounded-xl overflow-hidden">
-            <div className="flex border-b">
-              {(['notes', 'questions'] as const).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setTab(t)}
-                  className={`flex-1 py-2.5 text-sm font-medium ${tab === t ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
-                >
-                  {t === 'notes' ? 'Ghi chú' : 'Câu hỏi nhanh'}
-                </button>
-              ))}
+          {/* Tiêu đề bài học + hành động */}
+          <div className="flex items-start justify-between gap-4 pt-1">
+            <h2 className="text-xl lg:text-2xl font-bold text-gray-900 leading-snug">{lesson.title}</h2>
+            {lesson.type === 'video' && (
+              <button
+                onClick={saveNote}
+                className="shrink-0 inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700"
+              >
+                🗒 Lưu ghi chú
+              </button>
+            )}
+          </div>
+          {lesson.description && <p className="text-sm text-gray-600 -mt-3">{lesson.description}</p>}
+
+          {/* Video: tabs Phụ đề / Ghi chú / Hỏi đáp */}
+          {lesson.type === 'video' && (
+            <div>
+              <div className="flex gap-6 border-b">
+                {TABS.map(([key, label]) => (
+                  <button
+                    key={key}
+                    onClick={() => setTab(key)}
+                    className={`py-3 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === key ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-800'}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="pt-4">
+                {tab === 'notes' && (
+                  <NotesPanel
+                    lessonId={lessonId}
+                    lessonTitle={lesson.title}
+                    positionType={notePositionType}
+                    getCurrentPosition={() => videoTimeRef.current}
+                    onJumpTo={jumpToVideo}
+                    addSignal={noteAddSignal}
+                  />
+                )}
+                {tab === 'questions' && (
+                  <QuestionsPanel
+                    lessonId={lessonId}
+                    positionType="video_timestamp"
+                    getCurrentPosition={() => videoTimeRef.current}
+                    onJumpTo={jumpToVideo}
+                  />
+                )}
+              </div>
             </div>
-            <div className="p-4">
-              {tab === 'notes' && (
-                <NotesPanel
-                  lessonId={lessonId}
-                  positionType={lesson.type === 'video' ? 'video_timestamp' : lesson.type === 'document' ? 'document_page' : 'none'}
-                  getCurrentPosition={() => videoTimeRef.current}
-                  onJumpTo={(pos) => {
-                    const video = document.querySelector('video');
-                    if (video) video.currentTime = pos;
-                  }}
-                />
-              )}
-              {tab === 'questions' && (
-                <div className="text-sm text-gray-500 text-center py-4">
-                  Tính năng câu hỏi nhanh (Phase 12)
+          )}
+
+          {/* Document: nút mở Hỏi đáp (mặc định đóng) */}
+          {lesson.type === 'document' && (
+            <div className="rounded-2xl bg-slate-50 overflow-hidden">
+              <button
+                onClick={() => setQaOpen((v) => !v)}
+                className="w-full flex items-center justify-between px-4 py-3.5 text-sm font-semibold text-gray-800 hover:bg-slate-100/70 transition-colors"
+              >
+                <span>💬 Hỏi đáp</span>
+                <span className={`text-gray-400 transition-transform ${qaOpen ? 'rotate-180' : ''}`}>⌄</span>
+              </button>
+              {qaOpen && (
+                <div className="px-4 pb-4">
+                  <QuestionsPanel
+                    lessonId={lessonId}
+                    positionType="none"
+                    getCurrentPosition={() => 0}
+                  />
                 </div>
               )}
             </div>
+          )}
           </div>
         </main>
-
-        {/* Sidebar */}
-        <LearnSidebar
-          courseId={courseId}
-          currentLessonId={lessonId}
-          sections={sections}
-          lessonProgress={lessonProgress}
-          progressPercent={progress?.progressPercent ?? 0}
-          isOpen={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-        />
       </div>
     </div>
   );

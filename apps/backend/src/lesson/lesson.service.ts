@@ -105,7 +105,12 @@ export class LessonService {
   async getLesson(lessonId: string, userId?: string) {
     const lesson = await this.prisma.lesson.findUnique({
       where: { id: lessonId },
-      include: { videoAsset: true, documentAsset: true, quizLesson: true },
+      include: {
+        videoAsset: true,
+        documentAsset: true,
+        quizLesson: true,
+        section: { select: { course: { select: { id: true, title: true } } } },
+      },
     });
     if (!lesson) throw new NotFoundException('Lesson not found');
 
