@@ -2,6 +2,7 @@ import { apiClient } from './axios';
 
 export interface CourseFilter {
   search?: string;
+  category?: string;
   categoryId?: string;
   level?: string;
   price?: 'free' | 'paid';

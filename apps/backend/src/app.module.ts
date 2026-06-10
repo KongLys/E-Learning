@@ -27,6 +27,7 @@ import { NotificationModule } from './notification/notification.module';
 import { InstructorStatsModule } from './instructor-stats/instructor-stats.module';
 import { AiModule } from './ai/ai.module';
 import { ModerationModule } from './moderation/moderation.module';
+import { CouponModule } from './coupon/coupon.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 
@@ -102,6 +103,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
     ChatModule,
     AiModule,
     ModerationModule,
+    CouponModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

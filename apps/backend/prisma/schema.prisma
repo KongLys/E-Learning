@@ -136,6 +136,7 @@ model User {
   conversationReads    ConversationRead[]
   messageReactions     MessageReaction[]
   aiConversations     AiConversation[]
+  coupons             Coupon[]
 
   @@map("users")
 }
@@ -175,6 +176,10 @@ model Course {
   createdAt        DateTime     @default(now()) @map("created_at")
   publishedAt      DateTime?    @map("published_at")
 
+  objectives     String[]         @default([])
+  targetAudience String[]         @default([]) @map("target_audience")
+  requirements   String[]         @default([])
+
   moderationStatus ModerationStatus @default(pending) @map("moderation_status")
   moderationLabel  String?          @map("moderation_label")
   moderationScore  Float?           @map("moderation_score")
@@ -193,6 +198,7 @@ model Course {
   chunks          CourseChunk[]
   aiConversations AiConversation[]
   mindmaps        CourseMindmap[]
+  coupons         Coupon[]
 
   @@index([instructorId])
   @@index([categoryId])
@@ -781,4 +787,25 @@ model AiMessage {
 
   @@index([conversationId, createdAt])
   @@map("ai_messages")
+}
+
+// ─── Coupons ──────────────────────────────────────────────────────────────────
+
+model Coupon {
+  id           String    @id @default(uuid())
+  code         String    @unique
+  instructorId String    @map("instructor_id")
+  courseId     String?   @map("course_id")
+  discountPct  Int       @map("discount_pct") // 1-100
+  maxUses      Int       @default(0) @map("max_uses") // 0 = unlimited
+  usedCount    Int       @default(0) @map("used_count")
+  expiresAt    DateTime? @map("expires_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  instructor User    @relation(fields: [instructorId], references: [id], onDelete: Cascade)
+  course     Course? @relation(fields: [courseId], references: [id], onDelete: SetNull)
+
+  @@index([instructorId])
+  @@index([code])
+  @@map("coupons")
 }

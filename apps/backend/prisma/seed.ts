@@ -4,24 +4,26 @@ import * as bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 
 async function main() {
-  // Categories
-  const [lapTrinh, thietKe, kinhDoanh] = await Promise.all([
-    prisma.category.upsert({
-      where: { slug: 'lap-trinh' },
-      update: {},
-      create: { name: 'Lập trình', slug: 'lap-trinh', description: 'Các khóa học lập trình' },
-    }),
-    prisma.category.upsert({
-      where: { slug: 'thiet-ke' },
-      update: {},
-      create: { name: 'Thiết kế', slug: 'thiet-ke', description: 'Các khóa học thiết kế' },
-    }),
-    prisma.category.upsert({
-      where: { slug: 'kinh-doanh' },
-      update: {},
-      create: { name: 'Kinh doanh', slug: 'kinh-doanh', description: 'Các khóa học kinh doanh' },
-    }),
-  ]);
+  // Categories — chỉ dành cho ngành Công nghệ thông tin
+  const itCategories = [
+    { name: 'Lập trình Web', slug: 'lap-trinh-web', description: 'Phát triển ứng dụng web (frontend & backend)' },
+    { name: 'Lập trình Mobile', slug: 'lap-trinh-mobile', description: 'Phát triển ứng dụng di động' },
+    { name: 'Khoa học dữ liệu & AI', slug: 'khoa-hoc-du-lieu-ai', description: 'Khoa học dữ liệu, máy học và trí tuệ nhân tạo' },
+    { name: 'An ninh mạng', slug: 'an-ninh-mang', description: 'Bảo mật và an toàn thông tin' },
+    { name: 'DevOps & Cloud', slug: 'devops-cloud', description: 'DevOps, CI/CD và điện toán đám mây' },
+    { name: 'Cơ sở dữ liệu', slug: 'co-so-du-lieu', description: 'Thiết kế và quản trị cơ sở dữ liệu' },
+  ];
+
+  const categories = await Promise.all(
+    itCategories.map((c) =>
+      prisma.category.upsert({ where: { slug: c.slug }, update: { name: c.name, description: c.description }, create: c }),
+    ),
+  );
+
+  // Loại bỏ mọi category không thuộc ngành CNTT (course liên quan sẽ được set null tự động)
+  await prisma.category.deleteMany({ where: { slug: { notIn: itCategories.map((c) => c.slug) } } });
+
+  const lapTrinh = categories[0]; // Lập trình Web — dùng cho khóa học demo
 
   // Users
   const adminHash = await bcrypt.hash('Admin@123', 10);
@@ -210,7 +212,7 @@ async function main() {
   ]);
 
   console.log('✅ Seed completed:', {
-    categories: [lapTrinh.slug, thietKe.slug, kinhDoanh.slug],
+    categories: categories.map((c) => c.slug),
     users: [admin.email, instructor.email, student.email],
     course: course.slug,
   });

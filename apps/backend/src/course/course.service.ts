@@ -39,6 +39,9 @@ export class CourseService {
         level: (dto.level as 'beginner' | 'intermediate' | 'advanced') ?? 'beginner',
         language: dto.language ?? 'vi',
         categoryId: dto.categoryId,
+        objectives: dto.objectives ?? [],
+        targetAudience: dto.targetAudience ?? [],
+        requirements: dto.requirements ?? [],
       },
     });
     await this.moderation.moderateCourse(course.id, instructorId, course.title, course.description);
@@ -62,6 +65,9 @@ export class CourseService {
         level: dto.level as 'beginner' | 'intermediate' | 'advanced' | undefined,
         language: dto.language,
         categoryId: dto.categoryId,
+        ...(dto.objectives !== undefined && { objectives: dto.objectives }),
+        ...(dto.targetAudience !== undefined && { targetAudience: dto.targetAudience }),
+        ...(dto.requirements !== undefined && { requirements: dto.requirements }),
       },
     });
     // Re-moderate when the moderated text fields change.
@@ -198,6 +204,10 @@ export class CourseService {
     return { courses, total, page, limit };
   }
 
+  async listCategories() {
+    return this.prisma.category.findMany({ orderBy: { name: 'asc' } });
+  }
+
   async getCourseBySlug(slug: string) {
     const course = await this.prisma.course.findUnique({
       where: { slug },
@@ -216,6 +226,28 @@ export class CourseService {
       },
     });
     if (!course) throw new NotFoundException('Course not found');
+    return course;
+  }
+
+  async getCourseForManage(courseId: string, userId: string, userRole: string) {
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
+      include: {
+        instructor: { select: { id: true, fullName: true, avatarUrl: true, bio: true } },
+        category: true,
+        sections: {
+          orderBy: { orderIndex: 'asc' },
+          include: {
+            lessons: {
+              orderBy: { orderIndex: 'asc' },
+              select: { id: true, title: true, type: true, durationSec: true, isPreview: true, orderIndex: true },
+            },
+          },
+        },
+      },
+    });
+    if (!course) throw new NotFoundException('Course not found');
+    this.assertOwnerOrAdmin(course, userId, userRole);
     return course;
   }
 

@@ -24,7 +24,7 @@ export class StorageService implements OnModuleInit {
       .get<string>('R2_PUBLIC_URL', '')
       .replace(/\/$/, '');
     this.client = new S3Client({
-      endpoint: this.config.get<string>('R2_ENDPOINT'),
+      endpoint: this.sanitizeEndpoint(this.config.get<string>('R2_ENDPOINT')),
       region: this.config.get<string>('R2_REGION', 'auto'),
       forcePathStyle: true,
       credentials: {
@@ -101,6 +101,29 @@ export class StorageService implements OnModuleInit {
     await this.client
       .send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }))
       .catch(() => undefined);
+  }
+
+  /**
+   * R2's S3 API endpoint must be the bare account host (no path). With
+   * forcePathStyle the SDK appends `/<bucket>/<key>` itself, so a stray path
+   * segment (e.g. the bucket name) doubles the prefix and breaks public URLs.
+   * Strip any path and warn rather than letting it silently corrupt keys.
+   */
+  private sanitizeEndpoint(endpoint?: string): string | undefined {
+    if (!endpoint) return endpoint;
+    try {
+      const url = new URL(endpoint);
+      if (url.pathname && url.pathname !== '/') {
+        this.logger.warn(
+          `R2_ENDPOINT must not contain a path ('${url.pathname}') — using origin '${url.origin}'. ` +
+            `The bucket is added separately via R2_BUCKET.`,
+        );
+      }
+      return url.origin;
+    } catch {
+      this.logger.warn(`R2_ENDPOINT is not a valid URL: '${endpoint}'`);
+      return endpoint;
+    }
   }
 
   getPublicUrl(key: string): string {

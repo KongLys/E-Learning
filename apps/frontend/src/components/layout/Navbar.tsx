@@ -61,6 +61,42 @@ function ChevronDownIcon() {
   );
 }
 
+function SearchIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.35-4.35" />
+    </svg>
+  );
+}
+
+function NavSearch() {
+  const router = useRouter();
+  const [value, setValue] = useState('');
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        const q = value.trim();
+        router.push(q ? `/courses?search=${encodeURIComponent(q)}` : '/courses');
+      }}
+      className="relative w-full max-w-md"
+    >
+      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-soft pointer-events-none">
+        <SearchIcon />
+      </span>
+      <input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="Tìm kiếm khóa học..."
+        aria-label="Tìm kiếm khóa học"
+        className="w-full rounded-pill border border-hairline-strong bg-surface-card pl-10 pr-4 py-2 text-sm text-ink placeholder:text-muted-soft focus:outline-none focus:border-emphasis transition-colors"
+      />
+    </form>
+  );
+}
+
 function NotificationBell() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -215,9 +251,6 @@ function UserMenu() {
                 <Link href="/instructor/dashboard" onClick={() => setOpen(false)} className="block px-4 py-2 text-sm text-muted hover:text-ink hover:bg-canvas transition-colors">
                   Trang giảng viên
                 </Link>
-                <Link href="/instructor/statistics" onClick={() => setOpen(false)} className="block px-4 py-2 text-sm text-muted hover:text-ink hover:bg-canvas transition-colors">
-                  Thống kê
-                </Link>
               </>
             )}
             {user.role === 'admin' && (
@@ -245,76 +278,65 @@ export function Navbar() {
 
   return (
     <nav className="sticky top-0 z-40 h-16 bg-canvas/95 backdrop-blur-sm border-b border-hairline">
-      <div className="max-w-300 mx-auto h-full px-6 flex items-center justify-between">
-        {/* Logo */}
+      <div className="max-w-300 mx-auto h-full px-6 flex items-center gap-6">
+        {/* Left: Logo + Nav links */}
         <Link href="/" className="font-display text-xl text-ink select-none shrink-0">
           ELearn
         </Link>
 
         {/* Nav links */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 shrink-0">
           <Link
             href="/courses"
-            className={`px-4 py-2 text-[15px] font-medium transition-colors ${
-              isActive('/courses')
-                ? 'text-ink border-b-2 border-ink pb-1.5'
-                : 'text-muted hover:text-ink rounded-lg hover:bg-surface-strong'
-            }`}
+            className={`px-4 py-2 text-[15px] font-medium transition-colors ${isActive('/courses')
+              ? 'text-ink border-b-2 border-ink pb-1.5'
+              : 'text-muted hover:text-ink rounded-lg hover:bg-surface-strong'
+              }`}
           >
             Khám phá
           </Link>
+        </div>
+
+        {/* Center: Search */}
+        <div className="flex flex-1 justify-center">
+          <NavSearch />
+        </div>
+
+        {/* Right */}
+        <div className="flex items-center gap-2 shrink-0">
           {user?.role === 'student' && (
             <Link
               href="/my-courses"
-              className={`px-4 py-2 text-[15px] font-medium transition-colors ${
-                isActive('/my-courses')
-                  ? 'text-ink border-b-2 border-ink pb-1.5'
-                  : 'text-muted hover:text-ink rounded-lg hover:bg-surface-strong'
-              }`}
+              className={`px-4 py-2 text-[15px] font-medium transition-colors ${isActive('/my-courses')
+                ? 'text-ink border-b-2 border-ink pb-1.5'
+                : 'text-muted hover:text-ink rounded-lg hover:bg-surface-strong'
+                }`}
             >
               Khóa học của tôi
             </Link>
           )}
           {user?.role === 'instructor' && (
-            <>
-              <Link
-                href="/instructor/dashboard"
-                className={`px-4 py-2 text-[15px] font-medium transition-colors ${
-                  isActive('/instructor/dashboard') || isActive('/instructor/courses') || isActive('/instructor/questions')
-                    ? 'text-ink border-b-2 border-ink pb-1.5'
-                    : 'text-muted hover:text-ink rounded-lg hover:bg-surface-strong'
+            <Link
+              href="/instructor/dashboard"
+              className={`px-4 py-2 text-[15px] font-medium transition-colors ${isActive('/instructor/dashboard') || isActive('/instructor/courses') || isActive('/instructor/questions')
+                ? 'text-ink border-b-2 border-ink pb-1.5'
+                : 'text-muted hover:text-ink rounded-lg hover:bg-surface-strong'
                 }`}
-              >
-                Giảng dạy
-              </Link>
-              <Link
-                href="/instructor/statistics"
-                className={`px-4 py-2 text-[15px] font-medium transition-colors ${
-                  isActive('/instructor/statistics')
-                    ? 'text-ink border-b-2 border-ink pb-1.5'
-                    : 'text-muted hover:text-ink rounded-lg hover:bg-surface-strong'
-                }`}
-              >
-                Thống kê
-              </Link>
-            </>
+            >
+              Giảng dạy
+            </Link>
           )}
           {user?.role === 'admin' && (
             <Link
               href="/admin"
-              className={`px-4 py-2 text-[15px] font-medium transition-colors ${
-                isActive('/admin')
-                  ? 'text-ink border-b-2 border-ink pb-1.5'
-                  : 'text-muted hover:text-ink rounded-lg hover:bg-surface-strong'
-              }`}
+              className={`px-4 py-2 text-[15px] font-medium transition-colors ${isActive('/admin')
+                ? 'text-ink border-b-2 border-ink pb-1.5'
+                : 'text-muted hover:text-ink rounded-lg hover:bg-surface-strong'
+                }`}
             >
               Admin
             </Link>
           )}
-        </div>
-
-        {/* Right */}
-        <div className="flex items-center gap-2">
           {user ? (
             <>
               {(user.role === 'student' || user.role === 'instructor') && (

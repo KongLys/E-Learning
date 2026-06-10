@@ -28,4 +28,14 @@ export class InstructorStatsController {
   ) {
     return this.statsService.getCourseStats(user.userId, courseId);
   }
+
+  @Get('stats/engagement')
+  getEngagement(@CurrentUser() user: { userId: string }) {
+    return this.statsService.getEngagement(user.userId);
+  }
+
+  @Get('stats/quiz-insights')
+  getQuizInsights(@CurrentUser() user: { userId: string }) {
+    return this.statsService.getQuizInsights(user.userId);
+  }
 }

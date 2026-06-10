@@ -29,6 +29,12 @@ export class CourseController {
   }
 
   @Public()
+  @Get('courses/categories')
+  listCategories() {
+    return this.courseService.listCategories();
+  }
+
+  @Public()
   @Get('courses/:slug')
   getBySlug(@Param('slug') slug: string) {
     return this.courseService.getCourseBySlug(slug);
@@ -75,5 +81,13 @@ export class CourseController {
   @Get('instructor/courses')
   myCourses(@CurrentUser() user: { userId: string }) {
     return this.courseService.getInstructorCourses(user.userId);
+  }
+
+  @Get('courses/:id/manage')
+  getForManage(
+    @CurrentUser() user: { userId: string; role: string },
+    @Param('id') id: string,
+  ) {
+    return this.courseService.getCourseForManage(id, user.userId, user.role);
   }
 }

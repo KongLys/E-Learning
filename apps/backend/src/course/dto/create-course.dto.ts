@@ -1,4 +1,4 @@
-import { IsIn, IsNumber, IsOptional, IsString, IsUUID, Min, MinLength } from 'class-validator';
+import { IsArray, IsIn, IsNumber, IsOptional, IsString, IsUUID, Min, MinLength } from 'class-validator';
 
 export class CreateCourseDto {
   @IsString()
@@ -34,4 +34,19 @@ export class CreateCourseDto {
   @IsOptional()
   @IsUUID()
   categoryId?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  objectives?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  targetAudience?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  requirements?: string[];
 }
