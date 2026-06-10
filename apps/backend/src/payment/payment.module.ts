@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 import { PaymentController } from './payment.controller';
 import { PaymentService } from './payment.service';
-import { VnpayService } from './vnpay/vnpay.service';
+import { SepayService } from './sepay/sepay.service';
 
 @Module({
   controllers: [PaymentController],
-  providers: [PaymentService, VnpayService],
+  providers: [PaymentService, SepayService],
 })
 export class PaymentModule {}

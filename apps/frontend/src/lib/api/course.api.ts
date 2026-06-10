@@ -23,9 +23,21 @@ export const enrollmentApi = {
   getProgress: (courseId: string) => apiClient.get(`/enrollments/${courseId}/progress`),
 };
 
+export interface SepayPaymentInfo {
+  orderId: string;
+  qrUrl: string;
+  transferCode: string;
+  amount: number;
+  currency: string;
+  accountNumber: string;
+  bankCode: string;
+  accountName: string;
+}
+
 export const orderApi = {
   createOrder: (courseIds: string[], idempotencyKey: string) =>
     apiClient.post('/orders', { courseIds, idempotencyKey }),
-  initiatePayment: (orderId: string, returnUrl: string) =>
-    apiClient.post('/payments/initiate', { orderId, gateway: 'vnpay', returnUrl }),
+  initiatePayment: (orderId: string) =>
+    apiClient.post<SepayPaymentInfo>('/payments/initiate', { orderId }),
+  getOrder: (orderId: string) => apiClient.get(`/orders/${orderId}`),
 };

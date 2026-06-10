@@ -3,11 +3,12 @@
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { courseApi, enrollmentApi, orderApi } from '@/lib/api/course.api';
+import { courseApi, enrollmentApi, orderApi, type SepayPaymentInfo } from '@/lib/api/course.api';
 import { useAuthStore } from '@/store/auth.store';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorMessage } from '@/components/common/ErrorMessage';
 import { PriceDisplay } from '@/components/ui/PriceDisplay';
+import { PaymentQrModal } from '@/components/payment/PaymentQrModal';
 import { formatDuration } from '@/lib/utils';
 import { useState } from 'react';
 
@@ -74,6 +75,7 @@ export default function CourseDetailPage() {
   const router = useRouter();
   const [enrollError, setEnrollError] = useState('');
   const [openSection, setOpenSection] = useState<string | null>(null);
+  const [payment, setPayment] = useState<SepayPaymentInfo | null>(null);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['course', slug],
@@ -101,10 +103,10 @@ export default function CourseDetailPage() {
     mutationFn: async () => {
       const key = `${user!.id}-${course.id}-${Date.now()}`;
       const { data: order } = await orderApi.createOrder([course.id], key);
-      const returnUrl = `${window.location.origin}/checkout/success`;
-      const { data: payment } = await orderApi.initiatePayment(order.orderId, returnUrl);
-      window.location.href = payment.paymentUrl;
+      const { data: paymentInfo } = await orderApi.initiatePayment(order.orderId);
+      return paymentInfo;
     },
+    onSuccess: (paymentInfo) => setPayment(paymentInfo),
     onError: (err: any) => setEnrollError(err?.response?.data?.message ?? 'Lỗi thanh toán'),
   });
 
@@ -294,6 +296,15 @@ export default function CourseDetailPage() {
           </div>
         </div>
       </div>
+
+      {payment && (
+        <PaymentQrModal
+          payment={payment}
+          courseId={course.id}
+          onClose={() => setPayment(null)}
+          onPaid={() => router.push(`/learn/${course.id}`)}
+        />
+      )}
     </div>
   );
 }

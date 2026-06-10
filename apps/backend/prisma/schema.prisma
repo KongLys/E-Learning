@@ -477,7 +477,8 @@ model OrderItem {
 model Payment {
   id           String        @id @default(uuid())
   orderId      String        @unique @map("order_id")
-  gateway      String        @default("vnpay")
+  gateway      String        @default("sepay")
+  transferCode String?       @unique @map("transfer_code")
   gatewayTxnId String?       @map("gateway_txn_id")
   amount       Decimal       @db.Decimal(12, 2)
   currency     String        @default("VND")
