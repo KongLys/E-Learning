@@ -23,7 +23,7 @@ export function AddSectionModal({ position, onSubmit, onClose, isPending }: AddS
         className="bg-white rounded-2xl w-full max-w-md my-8 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <h2 className="text-lg font-bold">
             Thêm phần mới {position === 'top' ? '(lên đầu)' : '(xuống cuối)'}
           </h2>
@@ -42,18 +42,18 @@ export function AddSectionModal({ position, onSubmit, onClose, isPending }: AddS
               if (e.key === 'Enter' && canSubmit) onSubmit(title.trim());
             }}
             placeholder="Tên phần mới..."
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            className="w-full text-sm bg-white rounded-xl px-3 py-2.5 outline-none ring-1 ring-gray-200 focus:ring-2 focus:ring-blue-400"
           />
         </div>
 
-        <div className="flex justify-end gap-2 px-6 py-4 border-t">
-          <button onClick={onClose} className="text-sm border px-4 py-2 rounded-lg">
+        <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-100">
+          <button onClick={onClose} className="text-sm text-gray-600 px-4 py-2 rounded-full hover:bg-gray-100 transition-colors">
             Hủy
           </button>
           <button
             onClick={() => onSubmit(title.trim())}
             disabled={!canSubmit}
-            className="text-sm bg-purple-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50"
+            className="text-sm bg-blue-600 text-white px-4 py-2 rounded-full font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
           >
             {isPending ? 'Đang thêm...' : 'Thêm phần'}
           </button>

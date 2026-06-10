@@ -78,7 +78,7 @@ export default function CourseCurriculumPage() {
         </div>
         <Link
           href={`/instructor/courses/${id}/materials`}
-          className="flex shrink-0 items-center gap-1.5 rounded-md border border-purple-200 px-3 py-2 text-sm font-medium text-purple-700 hover:bg-purple-50"
+          className="flex shrink-0 items-center gap-1.5 rounded-full border border-blue-200 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
         >
           <FileText size={15} />
           Tài liệu khóa học
@@ -90,7 +90,7 @@ export default function CourseCurriculumPage() {
       {/* Thêm phần ở trên cùng (khung nét đứt) */}
       <button
         onClick={() => setAddSectionAt('top')}
-        className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-300 py-3 text-sm text-gray-400 hover:border-purple-400 hover:text-purple-600"
+        className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-gray-200 py-3 text-sm text-gray-400 hover:border-blue-400 hover:text-blue-600"
       >
         <Plus size={16} />
         Thêm phần lên đầu
@@ -98,8 +98,8 @@ export default function CourseCurriculumPage() {
 
       {/* Sections */}
       {sections.map((section: any, idx: number) => (
-        <div key={section.id} className="border rounded-xl overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 bg-gray-50">
+        <div key={section.id} className="rounded-2xl border border-gray-100 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 bg-slate-50">
             <span className="font-medium text-sm">Phần {idx + 1}: {section.title}</span>
             <button
               onClick={() => deleteSectionMutation.mutate(section.id)}
@@ -110,19 +110,19 @@ export default function CourseCurriculumPage() {
           </div>
 
           {/* Lessons */}
-          <ul className="divide-y">
+          <ul className="divide-y divide-gray-100">
             {section.lessons?.map((lesson: any) => (
               <li key={lesson.id} className="px-4 py-3 flex items-center gap-3">
                 <LessonTypeIcon type={lesson.type} size={15} className="text-gray-400 shrink-0" />
                 <Link
                   href={`/instructor/courses/${id}/curriculum/${lesson.id}`}
-                  className="flex-1 text-left text-sm hover:text-purple-600"
+                  className="flex-1 text-left text-sm hover:text-blue-600"
                 >
                   {lesson.title}
                 </Link>
                 <Link
                   href={`/instructor/courses/${id}/curriculum/${lesson.id}`}
-                  className="text-xs text-purple-500 hover:underline"
+                  className="text-xs text-blue-600 hover:underline"
                 >
                   Chi tiết
                 </Link>
@@ -134,7 +134,7 @@ export default function CourseCurriculumPage() {
           {/* Add lesson */}
           <button
             onClick={() => setAddLessonForSection(section.id)}
-            className="w-full px-4 py-2 text-xs text-purple-600 hover:bg-purple-50 text-left"
+            className="w-full px-4 py-2 text-xs text-blue-600 hover:bg-blue-50 text-left"
           >
             + Thêm bài học
           </button>
@@ -144,7 +144,7 @@ export default function CourseCurriculumPage() {
       {/* Thêm phần ở cuối */}
       <button
         onClick={() => setAddSectionAt('bottom')}
-        className="w-full rounded-lg bg-purple-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-purple-700"
+        className="w-full rounded-full bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
       >
         + Thêm phần mới
       </button>

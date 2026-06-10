@@ -5,6 +5,8 @@ import { useHasHydrated } from '@/lib/hooks/useHasHydrated';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { NotificationBell } from '@/components/layout/NotificationBell';
+import { UserMenu } from '@/components/layout/UserMenu';
 import Link from 'next/link';
 import {
   BookOpen,
@@ -212,9 +214,17 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
             >
               <Menu size={20} />
             </button>
-            <span className="text-xs text-gray-400">{user.fullName ?? user.email}</span>
           </div>
-          <Link href="/" className="text-xs text-gray-400 hover:text-gray-600">← Trang chủ</Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/"
+              className="px-3 py-1.5 text-sm font-medium text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              Học viên
+            </Link>
+            <NotificationBell />
+            <UserMenu />
+          </div>
         </header>
         <main className="flex-1 p-4 sm:p-6 lg:p-7 overflow-auto">{children}</main>
       </div>

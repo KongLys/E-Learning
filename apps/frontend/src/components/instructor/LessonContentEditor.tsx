@@ -100,7 +100,7 @@ export function LessonContentEditor({ courseId, lesson }: LessonContentEditorPro
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            className="w-full text-sm bg-white rounded-xl px-3 py-2.5 outline-none ring-1 ring-gray-200 focus:ring-2 focus:ring-blue-400"
           />
         </div>
         <div>
@@ -110,13 +110,13 @@ export function LessonContentEditor({ courseId, lesson }: LessonContentEditorPro
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
             placeholder="Học viên có thể làm được gì sau khi hoàn thành bài học này?"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            className="w-full text-sm bg-white rounded-xl px-3 py-2.5 outline-none ring-1 ring-gray-200 focus:ring-2 focus:ring-blue-400"
           />
         </div>
         <button
           onClick={() => saveBasics.mutate()}
           disabled={saveBasics.isPending}
-          className="text-xs bg-gray-800 text-white px-4 py-2 rounded-lg disabled:opacity-50"
+          className="text-xs bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50"
         >
           {saveBasics.isPending ? 'Đang lưu...' : 'Lưu thông tin'}
         </button>
@@ -124,7 +124,7 @@ export function LessonContentEditor({ courseId, lesson }: LessonContentEditorPro
 
       {/* ===== VIDEO ===== */}
       {lesson.type === 'video' && (
-        <section className="space-y-3 border-t pt-5">
+        <section className="space-y-3 border-t border-gray-100 pt-5">
           <h3 className="text-sm font-semibold text-gray-700">Video bài giảng</h3>
           {detail?.videoAsset?.videoUrl ? (
             <p className="text-xs text-green-600">✓ Đã tải video lên</p>
@@ -164,7 +164,7 @@ export function LessonContentEditor({ courseId, lesson }: LessonContentEditorPro
             <button
               onClick={() => saveVideoConfig.mutate()}
               disabled={saveVideoConfig.isPending}
-              className="block text-xs bg-blue-600 text-white px-4 py-2 rounded-lg disabled:opacity-50"
+              className="block text-xs bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50"
             >
               {saveVideoConfig.isPending ? 'Đang lưu...' : 'Lưu cấu hình video'}
             </button>
@@ -174,7 +174,7 @@ export function LessonContentEditor({ courseId, lesson }: LessonContentEditorPro
 
       {/* ===== DOCUMENT ===== */}
       {lesson.type === 'document' && (
-        <section className="space-y-3 border-t pt-5">
+        <section className="space-y-3 border-t border-gray-100 pt-5">
           <h3 className="text-sm font-semibold text-gray-700">Tài liệu</h3>
           {detail?.documentAsset?.fileUrl ? (
             <p className="text-xs text-green-600">✓ Đã tải file ({detail.documentAsset.fileType?.toUpperCase()})</p>
@@ -202,13 +202,13 @@ export function LessonContentEditor({ courseId, lesson }: LessonContentEditorPro
               min={0}
               value={minReadTimeSec}
               onChange={(e) => setMinReadTimeSec(Math.max(0, Number(e.target.value) || 0))}
-              className="w-32 border border-gray-300 rounded-lg px-3 py-2 text-sm block"
+              className="w-32 text-sm bg-white rounded-xl px-3 py-2.5 outline-none ring-1 ring-gray-200 focus:ring-2 focus:ring-blue-400 block"
             />
           </div>
           <button
             onClick={() => saveDocConfig.mutate()}
             disabled={saveDocConfig.isPending}
-            className="text-xs bg-blue-600 text-white px-4 py-2 rounded-lg disabled:opacity-50"
+            className="text-xs bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50"
           >
             {saveDocConfig.isPending ? 'Đang lưu...' : 'Lưu nội dung tài liệu'}
           </button>
@@ -217,7 +217,7 @@ export function LessonContentEditor({ courseId, lesson }: LessonContentEditorPro
 
       {/* ===== QUIZ ===== */}
       {lesson.type === 'quiz' && (
-        <section className="border-t pt-5">
+        <section className="border-t border-gray-100 pt-5">
           <h3 className="text-sm font-semibold text-gray-700 mb-3">
             {LESSON_TYPE_META.quiz.label}
           </h3>

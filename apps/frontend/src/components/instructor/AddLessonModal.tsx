@@ -25,7 +25,7 @@ export function AddLessonModal({ onSubmit, onClose, isPending }: AddLessonModalP
         className="bg-white rounded-2xl w-full max-w-lg my-8 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <h2 className="text-lg font-bold">Thêm bài học</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl leading-none">
             ✕
@@ -40,7 +40,7 @@ export function AddLessonModal({ onSubmit, onClose, isPending }: AddLessonModalP
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Tên bài học..."
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              className="w-full text-sm bg-white rounded-xl px-3 py-2.5 outline-none ring-1 ring-gray-200 focus:ring-2 focus:ring-blue-400"
             />
           </div>
 
@@ -51,7 +51,7 @@ export function AddLessonModal({ onSubmit, onClose, isPending }: AddLessonModalP
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
               placeholder="Học viên có thể làm được gì sau khi hoàn thành bài học này?"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              className="w-full text-sm bg-white rounded-xl px-3 py-2.5 outline-none ring-1 ring-gray-200 focus:ring-2 focus:ring-blue-400"
             />
           </div>
 
@@ -63,10 +63,10 @@ export function AddLessonModal({ onSubmit, onClose, isPending }: AddLessonModalP
                   key={t}
                   type="button"
                   onClick={() => setType(t)}
-                  className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                  className={`flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-sm transition-colors ${
                     type === t
-                      ? 'border-purple-500 bg-purple-50 text-purple-700 font-medium'
-                      : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                      ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium'
+                      : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                   }`}
                 >
                   <LessonTypeIcon type={t} size={15} />
@@ -77,14 +77,14 @@ export function AddLessonModal({ onSubmit, onClose, isPending }: AddLessonModalP
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 px-6 py-4 border-t">
-          <button onClick={onClose} className="text-sm border px-4 py-2 rounded-lg">
+        <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-100">
+          <button onClick={onClose} className="text-sm text-gray-600 px-4 py-2 rounded-full hover:bg-gray-100 transition-colors">
             Hủy
           </button>
           <button
             onClick={() => onSubmit({ title: title.trim(), type, description: description.trim() })}
             disabled={!canSubmit}
-            className="text-sm bg-purple-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50"
+            className="text-sm bg-blue-600 text-white px-4 py-2 rounded-full font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
           >
             {isPending ? 'Đang thêm...' : 'Thêm bài học'}
           </button>

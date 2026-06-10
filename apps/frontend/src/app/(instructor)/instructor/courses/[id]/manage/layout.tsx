@@ -65,7 +65,7 @@ export default function ManageCourseLayout({ children }: { children: React.React
                         href={href}
                         className={`flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors ${
                           active
-                            ? 'bg-purple-50 text-purple-700 font-medium border-l-2 border-purple-600'
+                            ? 'bg-blue-50 text-blue-700 font-medium border-l-2 border-blue-600'
                             : 'text-gray-600 hover:bg-gray-100'
                         }`}
                       >
@@ -85,7 +85,7 @@ export default function ManageCourseLayout({ children }: { children: React.React
             onClick={() => submitMutation.mutate()}
             disabled={submitMutation.isPending || !editable}
             title={editable ? '' : 'Khóa học chỉ có thể gửi khi ở trạng thái nháp hoặc bị từ chối'}
-            className="w-full rounded-md bg-purple-600 py-2.5 text-sm font-semibold text-white hover:bg-purple-700 disabled:opacity-50 transition-colors"
+            className="w-full rounded-full bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
             {submitMutation.isPending ? 'Đang gửi...' : 'Gửi đi để xem xét'}
           </button>
