@@ -50,4 +50,12 @@ export class UpdateCourseDto {
   @IsArray()
   @IsString({ each: true })
   requirements?: string[];
+
+  @IsOptional()
+  @IsString()
+  welcomeMessage?: string;
+
+  @IsOptional()
+  @IsString()
+  congratulationsMessage?: string;
 }

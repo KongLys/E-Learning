@@ -48,7 +48,7 @@ export default function ChatPage() {
   const typingClearTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const ownTypingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
 
   const socket = useChatSocket(accessToken);
 
@@ -93,9 +93,11 @@ export default function ChatPage() {
     typingClearTimers.current.clear();
   }, [selectedId]);
 
-  // Auto-scroll to bottom on new messages
+  // Auto-scroll to bottom on new messages — scroll only the message list,
+  // never the window (which would drag the whole page down to the footer).
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const c = messagesContainerRef.current;
+    if (c) c.scrollTo({ top: c.scrollHeight, behavior: 'smooth' });
   }, [messages, typingUsers]);
 
   // Clear timers on unmount
@@ -333,7 +335,7 @@ export default function ChatPage() {
           </div>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-canvas">
+          <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-canvas">
             {messagesQuery.isLoading ? (
               <div className="flex items-center justify-center h-full">
                 <LoadingSpinner />
@@ -505,7 +507,6 @@ export default function ChatPage() {
                 </div>
               </div>
             )}
-            <div ref={messagesEndRef} />
           </div>
 
           {/* Input */}

@@ -180,6 +180,9 @@ model Course {
   targetAudience String[]         @default([]) @map("target_audience")
   requirements   String[]         @default([])
 
+  welcomeMessage         String? @map("welcome_message") @db.Text
+  congratulationsMessage String? @map("congratulations_message") @db.Text
+
   moderationStatus ModerationStatus @default(pending) @map("moderation_status")
   moderationLabel  String?          @map("moderation_label")
   moderationScore  Float?           @map("moderation_score")

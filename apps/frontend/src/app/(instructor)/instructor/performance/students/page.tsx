@@ -74,7 +74,7 @@ export default function StudentsPage() {
                     </td>
                     <td className="px-5 py-3 text-right font-semibold text-gray-900">{course.totalStudents ?? 0}</td>
                     <td className="px-5 py-3 text-right">
-                      <Link href={`/instructor/courses/${course.id}/edit`} className="text-xs text-blue-600 hover:underline">
+                      <Link href={`/instructor/courses/${course.id}/manage/curriculum`} className="text-xs text-blue-600 hover:underline">
                         Xem
                       </Link>
                     </td>

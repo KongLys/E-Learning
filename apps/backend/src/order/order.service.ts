@@ -13,7 +13,7 @@ export class OrderService {
   constructor(private prisma: PrismaService) {}
 
   async createOrder(userId: string, userRole: string, dto: CreateOrderDto) {
-    if (userRole !== 'student') throw new ForbiddenException('Only students can place orders');
+    if (userRole === 'admin') throw new ForbiddenException('Admin không thể mua khóa học');
 
     const existing = await this.prisma.order.findUnique({ where: { idempotencyKey: dto.idempotencyKey }, include: { items: { include: { course: { select: { id: true, title: true } } } } } });
     if (existing) return this.formatOrder(existing);
@@ -22,6 +22,10 @@ export class OrderService {
       where: { id: { in: dto.courseIds }, status: 'published' },
     });
     if (courses.length !== dto.courseIds.length) throw new NotFoundException('One or more courses not found or not published');
+
+    if (courses.some((c) => c.instructorId === userId)) {
+      throw new ForbiddenException('Bạn không thể mua khóa học của chính mình');
+    }
 
     for (const courseId of dto.courseIds) {
       const enrolled = await this.prisma.enrollment.findFirst({ where: { studentId: userId, courseId } });

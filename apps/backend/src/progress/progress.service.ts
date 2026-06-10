@@ -4,12 +4,16 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateProgressDto } from './dto/update-progress.dto';
 
 @Injectable()
 export class ProgressService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private events: EventEmitter2,
+  ) {}
 
   async updateProgress(studentId: string, dto: UpdateProgressDto) {
     const lesson = await this.prisma.lesson.findUnique({
@@ -107,9 +111,21 @@ export class ProgressService {
     const progressPercent = totalLessons > 0 ? (completedCount / totalLessons) * 100 : 0;
     const status = progressPercent >= 100 ? 'completed' : 'active';
 
-    return this.prisma.enrollment.update({
+    const previous = await this.prisma.enrollment.findUnique({
+      where: { id: enrollmentId },
+      select: { status: true, studentId: true },
+    });
+
+    const updated = await this.prisma.enrollment.update({
       where: { id: enrollmentId },
       data: { progressPercent, status },
     });
+
+    // Fire once, only on the active → completed transition.
+    if (status === 'completed' && previous?.status !== 'completed') {
+      this.events.emit('course.completed', { studentId: updated.studentId, courseId });
+    }
+
+    return updated;
   }
 }

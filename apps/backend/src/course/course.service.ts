@@ -68,6 +68,8 @@ export class CourseService {
         ...(dto.objectives !== undefined && { objectives: dto.objectives }),
         ...(dto.targetAudience !== undefined && { targetAudience: dto.targetAudience }),
         ...(dto.requirements !== undefined && { requirements: dto.requirements }),
+        ...(dto.welcomeMessage !== undefined && { welcomeMessage: dto.welcomeMessage }),
+        ...(dto.congratulationsMessage !== undefined && { congratulationsMessage: dto.congratulationsMessage }),
       },
     });
     // Re-moderate when the moderated text fields change.

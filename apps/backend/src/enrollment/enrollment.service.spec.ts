@@ -8,8 +8,8 @@ const mockPrisma = {
   enrollment: { findFirst: jest.fn(), create: jest.fn(), findMany: jest.fn() },
 };
 
-const publishedFreeCourse = { id: 'course-1', status: 'published', price: 0 };
-const publishedPaidCourse = { id: 'course-2', status: 'published', price: 100000 };
+const publishedFreeCourse = { id: 'course-1', status: 'published', price: 0, instructorId: 'instructor-x' };
+const publishedPaidCourse = { id: 'course-2', status: 'published', price: 100000, instructorId: 'instructor-x' };
 
 describe('EnrollmentService', () => {
   let service: EnrollmentService;
@@ -27,14 +27,25 @@ describe('EnrollmentService', () => {
   });
 
   describe('enroll', () => {
-    it('throws ForbiddenException for instructor role', async () => {
-      await expect(service.enroll('user-1', 'instructor', 'course-1'))
-        .rejects.toThrow(ForbiddenException);
-    });
-
     it('throws ForbiddenException for admin role', async () => {
       await expect(service.enroll('user-1', 'admin', 'course-1'))
         .rejects.toThrow(ForbiddenException);
+    });
+
+    it('throws ForbiddenException when enrolling in own course', async () => {
+      mockPrisma.course.findUnique.mockResolvedValue({ ...publishedFreeCourse, instructorId: 'instructor-1' });
+      await expect(service.enroll('instructor-1', 'instructor', 'course-1'))
+        .rejects.toThrow(ForbiddenException);
+    });
+
+    it('allows an instructor to enroll in another instructor’s free course', async () => {
+      mockPrisma.course.findUnique.mockResolvedValue(publishedFreeCourse);
+      mockPrisma.enrollment.findFirst.mockResolvedValue(null);
+      mockPrisma.enrollment.create.mockResolvedValue({ id: 'enroll-2', courseId: 'course-1', status: 'active' });
+
+      const result = await service.enroll('instructor-1', 'instructor', 'course-1');
+      expect(result.status).toBe('active');
+      expect(mockPrisma.enrollment.create).toHaveBeenCalled();
     });
 
     it('throws NotFoundException when course not found', async () => {

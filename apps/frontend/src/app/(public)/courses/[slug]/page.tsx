@@ -89,6 +89,7 @@ export default function CourseDetailPage() {
   const course = data?.data;
   const enrollments: any[] = enrollData?.data ?? [];
   const isEnrolled = enrollments.some((e: any) => e.courseId === course?.id);
+  const isOwner = !!user && course?.instructor?.id === user.id;
 
   const enrollMutation = useMutation({
     mutationFn: () => enrollmentApi.enrollFree(course.id),
@@ -227,6 +228,13 @@ export default function CourseDetailPage() {
                 >
                   Đăng nhập để đăng ký
                 </button>
+              ) : isOwner ? (
+                <Link
+                  href={`/instructor/courses/${course.id}/manage/curriculum`}
+                  className="w-full inline-flex h-11 items-center justify-center rounded-pill bg-emphasis text-white text-[15px] font-medium hover:bg-ink transition-colors"
+                >
+                  Quản lý khóa học
+                </Link>
               ) : isEnrolled ? (
                 <button
                   onClick={() => router.push(`/learn/${course.id}`)}

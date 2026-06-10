@@ -28,9 +28,31 @@ describe('OrderService', () => {
   describe('createOrder', () => {
     const dto = { courseIds: ['course-1'], idempotencyKey: 'key-1' };
 
-    it('throws ForbiddenException for non-student role', async () => {
-      await expect(service.createOrder('user-1', 'instructor', dto))
+    it('throws ForbiddenException for admin role', async () => {
+      await expect(service.createOrder('user-1', 'admin', dto))
         .rejects.toThrow(ForbiddenException);
+    });
+
+    it('throws ForbiddenException when buying own course', async () => {
+      mockPrisma.order.findUnique.mockResolvedValue(null);
+      mockPrisma.course.findMany.mockResolvedValue([{ id: 'course-1', price: 100000, instructorId: 'instructor-1' }]);
+      await expect(service.createOrder('instructor-1', 'instructor', dto))
+        .rejects.toThrow(ForbiddenException);
+    });
+
+    it('allows an instructor to buy another instructor’s course', async () => {
+      mockPrisma.order.findUnique.mockResolvedValue(null);
+      mockPrisma.course.findMany.mockResolvedValue([{ id: 'course-1', price: 299000, title: 'Test Course', instructorId: 'instructor-x' }]);
+      mockPrisma.enrollment.findFirst.mockResolvedValue(null);
+      mockPrisma.order.create.mockResolvedValue({
+        id: 'order-i', totalAmount: 299000, currency: 'VND', status: 'pending',
+        idempotencyKey: 'key-1', paidAt: null, createdAt: new Date(),
+        items: [{ courseId: 'course-1', price: 299000, course: { id: 'course-1', title: 'Test Course' } }],
+        payment: null,
+      });
+
+      const result = await service.createOrder('instructor-1', 'instructor', dto);
+      expect(result.orderId).toBe('order-i');
     });
 
     it('returns existing order for duplicate idempotencyKey', async () => {
