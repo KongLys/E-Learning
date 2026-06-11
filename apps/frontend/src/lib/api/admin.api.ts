@@ -19,10 +19,15 @@ export const adminApi = {
     apiClient.get('/admin/orders', { params }),
   refundOrder: (id: string) => apiClient.post(`/admin/orders/${id}/refund`),
 
-  getModeration: (params?: { status?: string; type?: 'course' | 'material' }) =>
+  getModeration: (params?: { status?: string; type?: 'course' | 'lesson' }) =>
     apiClient.get('/admin/moderation', { params }),
-  approveModeration: (type: 'course' | 'material', id: string) =>
+  approveModeration: (type: 'course' | 'lesson', id: string) =>
     apiClient.post(`/admin/moderation/${type}/${id}/approve`),
-  rejectModeration: (type: 'course' | 'material', id: string, reason?: string) =>
+  rejectModeration: (type: 'course' | 'lesson', id: string, reason?: string) =>
     apiClient.post(`/admin/moderation/${type}/${id}/reject`, { reason }),
+
+  getReviewReports: (params?: { status?: 'pending' | 'resolved' | 'dismissed' }) =>
+    apiClient.get('/admin/review-reports', { params }),
+  resolveReviewReport: (id: string, action: 'delete' | 'dismiss') =>
+    apiClient.post(`/admin/review-reports/${id}/resolve`, { action }),
 };

@@ -6,7 +6,12 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 
-const mockRedis = { get: jest.fn(), setex: jest.fn(), del: jest.fn(), keys: jest.fn() };
+const mockRedis = {
+  get: jest.fn(),
+  setex: jest.fn(),
+  del: jest.fn(),
+  keys: jest.fn(),
+};
 const mockPrisma = {
   user: { findUnique: jest.fn(), create: jest.fn() },
 };
@@ -23,7 +28,10 @@ describe('AuthService', () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: JwtService, useValue: mockJwt },
         { provide: ConfigService, useValue: mockConfig },
-        { provide: 'default_IORedisModuleConnectionToken', useValue: mockRedis },
+        {
+          provide: 'default_IORedisModuleConnectionToken',
+          useValue: mockRedis,
+        },
       ],
     }).compile();
 
@@ -36,19 +44,34 @@ describe('AuthService', () => {
 
   describe('register', () => {
     it('throws ConflictException if email already exists', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({ id: '1', email: 'test@test.com' });
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: '1',
+        email: 'test@test.com',
+      });
       await expect(
-        service.register({ email: 'test@test.com', password: 'Test@123', fullName: 'Test', role: 'student' }),
+        service.register({
+          email: 'test@test.com',
+          password: 'Test@123',
+          fullName: 'Test',
+          role: 'student',
+        }),
       ).rejects.toThrow(ConflictException);
     });
 
     it('creates user successfully', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
       mockPrisma.user.create.mockResolvedValue({
-        id: '1', email: 'new@test.com', fullName: 'New', role: 'student', avatarUrl: null,
+        id: '1',
+        email: 'new@test.com',
+        fullName: 'New',
+        role: 'student',
+        avatarUrl: null,
       });
       const result = await service.register({
-        email: 'new@test.com', password: 'Test@123', fullName: 'New', role: 'student',
+        email: 'new@test.com',
+        password: 'Test@123',
+        fullName: 'New',
+        role: 'student',
       });
       expect(result.user.email).toBe('new@test.com');
       expect(result.accessToken).toBeDefined();
@@ -58,7 +81,10 @@ describe('AuthService', () => {
   describe('login', () => {
     it('throws UnauthorizedException for wrong password', async () => {
       mockPrisma.user.findUnique.mockResolvedValue({
-        id: '1', email: 'test@test.com', passwordHash: await bcrypt.hash('Correct@1', 12), status: 'active',
+        id: '1',
+        email: 'test@test.com',
+        passwordHash: await bcrypt.hash('Correct@1', 12),
+        status: 'active',
       });
       await expect(
         service.login({ email: 'test@test.com', password: 'Wrong@1' }),
@@ -68,7 +94,10 @@ describe('AuthService', () => {
     it('throws UnauthorizedException for locked user', async () => {
       const hash = await bcrypt.hash('Test@123', 12);
       mockPrisma.user.findUnique.mockResolvedValue({
-        id: '1', email: 'test@test.com', passwordHash: hash, status: 'locked',
+        id: '1',
+        email: 'test@test.com',
+        passwordHash: hash,
+        status: 'locked',
       });
       await expect(
         service.login({ email: 'test@test.com', password: 'Test@123' }),
@@ -80,7 +109,9 @@ describe('AuthService', () => {
     it('throws UnauthorizedException if token not in Redis', async () => {
       mockJwt.verify.mockReturnValue({ sub: 'user-1', jti: 'jti-1' });
       mockRedis.get.mockResolvedValue(null);
-      await expect(service.refresh('some-token')).rejects.toThrow(UnauthorizedException);
+      await expect(service.refresh('some-token')).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
   });
 });

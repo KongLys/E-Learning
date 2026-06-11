@@ -9,7 +9,9 @@ export class RedisHealthIndicator extends HealthIndicator {
 
   constructor(private config: ConfigService) {
     super();
-    this.redis = new Redis(this.config.get<string>('REDIS_URL', 'redis://localhost:6379'));
+    this.redis = new Redis(
+      this.config.get<string>('REDIS_URL', 'redis://localhost:6379'),
+    );
   }
 
   async isHealthy(key: string): Promise<HealthIndicatorResult> {

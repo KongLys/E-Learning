@@ -10,7 +10,10 @@ export class PaymentController {
   constructor(private paymentService: PaymentService) {}
 
   @Post('initiate')
-  initiatePayment(@CurrentUser() u: { userId: string }, @Body() dto: InitiatePaymentDto) {
+  initiatePayment(
+    @CurrentUser() u: { userId: string },
+    @Body() dto: InitiatePaymentDto,
+  ) {
     return this.paymentService.initiatePayment(u.userId, dto);
   }
 

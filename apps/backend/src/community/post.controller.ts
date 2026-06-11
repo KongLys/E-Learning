@@ -1,4 +1,13 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { PostService } from './post.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -23,7 +32,11 @@ export class PostController {
     @Query('sort') sort?: string,
     @Query('page') page?: string,
   ) {
-    return this.postService.listPosts(courseId, { type, sort, page: page ? +page : 1 });
+    return this.postService.listPosts(courseId, {
+      type,
+      sort,
+      page: page ? +page : 1,
+    });
   }
 
   @Get('posts/:id')
@@ -41,17 +54,26 @@ export class PostController {
   }
 
   @Delete('posts/:id')
-  deletePost(@Param('id') id: string, @CurrentUser() u: { userId: string; role: string }) {
+  deletePost(
+    @Param('id') id: string,
+    @CurrentUser() u: { userId: string; role: string },
+  ) {
     return this.postService.deletePost(id, u.userId, u.role);
   }
 
   @Patch('posts/:id/pin')
-  pinPost(@Param('id') id: string, @CurrentUser() u: { userId: string; role: string }) {
+  pinPost(
+    @Param('id') id: string,
+    @CurrentUser() u: { userId: string; role: string },
+  ) {
     return this.postService.pinPost(id, u.userId, u.role);
   }
 
   @Patch('posts/:id/hide')
-  hidePost(@Param('id') id: string, @CurrentUser() u: { userId: string; role: string }) {
+  hidePost(
+    @Param('id') id: string,
+    @CurrentUser() u: { userId: string; role: string },
+  ) {
     return this.postService.hidePost(id, u.userId, u.role);
   }
 

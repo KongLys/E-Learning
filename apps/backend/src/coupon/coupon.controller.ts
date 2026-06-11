@@ -22,9 +22,15 @@ function parseCsvRows(csv: string) {
   if (lines.length < 2) return [];
   const headers = lines[0].split(',').map((h) => h.trim().toLowerCase());
   return lines.slice(1).map((line) => {
-    const values = line.match(/(".*?"|[^,]+)(?=,|$)/g)?.map((v) => v.replace(/^"|"$/g, '').trim()) ?? line.split(',').map((v) => v.trim());
+    const values =
+      line
+        .match(/(".*?"|[^,]+)(?=,|$)/g)
+        ?.map((v) => v.replace(/^"|"$/g, '').trim()) ??
+      line.split(',').map((v) => v.trim());
     const row: Record<string, string> = {};
-    headers.forEach((h, i) => { row[h] = values[i] ?? ''; });
+    headers.forEach((h, i) => {
+      row[h] = values[i] ?? '';
+    });
     return {
       code: row['code'] ?? '',
       courseId: row['courseid'] || undefined,
@@ -46,7 +52,10 @@ export class CouponController {
   }
 
   @Post()
-  createCoupon(@CurrentUser() user: { userId: string }, @Body() dto: CreateCouponDto) {
+  createCoupon(
+    @CurrentUser() user: { userId: string },
+    @Body() dto: CreateCouponDto,
+  ) {
     return this.couponService.createCoupon(user.userId, dto);
   }
 
@@ -62,7 +71,10 @@ export class CouponController {
   }
 
   @Get('courses-export')
-  async exportCourses(@CurrentUser() user: { userId: string }, @Res() res: Response) {
+  async exportCourses(
+    @CurrentUser() user: { userId: string },
+    @Res() res: Response,
+  ) {
     const csv = await this.couponService.getCoursesExport(user.userId);
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename="courses.csv"');
@@ -71,7 +83,10 @@ export class CouponController {
 
   @Delete(':id')
   @HttpCode(204)
-  deleteCoupon(@CurrentUser() user: { userId: string }, @Param('id') id: string) {
+  deleteCoupon(
+    @CurrentUser() user: { userId: string },
+    @Param('id') id: string,
+  ) {
     return this.couponService.deleteCoupon(user.userId, id);
   }
 }

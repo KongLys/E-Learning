@@ -21,20 +21,29 @@ export class EnrollmentService {
       throw new ForbiddenException('Admin không thể đăng ký khóa học');
     }
 
-    const course = await this.prisma.course.findUnique({ where: { id: courseId } });
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
+    });
     if (!course) throw new NotFoundException('Course not found');
     if (course.instructorId === studentId) {
-      throw new ForbiddenException('Bạn không thể đăng ký khóa học của chính mình');
+      throw new ForbiddenException(
+        'Bạn không thể đăng ký khóa học của chính mình',
+      );
     }
-    if (course.status !== 'published') throw new NotFoundException('Course not available');
+    if (course.status !== 'published')
+      throw new NotFoundException('Course not available');
 
     const existing = await this.prisma.enrollment.findFirst({
       where: { studentId, courseId },
     });
-    if (existing) throw new ConflictException('Already enrolled in this course');
+    if (existing)
+      throw new ConflictException('Already enrolled in this course');
 
     if (Number(course.price) > 0) {
-      throw new HttpException('Payment required to enroll in this course', HttpStatus.PAYMENT_REQUIRED);
+      throw new HttpException(
+        'Payment required to enroll in this course',
+        HttpStatus.PAYMENT_REQUIRED,
+      );
     }
 
     const enrollment = await this.prisma.enrollment.create({
@@ -43,17 +52,27 @@ export class EnrollmentService {
 
     this.events.emit('enrollment.created', { studentId, courseId });
 
-    return { enrollmentId: enrollment.id, courseId: enrollment.courseId, status: enrollment.status };
+    return {
+      enrollmentId: enrollment.id,
+      courseId: enrollment.courseId,
+      status: enrollment.status,
+    };
   }
 
   async enrollAfterPayment(studentId: string, courseId: string) {
     // Defensive: never self-enroll an owner even if a malformed/replayed
     // order.paid event reaches the listener.
-    const course = await this.prisma.course.findUnique({ where: { id: courseId } });
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
+    });
     if (!course || course.instructorId === studentId) return;
-    const existing = await this.prisma.enrollment.findFirst({ where: { studentId, courseId } });
+    const existing = await this.prisma.enrollment.findFirst({
+      where: { studentId, courseId },
+    });
     if (existing) return;
-    await this.prisma.enrollment.create({ data: { studentId, courseId, status: 'active' } });
+    await this.prisma.enrollment.create({
+      data: { studentId, courseId, status: 'active' },
+    });
     this.events.emit('enrollment.created', { studentId, courseId });
   }
 
@@ -63,8 +82,12 @@ export class EnrollmentService {
       include: {
         course: {
           select: {
-            id: true, title: true, slug: true, thumbnailUrl: true,
-            totalLessons: true, totalDurationSec: true,
+            id: true,
+            title: true,
+            slug: true,
+            thumbnailUrl: true,
+            totalLessons: true,
+            totalDurationSec: true,
             instructor: { select: { id: true, fullName: true } },
           },
         },

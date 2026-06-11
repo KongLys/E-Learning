@@ -1,9 +1,9 @@
 /**
  * Pure (no-AI) helpers for the mind-map pipeline.
  *
- * The heavy upstream work (PDF/DOCX → Markdown → heading-aware chunks) is already
- * done at material-upload time and persisted in `CourseChunk`. Each chunk carries
- * `sectionTitle` = the full heading path (e.g. "Chương 1 > 1.2 Mảng > Mảng động").
+ * The heavy upstream work (lesson content/PDF/DOCX → Markdown → heading-aware chunks)
+ * is already done at lesson-index time and persisted in `CourseChunk`. Each chunk
+ * carries `sectionTitle` = the full TOC path (e.g. "Phần 1 > Bài 2 > 1.2 Mảng").
  * These helpers rebuild a hierarchy from those paths for free, and convert the
  * AI-summarised tree into the various export formats — all without spending tokens.
  */
@@ -67,7 +67,9 @@ export function groupByHeading(
   let depth = maxDepth;
   for (; depth >= 1; depth--) {
     const keys = new Set(
-      ordered.map((c) => splitPath(c.sectionTitle).slice(0, depth).join(PATH_SEP)),
+      ordered.map((c) =>
+        splitPath(c.sectionTitle).slice(0, depth).join(PATH_SEP),
+      ),
     );
     if (keys.size <= maxGroups) break;
   }
@@ -148,7 +150,8 @@ export function buildTree(
     // Attach summary onto the deepest node.
     if (summary.title && path.length > 0) node.title = summary.title;
     if (summary.summary) node.summary = summary.summary;
-    if (summary.keywords?.length) node.keywords = dedupeKeywords(summary.keywords);
+    if (summary.keywords?.length)
+      node.keywords = dedupeKeywords(summary.keywords);
     if (summary.main_points?.length) {
       node.children ??= [];
       for (const p of summary.main_points) {
@@ -217,7 +220,10 @@ export function toMarkmap(root: MindNode): string {
 
 /** Mermaid `mindmap` syntax (indentation-based). */
 export function toMermaid(root: MindNode): string {
-  const lines: string[] = ['mindmap', `  root((${sanitizeMermaid(root.title)}))`];
+  const lines: string[] = [
+    'mindmap',
+    `  root((${sanitizeMermaid(root.title)}))`,
+  ];
   const walk = (node: MindNode, depth: number) => {
     lines.push(`${'  '.repeat(depth + 1)}${sanitizeMermaid(node.title)}`);
     for (const child of node.children ?? []) walk(child, depth + 1);
@@ -240,7 +246,10 @@ export function toXmind(root: MindNode): unknown {
 }
 
 function escapeInline(text: string): string {
-  return text.replace(/\r?\n+/g, ' ').replace(/`/g, "'").trim();
+  return text
+    .replace(/\r?\n+/g, ' ')
+    .replace(/`/g, "'")
+    .trim();
 }
 
 function sanitizeMermaid(text: string): string {

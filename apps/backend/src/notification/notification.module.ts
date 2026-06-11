@@ -12,7 +12,9 @@ import { PrismaModule } from '../prisma/prisma.module';
     PrismaModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      useFactory: (config: ConfigService) => ({ secret: config.get('JWT_SECRET') }),
+      useFactory: (config: ConfigService) => ({
+        secret: config.get('JWT_SECRET'),
+      }),
       inject: [ConfigService],
     }),
   ],

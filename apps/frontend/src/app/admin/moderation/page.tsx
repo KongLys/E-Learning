@@ -9,7 +9,7 @@ import {
 } from '@/lib/api/ai.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 
-type ContentType = 'course' | 'material';
+type ContentType = 'course' | 'lesson';
 
 interface ReviewItem {
   type: ContentType;
@@ -58,19 +58,19 @@ export default function AdminModerationPage() {
     moderationReason: c.moderationReason,
     appealReason: c.appealReason,
   }));
-  const materials: ReviewItem[] = (data?.data?.materials ?? []).map((m: any) => ({
-    type: 'material' as const,
-    id: m.id,
-    title: m.fileName,
-    subtitle: m.courseTitle,
-    instructor: m.instructor,
-    moderationStatus: m.moderationStatus,
-    moderationLabel: m.moderationLabel,
-    moderationReason: m.moderationReason,
-    appealReason: m.appealReason,
-    markdownUrl: m.markdownUrl,
+  const lessons: ReviewItem[] = (data?.data?.lessons ?? []).map((l: any) => ({
+    type: 'lesson' as const,
+    id: l.id,
+    title: l.title,
+    subtitle: l.sectionTitle ? `${l.courseTitle} · ${l.sectionTitle}` : l.courseTitle,
+    instructor: l.instructor,
+    moderationStatus: l.moderationStatus,
+    moderationLabel: l.moderationLabel,
+    moderationReason: l.moderationReason,
+    appealReason: l.appealReason,
+    markdownUrl: l.markdownUrl,
   }));
-  const items = [...materials, ...courses];
+  const items = [...lessons, ...courses];
 
   return (
     <div className="max-w-5xl">
@@ -94,7 +94,7 @@ export default function AdminModerationPage() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <span className="text-xs uppercase bg-gray-100 px-2 py-0.5 rounded">
-                    {item.type === 'material' ? 'Tài liệu' : 'Khóa học'}
+                    {item.type === 'lesson' ? 'Bài học' : 'Khóa học'}
                   </span>
                   <span className="font-medium truncate">{item.title}</span>
                   <span
@@ -108,7 +108,7 @@ export default function AdminModerationPage() {
                 </div>
                 {item.subtitle && (
                   <p className="text-xs text-gray-500">
-                    {item.type === 'material' ? `Khóa học: ${item.subtitle}` : `GV: ${item.subtitle}`}
+                    {item.type === 'lesson' ? `Khóa học: ${item.subtitle}` : `GV: ${item.subtitle}`}
                     {item.instructor?.email ? ` · ${item.instructor.email}` : ''}
                   </p>
                 )}

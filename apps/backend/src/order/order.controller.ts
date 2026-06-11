@@ -41,7 +41,11 @@ export class AdminOrderController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.orderService.getAdminOrders(status, page ? +page : 1, limit ? +limit : 20);
+    return this.orderService.getAdminOrders(
+      status,
+      page ? +page : 1,
+      limit ? +limit : 20,
+    );
   }
 
   @Post(':id/refund')

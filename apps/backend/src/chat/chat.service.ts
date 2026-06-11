@@ -17,7 +17,9 @@ const messageInclude = {
   reactions: { select: { userId: true, emoji: true } },
 } satisfies Prisma.MessageInclude;
 
-type MessageWithRelations = Prisma.MessageGetPayload<{ include: typeof messageInclude }>;
+type MessageWithRelations = Prisma.MessageGetPayload<{
+  include: typeof messageInclude;
+}>;
 
 @Injectable()
 export class ChatService {
@@ -65,7 +67,9 @@ export class ChatService {
    */
   async getOrCreateConversation(currentUserId: string, targetUserId: string) {
     if (currentUserId === targetUserId) {
-      throw new BadRequestException('Cannot start a conversation with yourself');
+      throw new BadRequestException(
+        'Cannot start a conversation with yourself',
+      );
     }
 
     const allowed = await this.haveEnrollmentRelationship(
@@ -94,7 +98,10 @@ export class ChatService {
   }
 
   /** True if one user is a student enrolled in a course taught by the other. */
-  private async haveEnrollmentRelationship(a: string, b: string): Promise<boolean> {
+  private async haveEnrollmentRelationship(
+    a: string,
+    b: string,
+  ): Promise<boolean> {
     const enrollment = await this.prisma.enrollment.findFirst({
       where: {
         OR: [
@@ -226,7 +233,9 @@ export class ChatService {
 
     const hasAttachments = !!data.attachments?.length;
     if (!data.content?.trim() && !hasAttachments) {
-      throw new BadRequestException('Message must have content or an attachment');
+      throw new BadRequestException(
+        'Message must have content or an attachment',
+      );
     }
 
     const message = await this.prisma.message.create({
@@ -284,7 +293,10 @@ export class ChatService {
     return this.formatMessage(updated);
   }
 
-  async deleteMessage(messageId: string, userId: string): Promise<MessagePayload> {
+  async deleteMessage(
+    messageId: string,
+    userId: string,
+  ): Promise<MessagePayload> {
     const message = await this.prisma.message.findUnique({
       where: { id: messageId },
       select: { senderId: true },
@@ -333,7 +345,10 @@ export class ChatService {
     return { conversationId, userId, lastReadMessageId: latest.id };
   }
 
-  private async countUnread(conversationId: string, userId: string): Promise<number> {
+  private async countUnread(
+    conversationId: string,
+    userId: string,
+  ): Promise<number> {
     const read = await this.prisma.conversationRead.findUnique({
       where: { conversationId_userId: { conversationId, userId } },
       include: { lastReadMessage: { select: { createdAt: true } } },

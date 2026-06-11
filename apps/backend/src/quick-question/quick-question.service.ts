@@ -31,20 +31,29 @@ export class QuickQuestionService {
         lessonId: dto.lessonId,
         content: dto.content,
         positionType: dto.positionType,
-        positionValue: dto.positionType === PositionType.NONE ? 0 : dto.positionValue,
+        positionValue:
+          dto.positionType === PositionType.NONE ? 0 : dto.positionValue,
         isPublic: dto.isPublic ?? true,
       },
     });
   }
 
-  async getByLesson(lessonId: string, userId: string, role: string, status?: string, page = 1, limit = 20) {
+  async getByLesson(
+    lessonId: string,
+    userId: string,
+    role: string,
+    status?: string,
+    page = 1,
+    limit = 20,
+  ) {
     const lesson = await this.prisma.lesson.findUnique({
       where: { id: lessonId },
       include: { section: { include: { course: true } } },
     });
     if (!lesson) throw new NotFoundException('Lesson not found');
 
-    const isInstructor = lesson.section.course.instructorId === userId || role === 'admin';
+    const isInstructor =
+      lesson.section.course.instructorId === userId || role === 'admin';
 
     const where: any = { lessonId };
     if (status) where.status = status;
@@ -54,17 +63,30 @@ export class QuickQuestionService {
 
     return this.prisma.quickQuestion.findMany({
       where,
-      include: { replies: { include: { author: { select: { id: true, fullName: true } } } } },
+      include: {
+        replies: {
+          include: { author: { select: { id: true, fullName: true } } },
+        },
+      },
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * limit,
       take: Math.min(limit, 50),
     });
   }
 
-  async getInstructorInbox(instructorId: string, courseId: string, status?: string, page = 1, limit = 20) {
-    const course = await this.prisma.course.findUnique({ where: { id: courseId } });
+  async getInstructorInbox(
+    instructorId: string,
+    courseId: string,
+    status?: string,
+    page = 1,
+    limit = 20,
+  ) {
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
+    });
     if (!course) throw new NotFoundException('Course not found');
-    if (course.instructorId !== instructorId) throw new ForbiddenException('Access denied');
+    if (course.instructorId !== instructorId)
+      throw new ForbiddenException('Access denied');
 
     const where: any = { lesson: { section: { courseId } } };
     if (status) where.status = status;
@@ -82,15 +104,25 @@ export class QuickQuestionService {
     });
   }
 
-  async addReply(questionId: string, authorId: string, role: string, dto: CreateReplyDto) {
+  async addReply(
+    questionId: string,
+    authorId: string,
+    role: string,
+    dto: CreateReplyDto,
+  ) {
     const question = await this.prisma.quickQuestion.findUnique({
       where: { id: questionId },
-      include: { lesson: { include: { section: { include: { course: true } } } } },
+      include: {
+        lesson: { include: { section: { include: { course: true } } } },
+      },
     });
     if (!question) throw new NotFoundException('Question not found');
 
-    const isInstructor = question.lesson.section.course.instructorId === authorId || role === 'admin';
-    if (!isInstructor) throw new ForbiddenException('Only instructors and admins can reply');
+    const isInstructor =
+      question.lesson.section.course.instructorId === authorId ||
+      role === 'admin';
+    if (!isInstructor)
+      throw new ForbiddenException('Only instructors and admins can reply');
 
     const reply = await this.prisma.questionReply.create({
       data: { questionId, authorId, content: dto.content },
@@ -107,13 +139,18 @@ export class QuickQuestionService {
   async closeQuestion(questionId: string, userId: string, role: string) {
     const question = await this.prisma.quickQuestion.findUnique({
       where: { id: questionId },
-      include: { lesson: { include: { section: { include: { course: true } } } } },
+      include: {
+        lesson: { include: { section: { include: { course: true } } } },
+      },
     });
     if (!question) throw new NotFoundException('Question not found');
 
     const isOwner = question.studentId === userId;
-    const isInstructor = question.lesson.section.course.instructorId === userId || role === 'admin';
-    if (!isOwner && !isInstructor) throw new ForbiddenException('Access denied');
+    const isInstructor =
+      question.lesson.section.course.instructorId === userId ||
+      role === 'admin';
+    if (!isOwner && !isInstructor)
+      throw new ForbiddenException('Access denied');
 
     return this.prisma.quickQuestion.update({
       where: { id: questionId },
@@ -123,10 +160,16 @@ export class QuickQuestionService {
   }
 
   async reopenQuestion(questionId: string, userId: string) {
-    const question = await this.prisma.quickQuestion.findUnique({ where: { id: questionId } });
+    const question = await this.prisma.quickQuestion.findUnique({
+      where: { id: questionId },
+    });
     if (!question) throw new NotFoundException('Question not found');
-    if (question.studentId !== userId) throw new ForbiddenException('Only the question owner can reopen');
-    if (question.status !== 'answered') throw new UnprocessableEntityException('Only answered questions can be reopened');
+    if (question.studentId !== userId)
+      throw new ForbiddenException('Only the question owner can reopen');
+    if (question.status !== 'answered')
+      throw new UnprocessableEntityException(
+        'Only answered questions can be reopened',
+      );
 
     return this.prisma.quickQuestion.update({
       where: { id: questionId },
@@ -139,13 +182,17 @@ export class QuickQuestionService {
     const question = await this.prisma.quickQuestion.findUnique({
       where: { id: questionId },
       include: {
-        replies: { include: { author: { select: { id: true, fullName: true } } } },
+        replies: {
+          include: { author: { select: { id: true, fullName: true } } },
+        },
         lesson: { include: { section: { include: { course: true } } } },
       },
     });
     if (!question) throw new NotFoundException('Question not found');
 
-    const isInstructor = question.lesson.section.course.instructorId === userId || role === 'admin';
+    const isInstructor =
+      question.lesson.section.course.instructorId === userId ||
+      role === 'admin';
     const isOwner = question.studentId === userId;
 
     if (!isInstructor && !isOwner && !question.isPublic) {
@@ -153,9 +200,14 @@ export class QuickQuestionService {
     }
 
     const enrolled = await this.prisma.enrollment.findFirst({
-      where: { studentId: userId, courseId: question.lesson.section.courseId, status: 'active' },
+      where: {
+        studentId: userId,
+        courseId: question.lesson.section.courseId,
+        status: 'active',
+      },
     });
-    if (!isInstructor && !enrolled) throw new ForbiddenException('Not enrolled in this course');
+    if (!isInstructor && !enrolled)
+      throw new ForbiddenException('Not enrolled in this course');
 
     return question;
   }

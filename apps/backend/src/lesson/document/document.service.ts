@@ -1,4 +1,9 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { createReadStream } from 'fs';
 import { readFile, unlink } from 'fs/promises';
@@ -9,7 +14,8 @@ import { LessonService } from '../lesson.service';
 import { sanitizeRichText } from '../../common/sanitize-html.util';
 
 const MAX_PDF_SIZE = 100 * 1024 * 1024;
-const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+const DOCX_MIME =
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const ALLOWED_DOC = ['application/pdf', DOCX_MIME];
 const DOCUMENT_URL_TTL = 60 * 60;
 
@@ -21,7 +27,12 @@ export class DocumentService {
     private lessonService: LessonService,
   ) {}
 
-  async uploadDocument(lessonId: string, userId: string, userRole: string, file: Express.Multer.File) {
+  async uploadDocument(
+    lessonId: string,
+    userId: string,
+    userRole: string,
+    file: Express.Multer.File,
+  ) {
     if (!ALLOWED_DOC.includes(file.mimetype)) {
       throw new BadRequestException('Only PDF and DOCX files are allowed');
     }
@@ -29,12 +40,19 @@ export class DocumentService {
       throw new BadRequestException('File must not exceed 100MB');
     }
 
-    const lesson = await this.prisma.lesson.findUnique({ where: { id: lessonId } });
+    const lesson = await this.prisma.lesson.findUnique({
+      where: { id: lessonId },
+    });
     if (!lesson) throw new NotFoundException('Lesson not found');
-    if (lesson.type !== 'document') throw new BadRequestException('Lesson is not a document type');
+    if (lesson.type !== 'document')
+      throw new BadRequestException('Lesson is not a document type');
 
-    const section = await this.prisma.section.findUnique({ where: { id: lesson.sectionId }, include: { course: true } });
-    if (userRole !== 'admin' && section?.course.instructorId !== userId) throw new ForbiddenException('Access denied');
+    const section = await this.prisma.section.findUnique({
+      where: { id: lesson.sectionId },
+      include: { course: true },
+    });
+    if (userRole !== 'admin' && section?.course.instructorId !== userId)
+      throw new ForbiddenException('Access denied');
 
     const isPdf = file.mimetype === 'application/pdf';
     const fileType = isPdf ? 'pdf' : 'docx';
@@ -42,7 +60,9 @@ export class DocumentService {
     let pageCount = 0;
     if (isPdf) {
       try {
-        const pdfParse = await import('pdf-parse') as unknown as (buf: Buffer) => Promise<{ numpages: number }>;
+        const pdfParse = (await import('pdf-parse')) as unknown as (
+          buf: Buffer,
+        ) => Promise<{ numpages: number }>;
         const buf = await readFile(file.path);
         const parsed = await pdfParse(buf);
         pageCount = parsed.numpages;
@@ -52,20 +72,52 @@ export class DocumentService {
     }
 
     const key = `docs/${lessonId}/${randomUUID()}.${fileType}`;
-    const existing = await this.prisma.documentAsset.findUnique({ where: { lessonId } });
-    if (existing?.fileUrl) await this.storage.deleteFile(this.storage.extractKeyFromUrl(existing.fileUrl));
+    const existing = await this.prisma.documentAsset.findUnique({
+      where: { lessonId },
+    });
+    if (existing?.fileUrl)
+      await this.storage.deleteFile(
+        this.storage.extractKeyFromUrl(existing.fileUrl),
+      );
 
     let url: string;
     try {
-      url = await this.storage.uploadFile(key, createReadStream(file.path), file.mimetype);
+      url = await this.storage.uploadFile(
+        key,
+        createReadStream(file.path),
+        file.mimetype,
+      );
     } finally {
       await unlink(file.path).catch(() => undefined);
     }
+    // File mới → bỏ markdown cache cũ, đưa pipeline parse về điểm xuất phát
+    const resetParse = {
+      markdownUrl: null,
+      llamaParseJobId: null,
+      parseStatus: 'uploaded' as const,
+      errorMsg: null,
+    };
     const asset = await this.prisma.documentAsset.upsert({
       where: { lessonId },
-      update: { fileUrl: url, fileType, pageCount, fileSize: BigInt(file.size) },
-      create: { lessonId, fileUrl: url, fileType, pageCount, fileSize: BigInt(file.size) },
+      update: {
+        fileUrl: url,
+        fileType,
+        pageCount,
+        fileSize: BigInt(file.size),
+        ...resetParse,
+      },
+      create: {
+        lessonId,
+        fileUrl: url,
+        fileType,
+        pageCount,
+        fileSize: BigInt(file.size),
+      },
     });
+
+    // Tài liệu mới phải kiểm duyệt lại rồi vector hóa cho AI
+    await this.lessonService.resetLessonModeration(lessonId);
+    await this.lessonService.enqueueLessonIndex(lessonId);
 
     return { ...asset, fileSize: asset.fileSize.toString() };
   }
@@ -76,24 +128,36 @@ export class DocumentService {
     userRole: string,
     dto: { contentHtml?: string; minReadTimeSec?: number },
   ) {
-    const lesson = await this.prisma.lesson.findUnique({ where: { id: lessonId } });
+    const lesson = await this.prisma.lesson.findUnique({
+      where: { id: lessonId },
+    });
     if (!lesson) throw new NotFoundException('Lesson not found');
-    if (lesson.type !== 'document') throw new BadRequestException('Lesson is not a document type');
+    if (lesson.type !== 'document')
+      throw new BadRequestException('Lesson is not a document type');
 
-    const section = await this.prisma.section.findUnique({ where: { id: lesson.sectionId }, include: { course: true } });
-    if (userRole !== 'admin' && section?.course.instructorId !== userId) throw new ForbiddenException('Access denied');
+    const section = await this.prisma.section.findUnique({
+      where: { id: lesson.sectionId },
+      include: { course: true },
+    });
+    if (userRole !== 'admin' && section?.course.instructorId !== userId)
+      throw new ForbiddenException('Access denied');
 
     const data: { contentHtml?: string; minReadTimeSec?: number } = {};
-    if (dto.contentHtml !== undefined) data.contentHtml = sanitizeRichText(dto.contentHtml);
-    if (dto.minReadTimeSec !== undefined) data.minReadTimeSec = dto.minReadTimeSec;
+    if (dto.contentHtml !== undefined)
+      data.contentHtml = sanitizeRichText(dto.contentHtml);
+    if (dto.minReadTimeSec !== undefined)
+      data.minReadTimeSec = dto.minReadTimeSec;
 
     const asset = await this.prisma.documentAsset.upsert({
       where: { lessonId },
       update: data,
       create: { lessonId, ...data },
     });
-    // Nội dung đọc đổi → vector hóa lại nội dung chương
-    if (dto.contentHtml !== undefined) await this.lessonService.enqueueLessonIndex(lessonId);
+    // Nội dung đọc đổi → kiểm duyệt lại + vector hóa lại nội dung chương
+    if (dto.contentHtml !== undefined) {
+      await this.lessonService.resetLessonModeration(lessonId);
+      await this.lessonService.enqueueLessonIndex(lessonId);
+    }
     return { ...asset, fileSize: asset.fileSize.toString() };
   }
 
@@ -105,12 +169,17 @@ export class DocumentService {
     if (!lesson) throw new NotFoundException('Lesson not found');
 
     if (!lesson.isPreview) {
-      const enrolled = await this.lessonService.isEnrolled(userId, lesson.section.courseId);
+      const enrolled = await this.lessonService.isEnrolled(
+        userId,
+        lesson.section.courseId,
+      );
       const isInstructor = lesson.section.course.instructorId === userId;
-      if (!enrolled && !isInstructor) throw new ForbiddenException('Not enrolled in this course');
+      if (!enrolled && !isInstructor)
+        throw new ForbiddenException('Not enrolled in this course');
     }
 
-    if (!lesson.documentAsset?.fileUrl) throw new NotFoundException('Document not uploaded yet');
+    if (!lesson.documentAsset?.fileUrl)
+      throw new NotFoundException('Document not uploaded yet');
     if (lesson.isPreview) return { url: lesson.documentAsset.fileUrl };
 
     const key = this.storage.extractKeyFromUrl(lesson.documentAsset.fileUrl);

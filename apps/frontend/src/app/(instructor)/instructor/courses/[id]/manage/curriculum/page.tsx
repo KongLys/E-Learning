@@ -10,7 +10,7 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { AddLessonModal } from '@/components/instructor/AddLessonModal';
 import { LessonTypeIcon, type LessonType } from '@/components/instructor/lessonTypeMeta';
 import Link from 'next/link';
-import { Check, ChevronDown, FileText, GripVertical, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Check, ChevronDown, GripVertical, Pencil, Plus, Trash2, X } from 'lucide-react';
 import {
   DndContext,
   KeyboardSensor,
@@ -455,13 +455,6 @@ export default function CourseCurriculumPage() {
             thêm nội dung, hoạt động thực hành và bài kiểm tra.
           </p>
         </div>
-        <Link
-          href={`/instructor/courses/${id}/materials`}
-          className="flex shrink-0 items-center gap-1.5 rounded-full border border-blue-200 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
-        >
-          <FileText size={15} />
-          Tài liệu khóa học
-        </Link>
       </header>
 
       {error && <ErrorMessage message={error} />}

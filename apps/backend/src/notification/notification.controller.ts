@@ -12,7 +12,11 @@ export class NotificationController {
     @Query('page') page?: string,
     @Query('unread_only') unreadOnly?: string,
   ) {
-    return this.notifService.getNotifications(u.userId, page ? +page : 1, unreadOnly === 'true');
+    return this.notifService.getNotifications(
+      u.userId,
+      page ? +page : 1,
+      unreadOnly === 'true',
+    );
   }
 
   @Get('unread-count')

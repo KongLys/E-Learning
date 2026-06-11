@@ -40,7 +40,10 @@ export class ChatController {
     @CurrentUser() user: { userId: string },
     @Body() dto: CreateConversationDto,
   ) {
-    return this.chatService.getOrCreateConversation(user.userId, dto.targetUserId);
+    return this.chatService.getOrCreateConversation(
+      user.userId,
+      dto.targetUserId,
+    );
   }
 
   @Get('conversations')
@@ -77,18 +80,22 @@ export class ChatController {
       file.mimetype,
     );
 
-    const message = await this.chatService.createMessage(conversationId, user.userId, {
-      content: body.content,
-      messageType: messageTypeFromMime(file.mimetype),
-      attachments: [
-        {
-          fileUrl,
-          fileName: file.originalname,
-          fileSize: file.size,
-          mimeType: file.mimetype,
-        },
-      ],
-    });
+    const message = await this.chatService.createMessage(
+      conversationId,
+      user.userId,
+      {
+        content: body.content,
+        messageType: messageTypeFromMime(file.mimetype),
+        attachments: [
+          {
+            fileUrl,
+            fileName: file.originalname,
+            fileSize: file.size,
+            mimeType: file.mimetype,
+          },
+        ],
+      },
+    );
 
     // Push to the other participant in realtime (REST is used only for multipart).
     this.chatGateway.broadcastMessage(conversationId, message);

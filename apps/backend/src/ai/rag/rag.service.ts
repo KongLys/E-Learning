@@ -2,7 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GeminiService } from '../gemini.service';
 import { CohereService } from '../cohere.service';
-import { VectorStoreService, RetrievedChunk } from '../vector/vector-store.service';
+import {
+  VectorStoreService,
+  RetrievedChunk,
+  ChunkScope,
+} from '../vector/vector-store.service';
 import {
   SYSTEM_INSTRUCTION,
   buildAnswerPrompt,
@@ -14,7 +18,7 @@ export interface Citation {
   chunkId: string;
   sectionTitle: string | null;
   pageNumber: number | null;
-  materialId: string | null;
+  sectionId: string | null;
   lessonId: string | null;
 }
 
@@ -44,23 +48,32 @@ export class RagService {
     courseId: string,
     query: string,
     conversationHistory: string[] = [],
+    scope?: ChunkScope,
   ): Promise<AskResult> {
     // 1. Query rewrite — sinh các biến thể truy vấn
     const rewrites = await this.queryRewrite(query, conversationHistory);
     const allQueries = unique([query, ...rewrites]).slice(0, 3);
 
-    // 2. Embed song song + hybrid search song song
+    // 2. Embed song song + hybrid search song song (giới hạn theo Phần/Bài nếu có)
     const embeddings = await this.gemini.embedBatch(allQueries);
     const pools = await Promise.all(
       allQueries.map((q, i) =>
-        this.vector.hybridSearch(courseId, embeddings[i], q, this.retrieveTop),
+        this.vector.hybridSearch(
+          courseId,
+          embeddings[i],
+          q,
+          this.retrieveTop,
+          scope,
+        ),
       ),
     );
     const fused = reciprocalRankFusion(pools, this.retrieveTop);
 
     if (fused.length === 0) {
       return {
-        stream: emptyStream('Tài liệu khóa học chưa đề cập đến nội dung này.'),
+        stream: emptyStream(
+          'Nội dung bài học trong khóa chưa đề cập đến vấn đề này.',
+        ),
         citations: [],
         contextChunks: [],
       };
@@ -75,14 +88,17 @@ export class RagService {
     const topK = rerankResults.map((r) => fused[r.index]);
 
     // 4. Compression — Gemini trích đoạn liên quan
-    const compressed = await this.compress(query, topK.map((c) => c.content));
+    const compressed = await this.compress(
+      query,
+      topK.map((c) => c.content),
+    );
 
     // 5. Generate answer
     const citations: Citation[] = topK.map((c) => ({
       chunkId: c.id,
       sectionTitle: c.sectionTitle,
       pageNumber: c.pageNumber,
-      materialId: c.materialId,
+      sectionId: c.sectionId,
       lessonId: c.lessonId,
     }));
     const prompt = buildAnswerPrompt(
@@ -103,7 +119,10 @@ export class RagService {
     return { stream, citations, contextChunks: topK };
   }
 
-  private async queryRewrite(query: string, history: string[]): Promise<string[]> {
+  private async queryRewrite(
+    query: string,
+    history: string[],
+  ): Promise<string[]> {
     try {
       const text = await this.gemini.generate(
         buildQueryRewritePrompt(query, history),
@@ -115,7 +134,9 @@ export class RagService {
         .filter((s) => s.length > 3)
         .slice(0, 3);
     } catch (err) {
-      this.logger.warn(`Query rewrite failed, using original only: ${(err as Error).message}`);
+      this.logger.warn(
+        `Query rewrite failed, using original only: ${(err as Error).message}`,
+      );
       return [];
     }
   }
@@ -128,7 +149,9 @@ export class RagService {
         maxOutputTokens: 1024,
       });
     } catch (err) {
-      this.logger.warn(`Compression failed, using raw chunks: ${(err as Error).message}`);
+      this.logger.warn(
+        `Compression failed, using raw chunks: ${(err as Error).message}`,
+      );
       return chunks.map((c, i) => `[Đoạn ${i + 1}] ${c}`).join('\n\n');
     }
   }

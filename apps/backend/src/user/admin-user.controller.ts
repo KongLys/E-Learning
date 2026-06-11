@@ -17,7 +17,13 @@ export class AdminUserController {
     @Query('status') status?: string,
     @Query('search') search?: string,
   ) {
-    return this.userService.listUsers({ page: page ? +page : 1, limit: limit ? +limit : 20, role, status, search });
+    return this.userService.listUsers({
+      page: page ? +page : 1,
+      limit: limit ? +limit : 20,
+      role,
+      status,
+      search,
+    });
   }
 
   @Patch(':id/status')

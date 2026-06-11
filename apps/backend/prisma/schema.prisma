@@ -126,6 +126,7 @@ model User {
   quickQuestions      QuickQuestion[]
   questionReplies     QuestionReply[]
   reviews             Review[]
+  reviewReports       ReviewReport[]
   communityPosts      CommunityPost[]
   postComments        PostComment[]
   postVotes           PostVote[]
@@ -197,10 +198,9 @@ model Course {
   orderItems      OrderItem[]
   reviews         Review[]
   communityPosts  CommunityPost[]
-  materials       CourseMaterial[]
   chunks          CourseChunk[]
   aiConversations AiConversation[]
-  mindmaps        CourseMindmap[]
+  mindmap         CourseMindmap?
   coupons         Coupon[]
 
   @@index([instructorId])
@@ -235,6 +235,15 @@ model Lesson {
   isPreview   Boolean    @default(false) @map("is_preview")
   createdAt   DateTime   @default(now()) @map("created_at")
 
+  // Kiểm duyệt AI cho nội dung bài học (description + contentHtml + file tài liệu)
+  // — cùng pattern với Course. Chỉ nội dung approved mới được index vào vector store.
+  moderationStatus ModerationStatus @default(pending) @map("moderation_status")
+  moderationLabel  String?          @map("moderation_label")
+  moderationScore  Float?           @map("moderation_score")
+  moderationReason String?          @map("moderation_reason")
+  appealReason     String?          @map("appeal_reason")
+  moderatedAt      DateTime?        @map("moderated_at")
+
   section        Section          @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   videoAsset     VideoAsset?
   documentAsset  DocumentAsset?
@@ -244,6 +253,7 @@ model Lesson {
   quickQuestions QuickQuestion[]
 
   @@index([sectionId])
+  @@index([moderationStatus])
   @@map("lessons")
 }
 
@@ -274,6 +284,15 @@ model DocumentAsset {
   fileSize       BigInt  @default(0) @map("file_size")
   contentHtml    String? @db.Text @map("content_html")
   minReadTimeSec Int     @default(0) @map("min_read_time_sec")
+
+  // Trạng thái chuyển đổi file PDF/DOCX → markdown (LlamaParse) + index cho AI
+  markdownUrl     String?        @map("markdown_url")
+  llamaParseJobId String?        @map("llama_parse_job_id")
+  parseStatus     MaterialStatus @default(uploaded) @map("parse_status")
+  errorMsg        String?        @map("error_msg")
+  chunkCount      Int            @default(0) @map("chunk_count")
+  tocJson         Json           @default("[]") @map("toc_json") // cây TOC [{title, level, children[]}]
+  updatedAt       DateTime       @default(now()) @updatedAt @map("updated_at")
 
   lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
 
@@ -497,13 +516,49 @@ model Review {
   courseId  String   @map("course_id")
   rating    Int
   content   String?  @db.Text
+  isHidden  Boolean  @default(false) @map("is_hidden")
   createdAt DateTime @default(now()) @map("created_at")
 
-  student User   @relation(fields: [studentId], references: [id])
-  course  Course @relation(fields: [courseId], references: [id])
+  student User           @relation(fields: [studentId], references: [id])
+  course  Course         @relation(fields: [courseId], references: [id])
+  reports ReviewReport[]
 
   @@unique([studentId, courseId])
   @@map("reviews")
+}
+
+enum ReviewReportReason {
+  inappropriate_harmful // Nội dung không phù hợp - Có hại, bạo lực, thù hận, tội phạm
+  inappropriate_other   // Nội dung không phù hợp - Khác
+  misconduct            // Hành vi không phù hợp
+  policy_violation      // Vi phạm chính sách
+  spam                  // Nội dung rác
+  inappropriate_ad      // Quảng cáo không phù hợp
+  other                 // Ý khác
+}
+
+enum ReportStatus {
+  pending
+  resolved
+  dismissed
+}
+
+model ReviewReport {
+  id         String             @id @default(uuid())
+  reviewId   String             @map("review_id")
+  reporterId String             @map("reporter_id")
+  reason     ReviewReportReason
+  detail     String?            @db.Text
+  status     ReportStatus       @default(pending)
+  createdAt  DateTime           @default(now()) @map("created_at")
+  resolvedAt DateTime?          @map("resolved_at")
+
+  review   Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  reporter User   @relation(fields: [reporterId], references: [id])
+
+  @@index([status])
+  @@index([reviewId])
+  @@map("review_reports")
 }
 
 // ─── Notifications ───────────────────────────────────────────────────────────
@@ -687,41 +742,9 @@ model MessageReaction {
 
 // ─── RAG / AI Knowledge Base ──────────────────────────────────────────────────
 
-model CourseMaterial {
-  id              String         @id @default(uuid())
-  courseId        String         @map("course_id")
-  fileName        String         @map("file_name")
-  fileUrl         String         @map("file_url")
-  markdownUrl     String?        @map("markdown_url")
-  fileType        String         @map("file_type")
-  fileSize        BigInt         @default(0) @map("file_size")
-  llamaParseJobId String?        @map("llama_parse_job_id")
-  status          MaterialStatus @default(uploaded)
-  errorMsg        String?        @map("error_msg")
-  chunkCount      Int            @default(0) @map("chunk_count")
-  createdAt       DateTime       @default(now()) @map("created_at")
-  updatedAt       DateTime       @updatedAt @map("updated_at")
-
-  moderationStatus ModerationStatus @default(pending) @map("moderation_status")
-  moderationLabel  String?          @map("moderation_label")
-  moderationScore  Float?           @map("moderation_score")
-  moderationReason String?          @map("moderation_reason")
-  appealReason     String?          @map("appeal_reason")
-  moderatedAt      DateTime?        @map("moderated_at")
-
-  course  Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  chunks  CourseChunk[]
-  mindmap CourseMindmap?
-
-  @@index([courseId])
-  @@index([moderationStatus])
-  @@map("course_materials")
-}
-
 model CourseMindmap {
   id         String        @id @default(uuid())
-  materialId String        @unique @map("material_id")
-  courseId   String        @map("course_id")
+  courseId   String        @unique @map("course_id")
   title      String
   structure  Json          // cây JSON chuẩn {title, summary?, keywords?, children:[]}
   markmap    String        @db.Text // markdown markmap đã derive (cache render)
@@ -732,34 +755,32 @@ model CourseMindmap {
   createdAt  DateTime      @default(now()) @map("created_at")
   updatedAt  DateTime      @updatedAt @map("updated_at")
 
-  material CourseMaterial @relation(fields: [materialId], references: [id], onDelete: Cascade)
-  course   Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
-  @@index([courseId])
   @@map("course_mindmaps")
 }
 
 model CourseChunk {
   id           String                       @id @default(uuid())
   courseId     String                       @map("course_id")
-  materialId   String?                      @map("material_id")
+  sectionId    String?                      @map("section_id")
   lessonId     String?                      @map("lesson_id")
-  sourceType   String                       @map("source_type")
-  sectionTitle String?                      @map("section_title")
+  sourceType   String                       @map("source_type") // 'lesson_content' | 'lesson_file'
+  sectionTitle String?                      @map("section_title") // đường dẫn TOC đầy đủ "Phần > Bài > Đề mục"
   pageNumber   Int?                         @map("page_number")
   chunkIndex   Int                          @map("chunk_index")
   content      String                       @db.Text
   tokenCount   Int                          @default(0) @map("token_count")
   metadata     Json                         @default("{}")
   embedding    Unsupported("vector(768)")?
-  contentTsv   Unsupported("tsvector")?     @map("content_tsv")
+  contentTsv   Unsupported("tsvector")?     @default(dbgenerated("to_tsvector('simple'::regconfig, COALESCE(content, ''::text))")) @map("content_tsv")
   createdAt    DateTime                     @default(now()) @map("created_at")
 
-  course   Course          @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  material CourseMaterial? @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   @@index([courseId])
-  @@index([materialId])
+  @@index([sectionId])
+  @@index([lessonId])
   @@map("course_chunks")
 }
 

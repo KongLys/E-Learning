@@ -23,6 +23,7 @@ import { NoteModule } from './note/note.module';
 import { QuickQuestionModule } from './quick-question/quick-question.module';
 import { AdminModule } from './admin/admin.module';
 import { CommunityModule } from './community/community.module';
+import { ReviewModule } from './review/review.module';
 import { NotificationModule } from './notification/notification.module';
 import { InstructorStatsModule } from './instructor-stats/instructor-stats.module';
 import { AiModule } from './ai/ai.module';
@@ -62,7 +63,9 @@ import { RolesGuard } from './auth/guards/roles.guard';
         COHERE_API_KEY: Joi.string().allow('').default(''),
         COHERE_RERANK_MODEL: Joi.string().default('rerank-multilingual-v3.0'),
         LLAMA_CLOUD_API_KEY: Joi.string().allow('').default(''),
-        LLAMA_PARSE_BASE_URL: Joi.string().default('https://api.cloud.llamaindex.ai'),
+        LLAMA_PARSE_BASE_URL: Joi.string().default(
+          'https://api.cloud.llamaindex.ai',
+        ),
         LLAMA_PARSE_LANGUAGE: Joi.string().default('vi'),
         LLAMA_PARSE_RESULT_TYPE: Joi.string().default('markdown'),
         LLAMA_PARSE_POLL_INTERVAL_MS: Joi.number().default(5000),
@@ -75,7 +78,9 @@ import { RolesGuard } from './auth/guards/roles.guard';
         MODERATION_SERVICE_URL: Joi.string().default('http://localhost:8000'),
         MODERATION_API_KEY: Joi.string().allow('').default(''),
         MODERATION_TIMEOUT_MS: Joi.number().default(15000),
-        MODERATION_FAIL_OPEN: Joi.string().valid('true', 'false').default('true'),
+        MODERATION_FAIL_OPEN: Joi.string()
+          .valid('true', 'false')
+          .default('true'),
         MODERATION_DEBUG: Joi.string().valid('true', 'false').default('false'),
       }),
     }),
@@ -99,6 +104,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
     QuickQuestionModule,
     AdminModule,
     CommunityModule,
+    ReviewModule,
     NotificationModule,
     InstructorStatsModule,
     ChatModule,

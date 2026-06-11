@@ -74,7 +74,8 @@ export class MarkdownChunkerService {
       if (m) {
         flush();
         const level = m[1].length;
-        while (stack.length > 0 && stack[stack.length - 1].level >= level) stack.pop();
+        while (stack.length > 0 && stack[stack.length - 1].level >= level)
+          stack.pop();
         stack.push({ title: m[2], level });
       } else {
         buffer.push(line);
@@ -88,7 +89,11 @@ export class MarkdownChunkerService {
   }
 }
 
-function recursiveSplit(text: string, maxChars: number, overlap: number): string[] {
+function recursiveSplit(
+  text: string,
+  maxChars: number,
+  overlap: number,
+): string[] {
   if (text.length <= maxChars) return [text];
   const separators = ['\n\n', '\n', '. ', ' '];
   for (const sep of separators) {
@@ -104,7 +109,12 @@ function recursiveSplit(text: string, maxChars: number, overlap: number): string
   return out;
 }
 
-function splitBySeparator(text: string, sep: string, maxChars: number, overlap: number): string[] {
+function splitBySeparator(
+  text: string,
+  sep: string,
+  maxChars: number,
+  overlap: number,
+): string[] {
   const parts = text.split(sep);
   const out: string[] = [];
   let current = '';

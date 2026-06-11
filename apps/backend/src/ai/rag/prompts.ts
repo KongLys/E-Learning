@@ -7,7 +7,10 @@ Quy tắc:
 4. Trả lời bằng tiếng Việt, ngắn gọn, rõ ràng, đúng trọng tâm câu hỏi.
 5. Khi cần thiết, có thể trình bày bằng danh sách hoặc bảng để dễ đọc.`;
 
-export function buildQueryRewritePrompt(query: string, history: string[]): string {
+export function buildQueryRewritePrompt(
+  query: string,
+  history: string[],
+): string {
   const historyBlock =
     history.length > 0
       ? `Lịch sử hội thoại gần đây:\n${history.slice(-4).join('\n')}\n\n`
@@ -17,7 +20,10 @@ export function buildQueryRewritePrompt(query: string, history: string[]): strin
 Hãy sinh ra 3 biến thể của câu hỏi này để cải thiện kết quả truy xuất tài liệu khóa học. Mỗi biến thể là một câu hỏi/cụm từ tìm kiếm khác nhau nhưng cùng ý nghĩa. Trả về DUY NHẤT 3 dòng, mỗi dòng là 1 biến thể, không thêm số thứ tự, không thêm giải thích.`;
 }
 
-export function buildCompressionPrompt(query: string, chunks: string[]): string {
+export function buildCompressionPrompt(
+  query: string,
+  chunks: string[],
+): string {
   const ctxBlock = chunks
     .map((c, i) => `--- Đoạn ${i + 1} ---\n${c}`)
     .join('\n\n');

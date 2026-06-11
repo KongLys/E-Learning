@@ -1,5 +1,10 @@
 import { Type } from 'class-transformer';
-import { ArrayNotEmpty, IsArray, IsUUID, ValidateNested } from 'class-validator';
+import {
+  ArrayNotEmpty,
+  IsArray,
+  IsUUID,
+  ValidateNested,
+} from 'class-validator';
 
 class AnswerItemDto {
   @IsUUID()

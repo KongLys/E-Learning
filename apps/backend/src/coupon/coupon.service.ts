@@ -5,7 +5,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { BulkCreateCouponRowDto, CreateCouponDto } from './dto/create-coupon.dto';
+import {
+  BulkCreateCouponRowDto,
+  CreateCouponDto,
+} from './dto/create-coupon.dto';
 
 @Injectable()
 export class CouponService {
@@ -24,10 +27,13 @@ export class CouponService {
       const course = await this.prisma.course.findFirst({
         where: { id: dto.courseId, instructorId },
       });
-      if (!course) throw new ForbiddenException('Course not found or not yours');
+      if (!course)
+        throw new ForbiddenException('Course not found or not yours');
     }
 
-    const exists = await this.prisma.coupon.findUnique({ where: { code: dto.code.toUpperCase() } });
+    const exists = await this.prisma.coupon.findUnique({
+      where: { code: dto.code.toUpperCase() },
+    });
     if (exists) throw new BadRequestException('Coupon code already exists');
 
     return this.prisma.coupon.create({
@@ -56,16 +62,30 @@ export class CouponService {
     for (const row of rows) {
       try {
         if (!row.code || row.code.trim().length < 3) {
-          results.push({ code: row.code, success: false, error: 'Code quá ngắn' });
+          results.push({
+            code: row.code,
+            success: false,
+            error: 'Code quá ngắn',
+          });
           continue;
         }
         if (row.courseId && !myCourseIds.includes(row.courseId)) {
-          results.push({ code: row.code, success: false, error: 'Course không thuộc về bạn' });
+          results.push({
+            code: row.code,
+            success: false,
+            error: 'Course không thuộc về bạn',
+          });
           continue;
         }
-        const exists = await this.prisma.coupon.findUnique({ where: { code: row.code.toUpperCase() } });
+        const exists = await this.prisma.coupon.findUnique({
+          where: { code: row.code.toUpperCase() },
+        });
         if (exists) {
-          results.push({ code: row.code, success: false, error: 'Code đã tồn tại' });
+          results.push({
+            code: row.code,
+            success: false,
+            error: 'Code đã tồn tại',
+          });
           continue;
         }
         await this.prisma.coupon.create({
@@ -80,7 +100,11 @@ export class CouponService {
         });
         results.push({ code: row.code, success: true });
       } catch {
-        results.push({ code: row.code, success: false, error: 'Lỗi tạo coupon' });
+        results.push({
+          code: row.code,
+          success: false,
+          error: 'Lỗi tạo coupon',
+        });
       }
     }
 
@@ -88,9 +112,12 @@ export class CouponService {
   }
 
   async deleteCoupon(instructorId: string, couponId: string) {
-    const coupon = await this.prisma.coupon.findUnique({ where: { id: couponId } });
+    const coupon = await this.prisma.coupon.findUnique({
+      where: { id: couponId },
+    });
     if (!coupon) throw new NotFoundException('Coupon not found');
-    if (coupon.instructorId !== instructorId) throw new ForbiddenException('Access denied');
+    if (coupon.instructorId !== instructorId)
+      throw new ForbiddenException('Access denied');
     await this.prisma.coupon.delete({ where: { id: couponId } });
   }
 
@@ -111,7 +138,9 @@ export class CouponService {
     code: string,
     courseId: string,
   ): Promise<{ discountPct: number; couponId: string } | null> {
-    const coupon = await this.prisma.coupon.findUnique({ where: { code: code.toUpperCase() } });
+    const coupon = await this.prisma.coupon.findUnique({
+      where: { code: code.toUpperCase() },
+    });
     if (!coupon) return null;
     if (coupon.expiresAt && coupon.expiresAt < new Date()) return null;
     if (coupon.maxUses > 0 && coupon.usedCount >= coupon.maxUses) return null;

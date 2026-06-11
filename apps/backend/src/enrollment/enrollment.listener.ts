@@ -15,6 +15,9 @@ export class EnrollmentListener {
 
   @OnEvent('order.paid')
   async handleOrderPaid(event: OrderPaidEvent) {
-    await this.enrollmentService.enrollAfterPayment(event.userId, event.courseId);
+    await this.enrollmentService.enrollAfterPayment(
+      event.userId,
+      event.courseId,
+    );
   }
 }

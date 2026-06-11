@@ -1,5 +1,14 @@
 import {
-  Body, Controller, Get, HttpCode, Param, Patch, Post, Query, UploadedFile, UseInterceptors,
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Express } from 'express';
@@ -25,7 +34,15 @@ export class CourseController {
     @Query('sort') sort?: string,
     @Query('price') price?: string,
   ) {
-    return this.courseService.listPublicCourses({ page: +page! || 1, limit: +limit! || 12, category, level, search, sort, price });
+    return this.courseService.listPublicCourses({
+      page: +page! || 1,
+      limit: +limit! || 12,
+      category,
+      level,
+      search,
+      sort,
+      price,
+    });
   }
 
   @Public()
@@ -42,7 +59,10 @@ export class CourseController {
 
   @Roles('instructor')
   @Post('courses')
-  create(@CurrentUser() user: { userId: string }, @Body() dto: CreateCourseDto) {
+  create(
+    @CurrentUser() user: { userId: string },
+    @Body() dto: CreateCourseDto,
+  ) {
     return this.courseService.createCourse(user.userId, dto);
   }
 
@@ -73,7 +93,10 @@ export class CourseController {
 
   @HttpCode(200)
   @Post('courses/:id/archive')
-  archive(@CurrentUser() user: { userId: string; role: string }, @Param('id') id: string) {
+  archive(
+    @CurrentUser() user: { userId: string; role: string },
+    @Param('id') id: string,
+  ) {
     return this.courseService.archiveCourse(id, user.userId, user.role);
   }
 

@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import { PrismaService } from '../prisma/prisma.service';
@@ -23,37 +27,44 @@ export class InstructorStatsService {
     });
     const courseIds = courses.map((c) => c.id);
 
-    const [totalCourses, totalStudents, ratingAgg, pendingQuestions, revenueAgg] =
-      await Promise.all([
-        this.prisma.course.count({ where: { instructorId } }),
-        this.prisma.enrollment.count({
-          where: { courseId: { in: courseIds }, status: 'active' },
-        }),
-        this.prisma.review.aggregate({
-          _avg: { rating: true },
-          where: { courseId: { in: courseIds } },
-        }),
-        this.prisma.quickQuestion.count({
-          where: {
-            lesson: { section: { course: { instructorId } } },
-            status: 'pending',
-          },
-        }),
-        courseIds.length > 0
-          ? this.prisma.orderItem.aggregate({
-              _sum: { price: true },
-              where: {
-                courseId: { in: courseIds },
-                order: { status: 'paid' },
-              },
-            })
-          : Promise.resolve({ _sum: { price: null } }),
-      ]);
+    const [
+      totalCourses,
+      totalStudents,
+      ratingAgg,
+      pendingQuestions,
+      revenueAgg,
+    ] = await Promise.all([
+      this.prisma.course.count({ where: { instructorId } }),
+      this.prisma.enrollment.count({
+        where: { courseId: { in: courseIds }, status: 'active' },
+      }),
+      this.prisma.review.aggregate({
+        _avg: { rating: true },
+        where: { courseId: { in: courseIds } },
+      }),
+      this.prisma.quickQuestion.count({
+        where: {
+          lesson: { section: { course: { instructorId } } },
+          status: 'pending',
+        },
+      }),
+      courseIds.length > 0
+        ? this.prisma.orderItem.aggregate({
+            _sum: { price: true },
+            where: {
+              courseId: { in: courseIds },
+              order: { status: 'paid' },
+            },
+          })
+        : Promise.resolve({ _sum: { price: null } }),
+    ]);
 
     const result = {
       totalCourses,
       totalStudents,
-      avgRating: ratingAgg._avg.rating ? Number(ratingAgg._avg.rating.toFixed(1)) : 0,
+      avgRating: ratingAgg._avg.rating
+        ? Number(ratingAgg._avg.rating.toFixed(1))
+        : 0,
       totalRevenue: Number(revenueAgg._sum.price ?? 0),
       pendingQuestions,
     };
@@ -80,7 +91,9 @@ export class InstructorStatsService {
     let data: { date: string; amount: number }[] = [];
 
     if (courseIds.length > 0) {
-      const rows = await this.prisma.$queryRaw<{ date: Date; amount: string }[]>`
+      const rows = await this.prisma.$queryRaw<
+        { date: Date; amount: string }[]
+      >`
         SELECT DATE(o."paid_at") as date, SUM(oi.price) as amount
         FROM "order_items" oi
         JOIN "orders" o ON o.id = oi."order_id"
@@ -92,7 +105,10 @@ export class InstructorStatsService {
       `;
 
       data = rows.map((r) => ({
-        date: r.date instanceof Date ? r.date.toISOString().split('T')[0] : String(r.date),
+        date:
+          r.date instanceof Date
+            ? r.date.toISOString().split('T')[0]
+            : String(r.date),
         amount: Number(r.amount ?? 0),
       }));
     }
@@ -111,46 +127,62 @@ export class InstructorStatsService {
       where: { id: courseId, instructorId },
     });
     if (!course) throw new NotFoundException('Course not found');
-    if (course.instructorId !== instructorId) throw new ForbiddenException('Access denied');
+    if (course.instructorId !== instructorId)
+      throw new ForbiddenException('Access denied');
 
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
 
-    const [enrolledCount, completedCount, ratingAgg, ratingGroups, totalRevAgg, monthRevAgg, lessons] =
-      await Promise.all([
-        this.prisma.enrollment.count({ where: { courseId, status: 'active' } }),
-        this.prisma.enrollment.count({ where: { courseId, status: 'completed' } }),
-        this.prisma.review.aggregate({
-          _avg: { rating: true },
-          where: { courseId },
-        }),
-        this.prisma.review.groupBy({
-          by: ['rating'],
-          where: { courseId },
-          _count: { rating: true },
-        }),
-        this.prisma.orderItem.aggregate({
-          _sum: { price: true },
-          where: { courseId, order: { status: 'paid' } },
-        }),
-        this.prisma.orderItem.aggregate({
-          _sum: { price: true },
-          where: {
-            courseId,
-            order: { status: 'paid', paidAt: { gte: startOfMonth } },
-          },
-        }),
-        this.prisma.lesson.findMany({
-          where: { section: { courseId } },
-          select: { id: true, title: true },
-          orderBy: { orderIndex: 'asc' },
-        }),
-      ]);
+    const [
+      enrolledCount,
+      completedCount,
+      ratingAgg,
+      ratingGroups,
+      totalRevAgg,
+      monthRevAgg,
+      lessons,
+    ] = await Promise.all([
+      this.prisma.enrollment.count({ where: { courseId, status: 'active' } }),
+      this.prisma.enrollment.count({
+        where: { courseId, status: 'completed' },
+      }),
+      this.prisma.review.aggregate({
+        _avg: { rating: true },
+        where: { courseId },
+      }),
+      this.prisma.review.groupBy({
+        by: ['rating'],
+        where: { courseId },
+        _count: { rating: true },
+      }),
+      this.prisma.orderItem.aggregate({
+        _sum: { price: true },
+        where: { courseId, order: { status: 'paid' } },
+      }),
+      this.prisma.orderItem.aggregate({
+        _sum: { price: true },
+        where: {
+          courseId,
+          order: { status: 'paid', paidAt: { gte: startOfMonth } },
+        },
+      }),
+      this.prisma.lesson.findMany({
+        where: { section: { courseId } },
+        select: { id: true, title: true },
+        orderBy: { orderIndex: 'asc' },
+      }),
+    ]);
 
     const totalEnrolled = enrolledCount + completedCount;
 
-    const ratingDistribution: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    const ratingDistribution: Record<number, number> = {
+      1: 0,
+      2: 0,
+      3: 0,
+      4: 0,
+      5: 0,
+    };
     for (const g of ratingGroups) {
       ratingDistribution[g.rating] = g._count.rating;
     }
@@ -184,7 +216,9 @@ export class InstructorStatsService {
         totalEnrolled > 0
           ? Number(((completedCount / totalEnrolled) * 100).toFixed(1))
           : 0,
-      avgRating: ratingAgg._avg.rating ? Number(ratingAgg._avg.rating.toFixed(1)) : 0,
+      avgRating: ratingAgg._avg.rating
+        ? Number(ratingAgg._avg.rating.toFixed(1))
+        : 0,
       ratingDistribution,
       revenue: {
         total: Number(totalRevAgg._sum.price ?? 0),
@@ -209,42 +243,63 @@ export class InstructorStatsService {
     const courseIds = courses.map((c) => c.id);
 
     if (courseIds.length === 0) {
-      return { totalWatchTimeSec: 0, avgCompletionRate: 0, totalLessonsCompleted: 0, totalQuizAttempts: 0, totalQaQuestions: 0, avgRating: 0, totalReviews: 0 };
+      return {
+        totalWatchTimeSec: 0,
+        avgCompletionRate: 0,
+        totalLessonsCompleted: 0,
+        totalQuizAttempts: 0,
+        totalQaQuestions: 0,
+        avgRating: 0,
+        totalReviews: 0,
+      };
     }
 
-    const [watchTimeAgg, completionAgg, lessonsCompleted, quizAttempts, qaQuestions, ratingAgg, totalReviews] =
-      await Promise.all([
-        this.prisma.lessonProgress.aggregate({
-          _sum: { watchTimeSec: true },
-          where: { enrollment: { courseId: { in: courseIds } } },
-        }),
-        this.prisma.enrollment.aggregate({
-          _avg: { progressPercent: true },
-          where: { courseId: { in: courseIds } },
-        }),
-        this.prisma.lessonProgress.count({
-          where: { enrollment: { courseId: { in: courseIds } }, completed: true },
-        }),
-        this.prisma.quizAttempt.count({
-          where: { quizLesson: { lesson: { section: { courseId: { in: courseIds } } } } },
-        }),
-        this.prisma.quickQuestion.count({
-          where: { lesson: { section: { courseId: { in: courseIds } } } },
-        }),
-        this.prisma.review.aggregate({
-          _avg: { rating: true },
-          where: { courseId: { in: courseIds } },
-        }),
-        this.prisma.review.count({ where: { courseId: { in: courseIds } } }),
-      ]);
+    const [
+      watchTimeAgg,
+      completionAgg,
+      lessonsCompleted,
+      quizAttempts,
+      qaQuestions,
+      ratingAgg,
+      totalReviews,
+    ] = await Promise.all([
+      this.prisma.lessonProgress.aggregate({
+        _sum: { watchTimeSec: true },
+        where: { enrollment: { courseId: { in: courseIds } } },
+      }),
+      this.prisma.enrollment.aggregate({
+        _avg: { progressPercent: true },
+        where: { courseId: { in: courseIds } },
+      }),
+      this.prisma.lessonProgress.count({
+        where: { enrollment: { courseId: { in: courseIds } }, completed: true },
+      }),
+      this.prisma.quizAttempt.count({
+        where: {
+          quizLesson: { lesson: { section: { courseId: { in: courseIds } } } },
+        },
+      }),
+      this.prisma.quickQuestion.count({
+        where: { lesson: { section: { courseId: { in: courseIds } } } },
+      }),
+      this.prisma.review.aggregate({
+        _avg: { rating: true },
+        where: { courseId: { in: courseIds } },
+      }),
+      this.prisma.review.count({ where: { courseId: { in: courseIds } } }),
+    ]);
 
     const result = {
       totalWatchTimeSec: Number(watchTimeAgg._sum.watchTimeSec ?? 0),
-      avgCompletionRate: Number((completionAgg._avg.progressPercent ?? 0).toFixed(1)),
+      avgCompletionRate: Number(
+        (completionAgg._avg.progressPercent ?? 0).toFixed(1),
+      ),
       totalLessonsCompleted: lessonsCompleted,
       totalQuizAttempts: quizAttempts,
       totalQaQuestions: qaQuestions,
-      avgRating: ratingAgg._avg.rating ? Number(ratingAgg._avg.rating.toFixed(1)) : 0,
+      avgRating: ratingAgg._avg.rating
+        ? Number(ratingAgg._avg.rating.toFixed(1))
+        : 0,
       totalReviews,
     };
 
@@ -267,7 +322,16 @@ export class InstructorStatsService {
             answers: { select: { optionId: true } },
           },
         },
-        attempts: { select: { id: true, score: true, isPassed: true, startedAt: true, submittedAt: true, studentId: true } },
+        attempts: {
+          select: {
+            id: true,
+            score: true,
+            isPassed: true,
+            startedAt: true,
+            submittedAt: true,
+            studentId: true,
+          },
+        },
       },
     });
 
@@ -277,15 +341,27 @@ export class InstructorStatsService {
       const uniqueStudents = new Set(attempts.map((a) => a.studentId)).size;
       const retakeCount = attemptCount - uniqueStudents;
       const completedAttempts = attempts.filter((a) => a.submittedAt);
-      const avgScore = attemptCount > 0 ? Number((attempts.reduce((s, a) => s + a.score, 0) / attemptCount).toFixed(1)) : 0;
+      const avgScore =
+        attemptCount > 0
+          ? Number(
+              (
+                attempts.reduce((s, a) => s + a.score, 0) / attemptCount
+              ).toFixed(1),
+            )
+          : 0;
       const passCount = attempts.filter((a) => a.isPassed).length;
-      const passRate = attemptCount > 0 ? Number(((passCount / attemptCount) * 100).toFixed(1)) : 0;
+      const passRate =
+        attemptCount > 0
+          ? Number(((passCount / attemptCount) * 100).toFixed(1))
+          : 0;
       const avgDurationSec =
         completedAttempts.length > 0
           ? Math.round(
               completedAttempts.reduce((s, a) => {
                 if (!a.submittedAt) return s;
-                return s + (a.submittedAt.getTime() - a.startedAt.getTime()) / 1000;
+                return (
+                  s + (a.submittedAt.getTime() - a.startedAt.getTime()) / 1000
+                );
               }, 0) / completedAttempts.length,
             )
           : 0;
@@ -293,10 +369,19 @@ export class InstructorStatsService {
       const hardQuestions = ql.questions
         .map((q) => {
           const total = q.answers.length;
-          const correctOptionIds = q.options.filter((o) => o.isCorrect).map((o) => o.id);
-          const wrongCount = q.answers.filter((a) => !correctOptionIds.includes(a.optionId)).length;
+          const correctOptionIds = q.options
+            .filter((o) => o.isCorrect)
+            .map((o) => o.id);
+          const wrongCount = q.answers.filter(
+            (a) => !correctOptionIds.includes(a.optionId),
+          ).length;
           const wrongRate = total > 0 ? wrongCount / total : 0;
-          return { questionId: q.id, content: q.content, wrongRate: Number(wrongRate.toFixed(2)), total };
+          return {
+            questionId: q.id,
+            content: q.content,
+            wrongRate: Number(wrongRate.toFixed(2)),
+            total,
+          };
         })
         .filter((q) => q.wrongRate >= 0.5)
         .sort((a, b) => b.wrongRate - a.wrongRate);

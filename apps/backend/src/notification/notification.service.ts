@@ -5,7 +5,13 @@ import { PrismaService } from '../prisma/prisma.service';
 export class NotificationService {
   constructor(private prisma: PrismaService) {}
 
-  async create(userId: string, type: string, title: string, body: string, linkUrl?: string) {
+  async create(
+    userId: string,
+    type: string,
+    title: string,
+    body: string,
+    linkUrl?: string,
+  ) {
     return this.prisma.notification.create({
       data: { userId, type, title, body, linkUrl },
     });
@@ -30,7 +36,9 @@ export class NotificationService {
   }
 
   async getUnreadCount(userId: string) {
-    const count = await this.prisma.notification.count({ where: { userId, isRead: false } });
+    const count = await this.prisma.notification.count({
+      where: { userId, isRead: false },
+    });
     return { count };
   }
 

@@ -1,4 +1,12 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+} from '@nestjs/common';
 import { SectionService } from './section.service';
 import { CreateSectionDto } from './dto/create-section.dto';
 import { UpdateSectionDto } from './dto/update-section.dto';
@@ -22,7 +30,12 @@ export class SectionController {
     @Param('courseId') courseId: string,
     @Body() dto: CreateSectionDto,
   ) {
-    return this.sectionService.addSection(courseId, user.userId, user.role, dto);
+    return this.sectionService.addSection(
+      courseId,
+      user.userId,
+      user.role,
+      dto,
+    );
   }
 
   @Patch('reorder')
@@ -31,7 +44,12 @@ export class SectionController {
     @Param('courseId') courseId: string,
     @Body() dto: ReorderSectionsDto,
   ) {
-    return this.sectionService.reorderSections(courseId, user.userId, user.role, dto);
+    return this.sectionService.reorderSections(
+      courseId,
+      user.userId,
+      user.role,
+      dto,
+    );
   }
 
   @Patch(':sectionId')
@@ -41,7 +59,13 @@ export class SectionController {
     @Param('sectionId') sectionId: string,
     @Body() dto: UpdateSectionDto,
   ) {
-    return this.sectionService.updateSection(courseId, sectionId, user.userId, user.role, dto);
+    return this.sectionService.updateSection(
+      courseId,
+      sectionId,
+      user.userId,
+      user.role,
+      dto,
+    );
   }
 
   @Delete(':sectionId')
@@ -50,6 +74,11 @@ export class SectionController {
     @Param('courseId') courseId: string,
     @Param('sectionId') sectionId: string,
   ) {
-    return this.sectionService.deleteSection(courseId, sectionId, user.userId, user.role);
+    return this.sectionService.deleteSection(
+      courseId,
+      sectionId,
+      user.userId,
+      user.role,
+    );
   }
 }

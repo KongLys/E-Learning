@@ -3,10 +3,33 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { instructorApi } from '@/lib/api/instructor.api';
+import {
+  moderationApi,
+  MODERATION_COLORS,
+  MODERATION_LABELS,
+  type DocumentParseStatus,
+  type ModerationStatus,
+} from '@/lib/api/ai.api';
 import { RichTextEditor } from '@/components/common/RichTextEditor';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { QuizBuilder } from './QuizBuilder';
 import { LESSON_TYPE_META, type LessonType } from './lessonTypeMeta';
+
+const PARSE_LABEL: Record<DocumentParseStatus, string> = {
+  uploaded: 'Chờ xử lý AI',
+  parsing: 'Đang chuyển đổi tài liệu…',
+  parsed: 'Đã chuyển đổi — đang index…',
+  ready: 'AI đã sẵn sàng',
+  failed: 'Lỗi xử lý tài liệu',
+};
+
+const PARSE_COLOR: Record<DocumentParseStatus, string> = {
+  uploaded: 'bg-gray-100 text-gray-700',
+  parsing: 'bg-blue-100 text-blue-700 animate-pulse',
+  parsed: 'bg-yellow-100 text-yellow-800 animate-pulse',
+  ready: 'bg-green-100 text-green-700',
+  failed: 'bg-red-100 text-red-700',
+};
 
 interface LessonContentEditorProps {
   courseId: string;
@@ -82,6 +105,12 @@ export function LessonContentEditor({ courseId, lesson }: LessonContentEditorPro
     mutationFn: (file: File) => instructorApi.uploadDocument(lesson.id, file, setUploadPct),
     onSuccess: () => { setUploadPct(null); setError(''); invalidate(); },
     onError: (e) => { setUploadPct(null); onErr(e); },
+  });
+
+  const appeal = useMutation({
+    mutationFn: (reason?: string) => moderationApi.appealLesson(lesson.id, reason),
+    onSuccess: () => { setError(''); invalidate(); },
+    onError: onErr,
   });
 
   if (isLoading) return <div className="py-12"><LoadingSpinner /></div>;
@@ -176,6 +205,39 @@ export function LessonContentEditor({ courseId, lesson }: LessonContentEditorPro
       {lesson.type === 'document' && (
         <section className="space-y-3 border-t border-gray-100 pt-5">
           <h3 className="text-sm font-semibold text-gray-700">Tài liệu</h3>
+
+          {/* Trạng thái AI: chuyển đổi tài liệu + kiểm duyệt nội dung bài */}
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            {detail?.documentAsset?.fileUrl && detail?.documentAsset?.parseStatus && (
+              <span className={`px-2 py-1 rounded-full font-medium ${PARSE_COLOR[detail.documentAsset.parseStatus as DocumentParseStatus]}`}>
+                {PARSE_LABEL[detail.documentAsset.parseStatus as DocumentParseStatus]}
+              </span>
+            )}
+            {detail?.moderationStatus && (
+              <span className={`px-2 py-1 rounded-full font-medium ${MODERATION_COLORS[detail.moderationStatus as ModerationStatus]}`}>
+                Kiểm duyệt: {MODERATION_LABELS[detail.moderationStatus as ModerationStatus]}
+              </span>
+            )}
+            {detail?.moderationStatus === 'rejected' && (
+              <button
+                onClick={() => {
+                  const reason = window.prompt('Lý do kiến nghị duyệt lại (tuỳ chọn):') ?? undefined;
+                  appeal.mutate(reason || undefined);
+                }}
+                disabled={appeal.isPending}
+                className="px-2 py-1 rounded-full border border-amber-300 text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+              >
+                {appeal.isPending ? 'Đang gửi…' : 'Kiến nghị duyệt lại'}
+              </button>
+            )}
+          </div>
+          {detail?.moderationReason && detail?.moderationStatus !== 'approved' && (
+            <p className="text-xs text-red-600">{detail.moderationReason}</p>
+          )}
+          {detail?.documentAsset?.errorMsg && detail?.documentAsset?.parseStatus === 'failed' && (
+            <p className="text-xs text-red-600">{detail.documentAsset.errorMsg}</p>
+          )}
+
           {detail?.documentAsset?.fileUrl ? (
             <p className="text-xs text-green-600">✓ Đã tải file ({detail.documentAsset.fileType?.toUpperCase()})</p>
           ) : (

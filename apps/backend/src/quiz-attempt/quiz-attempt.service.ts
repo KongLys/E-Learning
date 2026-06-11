@@ -26,9 +26,14 @@ export class QuizAttemptService {
     if (!quiz) throw new NotFoundException('Quiz not found');
 
     const enrollment = await this.prisma.enrollment.findFirst({
-      where: { studentId, courseId: quiz.lesson.section.courseId, status: 'active' },
+      where: {
+        studentId,
+        courseId: quiz.lesson.section.courseId,
+        status: 'active',
+      },
     });
-    if (!enrollment) throw new ForbiddenException('Not enrolled in this course');
+    if (!enrollment)
+      throw new ForbiddenException('Not enrolled in this course');
 
     if (quiz.maxAttempts > 0) {
       const attemptCount = await this.prisma.quizAttempt.count({
@@ -51,7 +56,9 @@ export class QuizAttemptService {
 
     for (const question of quiz.questions) {
       totalPoints += question.points;
-      const correctOptionIds = question.options.filter((o) => o.isCorrect).map((o) => o.id);
+      const correctOptionIds = question.options
+        .filter((o) => o.isCorrect)
+        .map((o) => o.id);
       const answer = dto.answers.find((a) => a.questionId === question.id);
       const yourOptionIds = answer?.optionIds ?? [];
 
@@ -81,7 +88,10 @@ export class QuizAttemptService {
         isPassed,
         answers: {
           create: dto.answers.flatMap((a) =>
-            a.optionIds.map((optionId) => ({ questionId: a.questionId, optionId })),
+            a.optionIds.map((optionId) => ({
+              questionId: a.questionId,
+              optionId,
+            })),
           ),
         },
       },
@@ -104,7 +114,9 @@ export class QuizAttemptService {
   }
 
   async getAttempts(studentId: string, quizLessonId: string) {
-    const quiz = await this.prisma.quizLesson.findUnique({ where: { id: quizLessonId } });
+    const quiz = await this.prisma.quizLesson.findUnique({
+      where: { id: quizLessonId },
+    });
     if (!quiz) throw new NotFoundException('Quiz not found');
 
     return this.prisma.quizAttempt.findMany({

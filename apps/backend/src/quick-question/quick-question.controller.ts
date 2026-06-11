@@ -24,7 +24,14 @@ export class QuickQuestionController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.quickQuestionService.getByLesson(lessonId, u.userId, u.role, status, page ? +page : 1, limit ? +limit : 20);
+    return this.quickQuestionService.getByLesson(
+      lessonId,
+      u.userId,
+      u.role,
+      status,
+      page ? +page : 1,
+      limit ? +limit : 20,
+    );
   }
 
   @Get('instructor/courses/:courseId/questions')
@@ -35,7 +42,13 @@ export class QuickQuestionController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.quickQuestionService.getInstructorInbox(u.userId, courseId, status, page ? +page : 1, limit ? +limit : 20);
+    return this.quickQuestionService.getInstructorInbox(
+      u.userId,
+      courseId,
+      status,
+      page ? +page : 1,
+      limit ? +limit : 20,
+    );
   }
 
   @Get('quick-questions/:id')

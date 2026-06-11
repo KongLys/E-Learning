@@ -1,5 +1,13 @@
 import {
-  Body, Controller, Delete, Get, Param, Patch, Post, UploadedFile, UseInterceptors,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -20,8 +28,14 @@ import { Public } from '../auth/decorators/public.decorator';
 
 // Disk-backed multer storage: large uploads stream to a temp file instead of
 // being buffered whole in RAM (the service then streams the temp file to R2).
-const VIDEO_UPLOAD = { storage: diskStorage({ destination: tmpdir() }), limits: { fileSize: 2 * 1024 * 1024 * 1024 } };
-const DOCUMENT_UPLOAD = { storage: diskStorage({ destination: tmpdir() }), limits: { fileSize: 100 * 1024 * 1024 } };
+const VIDEO_UPLOAD = {
+  storage: diskStorage({ destination: tmpdir() }),
+  limits: { fileSize: 2 * 1024 * 1024 * 1024 },
+};
+const DOCUMENT_UPLOAD = {
+  storage: diskStorage({ destination: tmpdir() }),
+  limits: { fileSize: 100 * 1024 * 1024 },
+};
 
 @Controller()
 export class LessonController {
@@ -48,7 +62,12 @@ export class LessonController {
     @Param('sectionId') sectionId: string,
     @Body() body: { lessonIds: string[] },
   ) {
-    return this.lessonService.reorderLessons(sectionId, u.userId, u.role, body.lessonIds);
+    return this.lessonService.reorderLessons(
+      sectionId,
+      u.userId,
+      u.role,
+      body.lessonIds,
+    );
   }
 
   @Patch('lessons/:id')
@@ -61,7 +80,10 @@ export class LessonController {
   }
 
   @Delete('lessons/:id')
-  deleteLesson(@CurrentUser() u: { userId: string; role: string }, @Param('id') id: string) {
+  deleteLesson(
+    @CurrentUser() u: { userId: string; role: string },
+    @Param('id') id: string,
+  ) {
     return this.lessonService.deleteLesson(id, u.userId, u.role);
   }
 
@@ -107,7 +129,10 @@ export class LessonController {
   }
 
   @Get('lessons/:id/document-url')
-  getDocumentUrl(@CurrentUser() u: { userId: string }, @Param('id') id: string) {
+  getDocumentUrl(
+    @CurrentUser() u: { userId: string },
+    @Param('id') id: string,
+  ) {
     return this.documentService.getSignedDocumentUrl(id, u.userId);
   }
 
@@ -132,7 +157,10 @@ export class LessonController {
 
   @Public()
   @Get('lessons/:id/quiz')
-  getQuiz(@CurrentUser() u: { userId: string; role: string }, @Param('id') id: string) {
+  getQuiz(
+    @CurrentUser() u: { userId: string; role: string },
+    @Param('id') id: string,
+  ) {
     return this.quizService.getQuiz(id, u?.userId, u?.role);
   }
 

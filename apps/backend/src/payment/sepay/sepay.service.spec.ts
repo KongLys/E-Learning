@@ -21,7 +21,9 @@ describe('SepayService', () => {
     });
 
     it('mỗi lần sinh khác nhau', () => {
-      expect(service.generateTransferCode()).not.toBe(service.generateTransferCode());
+      expect(service.generateTransferCode()).not.toBe(
+        service.generateTransferCode(),
+      );
     });
   });
 
@@ -51,7 +53,9 @@ describe('SepayService', () => {
 
   describe('extractTransferCode', () => {
     it('trích đúng mã khi có text nối thêm', () => {
-      expect(service.extractTransferCode('DHA1B2C3D4 CHUYEN TIEN')).toBe('DHA1B2C3D4');
+      expect(service.extractTransferCode('DHA1B2C3D4 CHUYEN TIEN')).toBe(
+        'DHA1B2C3D4',
+      );
     });
 
     it('chuẩn hoá chữ thường và khoảng trắng', () => {

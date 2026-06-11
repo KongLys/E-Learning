@@ -9,7 +9,9 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 
 @WebSocketGateway({ cors: { origin: '*' }, namespace: '/notifications' })
-export class NotificationGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class NotificationGateway
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   server: Server;
 
@@ -20,9 +22,16 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
 
   async handleConnection(client: Socket) {
     try {
-      const token = client.handshake.auth?.token ?? client.handshake.headers?.authorization?.replace('Bearer ', '');
-      if (!token) { client.disconnect(); return; }
-      const payload = this.jwtService.verify(token, { secret: this.config.get('JWT_SECRET') });
+      const token =
+        client.handshake.auth?.token ??
+        client.handshake.headers?.authorization?.replace('Bearer ', '');
+      if (!token) {
+        client.disconnect();
+        return;
+      }
+      const payload = this.jwtService.verify(token, {
+        secret: this.config.get('JWT_SECRET'),
+      });
       client.join(`user:${payload.sub}`);
     } catch {
       client.disconnect();

@@ -2,11 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 
+export type ChunkSourceType = 'lesson_content' | 'lesson_file';
+
 export interface ChunkRow {
   courseId: string;
-  materialId: string | null;
+  sectionId: string | null;
   lessonId: string | null;
-  sourceType: 'material' | 'lesson_document';
+  sourceType: ChunkSourceType;
   sectionTitle: string | null;
   pageNumber: number | null;
   chunkIndex: number;
@@ -21,10 +23,16 @@ export interface RetrievedChunk {
   content: string;
   sectionTitle: string | null;
   pageNumber: number | null;
-  materialId: string | null;
+  sectionId: string | null;
   lessonId: string | null;
   sourceType: string;
   score: number;
+}
+
+/** Giới hạn phạm vi truy vấn theo Phần hoặc Bài (phân vùng TOC). */
+export interface ChunkScope {
+  sectionId?: string;
+  lessonId?: string;
 }
 
 @Injectable()
@@ -47,7 +55,7 @@ export class VectorStoreService {
       return Prisma.sql`(
         gen_random_uuid(),
         ${r.courseId},
-        ${r.materialId},
+        ${r.sectionId},
         ${r.lessonId},
         ${r.sourceType},
         ${r.sectionTitle},
@@ -61,7 +69,7 @@ export class VectorStoreService {
     });
     const sql = Prisma.sql`
       INSERT INTO course_chunks
-        (id, course_id, material_id, lesson_id, source_type, section_title, page_number, chunk_index, content, token_count, metadata, embedding)
+        (id, course_id, section_id, lesson_id, source_type, section_title, page_number, chunk_index, content, token_count, metadata, embedding)
       VALUES ${Prisma.join(values)}
     `;
     await this.prisma.$executeRaw(sql);
@@ -72,8 +80,15 @@ export class VectorStoreService {
     queryEmbedding: number[],
     queryText: string,
     k = 50,
+    scope?: ChunkScope,
   ): Promise<RetrievedChunk[]> {
     const vec = `[${queryEmbedding.join(',')}]`;
+    // Bộ lọc phạm vi (Phần/Bài) áp vào cả 2 nhánh vector + full-text.
+    const scopeSql = Prisma.sql`${
+      scope?.lessonId
+        ? Prisma.sql` AND lesson_id = ${scope.lessonId}`
+        : Prisma.empty
+    }${scope?.sectionId ? Prisma.sql` AND section_id = ${scope.sectionId}` : Prisma.empty}`;
     // Reciprocal Rank Fusion: combines vector ANN ranks with full-text ranks.
     // k=60 is a standard RRF constant.
     const rows = await this.prisma.$queryRaw<
@@ -82,7 +97,7 @@ export class VectorStoreService {
         content: string;
         section_title: string | null;
         page_number: number | null;
-        material_id: string | null;
+        section_id: string | null;
         lesson_id: string | null;
         source_type: string;
         rrf: number;
@@ -91,7 +106,7 @@ export class VectorStoreService {
       WITH vec AS (
         SELECT id, row_number() OVER (ORDER BY embedding <=> ${vec}::vector) AS rnk
         FROM course_chunks
-        WHERE course_id = ${courseId} AND embedding IS NOT NULL
+        WHERE course_id = ${courseId} AND embedding IS NOT NULL${scopeSql}
         ORDER BY embedding <=> ${vec}::vector
         LIMIT 100
       ),
@@ -100,11 +115,11 @@ export class VectorStoreService {
                row_number() OVER (ORDER BY ts_rank(content_tsv, plainto_tsquery('simple', ${queryText})) DESC) AS rnk
         FROM course_chunks
         WHERE course_id = ${courseId}
-          AND content_tsv @@ plainto_tsquery('simple', ${queryText})
+          AND content_tsv @@ plainto_tsquery('simple', ${queryText})${scopeSql}
         LIMIT 100
       )
       SELECT c.id, c.content, c.section_title, c.page_number,
-             c.material_id, c.lesson_id, c.source_type,
+             c.section_id, c.lesson_id, c.source_type,
              (COALESCE(1.0/(60 + vec.rnk), 0) + COALESCE(1.0/(60 + fts.rnk), 0))::float AS rrf
       FROM course_chunks c
       LEFT JOIN vec ON vec.id = c.id
@@ -119,15 +134,11 @@ export class VectorStoreService {
       content: r.content,
       sectionTitle: r.section_title,
       pageNumber: r.page_number,
-      materialId: r.material_id,
+      sectionId: r.section_id,
       lessonId: r.lesson_id,
       sourceType: r.source_type,
       score: r.rrf,
     }));
-  }
-
-  async deleteByMaterial(materialId: string): Promise<void> {
-    await this.prisma.courseChunk.deleteMany({ where: { materialId } });
   }
 
   async deleteByLesson(lessonId: string): Promise<void> {

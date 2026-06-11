@@ -1,10 +1,21 @@
-import { ConflictException, ForbiddenException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { OrderService } from './order.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 const mockPrisma = {
-  order: { findUnique: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn(), count: jest.fn() },
+  order: {
+    findUnique: jest.fn(),
+    findMany: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    count: jest.fn(),
+  },
   course: { findMany: jest.fn() },
   enrollment: { findFirst: jest.fn() },
   payment: { update: jest.fn() },
@@ -29,37 +40,74 @@ describe('OrderService', () => {
     const dto = { courseIds: ['course-1'], idempotencyKey: 'key-1' };
 
     it('throws ForbiddenException for admin role', async () => {
-      await expect(service.createOrder('user-1', 'admin', dto))
-        .rejects.toThrow(ForbiddenException);
+      await expect(service.createOrder('user-1', 'admin', dto)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('throws ForbiddenException when buying own course', async () => {
       mockPrisma.order.findUnique.mockResolvedValue(null);
-      mockPrisma.course.findMany.mockResolvedValue([{ id: 'course-1', price: 100000, instructorId: 'instructor-1' }]);
-      await expect(service.createOrder('instructor-1', 'instructor', dto))
-        .rejects.toThrow(ForbiddenException);
+      mockPrisma.course.findMany.mockResolvedValue([
+        { id: 'course-1', price: 100000, instructorId: 'instructor-1' },
+      ]);
+      await expect(
+        service.createOrder('instructor-1', 'instructor', dto),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('allows an instructor to buy another instructor’s course', async () => {
       mockPrisma.order.findUnique.mockResolvedValue(null);
-      mockPrisma.course.findMany.mockResolvedValue([{ id: 'course-1', price: 299000, title: 'Test Course', instructorId: 'instructor-x' }]);
+      mockPrisma.course.findMany.mockResolvedValue([
+        {
+          id: 'course-1',
+          price: 299000,
+          title: 'Test Course',
+          instructorId: 'instructor-x',
+        },
+      ]);
       mockPrisma.enrollment.findFirst.mockResolvedValue(null);
       mockPrisma.order.create.mockResolvedValue({
-        id: 'order-i', totalAmount: 299000, currency: 'VND', status: 'pending',
-        idempotencyKey: 'key-1', paidAt: null, createdAt: new Date(),
-        items: [{ courseId: 'course-1', price: 299000, course: { id: 'course-1', title: 'Test Course' } }],
+        id: 'order-i',
+        totalAmount: 299000,
+        currency: 'VND',
+        status: 'pending',
+        idempotencyKey: 'key-1',
+        paidAt: null,
+        createdAt: new Date(),
+        items: [
+          {
+            courseId: 'course-1',
+            price: 299000,
+            course: { id: 'course-1', title: 'Test Course' },
+          },
+        ],
         payment: null,
       });
 
-      const result = await service.createOrder('instructor-1', 'instructor', dto);
+      const result = await service.createOrder(
+        'instructor-1',
+        'instructor',
+        dto,
+      );
       expect(result.orderId).toBe('order-i');
     });
 
     it('returns existing order for duplicate idempotencyKey', async () => {
       const existingOrder = {
-        id: 'order-1', totalAmount: 100000, currency: 'VND', status: 'pending',
-        idempotencyKey: 'key-1', paidAt: null, createdAt: new Date(),
-        items: [{ courseId: 'course-1', price: 100000, course: { id: 'course-1', title: 'Test' } }],
+        id: 'order-1',
+        totalAmount: 100000,
+        currency: 'VND',
+        status: 'pending',
+        idempotencyKey: 'key-1',
+        paidAt: null,
+        createdAt: new Date(),
+        items: [
+          {
+            courseId: 'course-1',
+            price: 100000,
+            course: { id: 'course-1', title: 'Test' },
+          },
+        ],
         payment: null,
       };
       mockPrisma.order.findUnique.mockResolvedValue(existingOrder);
@@ -72,34 +120,54 @@ describe('OrderService', () => {
     it('throws NotFoundException when course not found', async () => {
       mockPrisma.order.findUnique.mockResolvedValue(null);
       mockPrisma.course.findMany.mockResolvedValue([]);
-      await expect(service.createOrder('student-1', 'student', dto))
-        .rejects.toThrow(NotFoundException);
+      await expect(
+        service.createOrder('student-1', 'student', dto),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('throws ConflictException when already enrolled', async () => {
       mockPrisma.order.findUnique.mockResolvedValue(null);
-      mockPrisma.course.findMany.mockResolvedValue([{ id: 'course-1', price: 100000 }]);
+      mockPrisma.course.findMany.mockResolvedValue([
+        { id: 'course-1', price: 100000 },
+      ]);
       mockPrisma.enrollment.findFirst.mockResolvedValue({ id: 'enroll-1' });
-      await expect(service.createOrder('student-1', 'student', dto))
-        .rejects.toThrow(ConflictException);
+      await expect(
+        service.createOrder('student-1', 'student', dto),
+      ).rejects.toThrow(ConflictException);
     });
 
     it('throws UnprocessableEntityException for free course order', async () => {
       mockPrisma.order.findUnique.mockResolvedValue(null);
-      mockPrisma.course.findMany.mockResolvedValue([{ id: 'course-1', price: 0 }]);
+      mockPrisma.course.findMany.mockResolvedValue([
+        { id: 'course-1', price: 0 },
+      ]);
       mockPrisma.enrollment.findFirst.mockResolvedValue(null);
-      await expect(service.createOrder('student-1', 'student', dto))
-        .rejects.toThrow(UnprocessableEntityException);
+      await expect(
+        service.createOrder('student-1', 'student', dto),
+      ).rejects.toThrow(UnprocessableEntityException);
     });
 
     it('creates order for paid course', async () => {
       mockPrisma.order.findUnique.mockResolvedValue(null);
-      mockPrisma.course.findMany.mockResolvedValue([{ id: 'course-1', price: 299000, title: 'Test Course' }]);
+      mockPrisma.course.findMany.mockResolvedValue([
+        { id: 'course-1', price: 299000, title: 'Test Course' },
+      ]);
       mockPrisma.enrollment.findFirst.mockResolvedValue(null);
       mockPrisma.order.create.mockResolvedValue({
-        id: 'order-new', totalAmount: 299000, currency: 'VND', status: 'pending',
-        idempotencyKey: 'key-1', paidAt: null, createdAt: new Date(),
-        items: [{ courseId: 'course-1', price: 299000, course: { id: 'course-1', title: 'Test Course' } }],
+        id: 'order-new',
+        totalAmount: 299000,
+        currency: 'VND',
+        status: 'pending',
+        idempotencyKey: 'key-1',
+        paidAt: null,
+        createdAt: new Date(),
+        items: [
+          {
+            courseId: 'course-1',
+            price: 299000,
+            course: { id: 'course-1', title: 'Test Course' },
+          },
+        ],
         payment: null,
       });
 

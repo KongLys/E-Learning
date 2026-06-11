@@ -21,7 +21,10 @@ export class SepayService {
     this.bankCode = this.config.get<string>('SEPAY_BANK_CODE', '');
     this.accountName = this.config.get<string>('SEPAY_ACCOUNT_NAME', '');
     this.apiKey = this.config.get<string>('SEPAY_API_KEY', '');
-    this.qrUrl = this.config.get<string>('SEPAY_QR_URL', 'https://qr.sepay.vn/img');
+    this.qrUrl = this.config.get<string>(
+      'SEPAY_QR_URL',
+      'https://qr.sepay.vn/img',
+    );
   }
 
   /** Sinh nội dung chuyển khoản duy nhất, ví dụ: DHA1B2C3D4 (chỉ chữ + số). */

@@ -167,7 +167,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       );
       if (result) {
         // Notify the other party that we've read up to this message.
-        client.to(this.room(payload.conversationId)).emit('message_read', result);
+        client
+          .to(this.room(payload.conversationId))
+          .emit('message_read', result);
       }
     } catch (error) {
       client.emit('mark_read_error', { error: error.message });

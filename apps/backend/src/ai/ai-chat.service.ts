@@ -4,8 +4,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RagService, Citation } from './rag/rag.service';
+import { ChunkScope } from './vector/vector-store.service';
 
 @Injectable()
 export class AiChatService {
@@ -27,7 +29,9 @@ export class AiChatService {
       select: { id: true },
     });
     if (!enrollment) {
-      throw new ForbiddenException('You must be enrolled in this course to use AI chat');
+      throw new ForbiddenException(
+        'You must be enrolled in this course to use AI chat',
+      );
     }
   }
 
@@ -55,13 +59,20 @@ export class AiChatService {
   }
 
   async loadConversation(conversationId: string, userId: string) {
-    const conv = await this.prisma.aiConversation.findUnique({ where: { id: conversationId } });
+    const conv = await this.prisma.aiConversation.findUnique({
+      where: { id: conversationId },
+    });
     if (!conv) throw new NotFoundException('Conversation not found');
     if (conv.userId !== userId) throw new ForbiddenException('Access denied');
     return conv;
   }
 
-  async ask(conversationId: string, userId: string, query: string) {
+  async ask(
+    conversationId: string,
+    userId: string,
+    query: string,
+    scope?: ChunkScope,
+  ) {
     if (!query || query.trim().length < 2) {
       throw new BadRequestException('Query is too short');
     }
@@ -82,8 +93,13 @@ export class AiChatService {
       data: { conversationId: conv.id, role: 'user', content: query },
     });
 
-    // Run RAG pipeline
-    const result = await this.rag.ask(conv.courseId, query, formattedHistory);
+    // Run RAG pipeline (có thể giới hạn phạm vi theo Phần/Bài)
+    const result = await this.rag.ask(
+      conv.courseId,
+      query,
+      formattedHistory,
+      scope,
+    );
 
     return {
       stream: result.stream,
@@ -95,7 +111,7 @@ export class AiChatService {
             conversationId: conv.id,
             role: 'assistant',
             content: fullText,
-            citations: result.citations as unknown as object,
+            citations: result.citations as unknown as Prisma.InputJsonValue,
           },
         });
         await this.prisma.aiConversation.update({
@@ -116,7 +132,7 @@ export class AiChatService {
       chunkId: c.chunkId,
       sectionTitle: c.sectionTitle,
       pageNumber: c.pageNumber,
-      materialId: c.materialId,
+      sectionId: c.sectionId,
       lessonId: c.lessonId,
     }));
   }

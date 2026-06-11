@@ -1,4 +1,13 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Query, BadRequestException } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  Post,
+  Query,
+  BadRequestException,
+} from '@nestjs/common';
 import { IsOptional, IsString, MaxLength } from 'class-validator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ModerationService, ContentType } from './moderation.service';
@@ -18,7 +27,10 @@ export class AdminModerationController {
 
   @Get()
   list(@Query('status') status?: string, @Query('type') type?: string) {
-    return this.moderation.listForReview({ status, type: this.parseType(type) });
+    return this.moderation.listForReview({
+      status,
+      type: this.parseType(type),
+    });
   }
 
   @HttpCode(200)
@@ -29,7 +41,11 @@ export class AdminModerationController {
 
   @HttpCode(200)
   @Post(':type/:id/reject')
-  reject(@Param('type') type: string, @Param('id') id: string, @Body() dto: RejectDto) {
+  reject(
+    @Param('type') type: string,
+    @Param('id') id: string,
+    @Body() dto: RejectDto,
+  ) {
     return this.moderation.reject(this.requireType(type), id, dto.reason);
   }
 
@@ -39,8 +55,8 @@ export class AdminModerationController {
   }
 
   private requireType(type: string): ContentType {
-    if (type !== 'course' && type !== 'material') {
-      throw new BadRequestException('type must be "course" or "material"');
+    if (type !== 'course' && type !== 'lesson') {
+      throw new BadRequestException('type must be "course" or "lesson"');
     }
     return type;
   }

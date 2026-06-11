@@ -32,7 +32,8 @@ export class NoteService {
         lessonId: dto.lessonId,
         content: dto.content,
         positionType: dto.positionType,
-        positionValue: dto.positionType === PositionType.NONE ? 0 : dto.positionValue,
+        positionValue:
+          dto.positionType === PositionType.NONE ? 0 : dto.positionValue,
       },
     });
   }
@@ -67,7 +68,10 @@ export class NoteService {
       orderBy: [{ lessonId: 'asc' }, { positionValue: 'asc' }],
     });
 
-    const grouped: Record<string, { lesson: { id: string; title: string }; notes: typeof notes }> = {};
+    const grouped: Record<
+      string,
+      { lesson: { id: string; title: string }; notes: typeof notes }
+    > = {};
     for (const note of notes) {
       const key = note.lessonId;
       if (!grouped[key]) grouped[key] = { lesson: note.lesson, notes: [] };
@@ -79,14 +83,19 @@ export class NoteService {
   async updateNote(noteId: string, studentId: string, dto: UpdateNoteDto) {
     const note = await this.prisma.note.findUnique({ where: { id: noteId } });
     if (!note) throw new NotFoundException('Note not found');
-    if (note.studentId !== studentId) throw new ForbiddenException('Access denied');
-    return this.prisma.note.update({ where: { id: noteId }, data: { content: dto.content } });
+    if (note.studentId !== studentId)
+      throw new ForbiddenException('Access denied');
+    return this.prisma.note.update({
+      where: { id: noteId },
+      data: { content: dto.content },
+    });
   }
 
   async deleteNote(noteId: string, studentId: string) {
     const note = await this.prisma.note.findUnique({ where: { id: noteId } });
     if (!note) throw new NotFoundException('Note not found');
-    if (note.studentId !== studentId) throw new ForbiddenException('Access denied');
+    if (note.studentId !== studentId)
+      throw new ForbiddenException('Access denied');
     await this.prisma.note.delete({ where: { id: noteId } });
     return { message: 'Note deleted' };
   }

@@ -25,10 +25,16 @@ export class ProgressService {
     const enrollment = await this.prisma.enrollment.findFirst({
       where: { studentId, courseId: lesson.section.courseId, status: 'active' },
     });
-    if (!enrollment) throw new ForbiddenException('Not enrolled in this course');
+    if (!enrollment)
+      throw new ForbiddenException('Not enrolled in this course');
 
     await this.prisma.lessonProgress.upsert({
-      where: { enrollmentId_lessonId: { enrollmentId: enrollment.id, lessonId: dto.lessonId } },
+      where: {
+        enrollmentId_lessonId: {
+          enrollmentId: enrollment.id,
+          lessonId: dto.lessonId,
+        },
+      },
       update: {
         lastPositionSec: dto.lastPositionSec,
         watchTimeSec: { increment: dto.watchTimeSec },
@@ -59,10 +65,13 @@ export class ProgressService {
     const enrollment = await this.prisma.enrollment.findFirst({
       where: { studentId, courseId: lesson.section.courseId, status: 'active' },
     });
-    if (!enrollment) throw new ForbiddenException('Not enrolled in this course');
+    if (!enrollment)
+      throw new ForbiddenException('Not enrolled in this course');
 
     const progress = await this.prisma.lessonProgress.findUnique({
-      where: { enrollmentId_lessonId: { enrollmentId: enrollment.id, lessonId } },
+      where: {
+        enrollmentId_lessonId: { enrollmentId: enrollment.id, lessonId },
+      },
     });
     const watchTimeSec = progress?.watchTimeSec ?? 0;
     const lastPositionSec = progress?.lastPositionSec ?? 0;
@@ -76,26 +85,41 @@ export class ProgressService {
         );
       }
     } else if (lesson.type === 'video') {
-      const duration = lesson.videoAsset?.durationSec ?? lesson.durationSec ?? 0;
+      const duration =
+        lesson.videoAsset?.durationSec ?? lesson.durationSec ?? 0;
       const mode = lesson.videoAsset?.completionMode ?? 'percent_90';
       if (duration > 0) {
         if (mode === 'ended_autonext') {
           if (lastPositionSec < duration - 2) {
-            throw new UnprocessableEntityException('Bạn cần xem hết video để hoàn thành');
+            throw new UnprocessableEntityException(
+              'Bạn cần xem hết video để hoàn thành',
+            );
           }
         } else if (watchTimeSec < duration * 0.9) {
-          throw new UnprocessableEntityException('Bạn cần xem tối thiểu 90% thời lượng video');
+          throw new UnprocessableEntityException(
+            'Bạn cần xem tối thiểu 90% thời lượng video',
+          );
         }
       }
     }
 
     await this.prisma.lessonProgress.upsert({
-      where: { enrollmentId_lessonId: { enrollmentId: enrollment.id, lessonId } },
+      where: {
+        enrollmentId_lessonId: { enrollmentId: enrollment.id, lessonId },
+      },
       update: { completed: true, completedAt: new Date() },
-      create: { enrollmentId: enrollment.id, lessonId, completed: true, completedAt: new Date() },
+      create: {
+        enrollmentId: enrollment.id,
+        lessonId,
+        completed: true,
+        completedAt: new Date(),
+      },
     });
 
-    const updated = await this.recalculateProgress(enrollment.id, lesson.section.courseId);
+    const updated = await this.recalculateProgress(
+      enrollment.id,
+      lesson.section.courseId,
+    );
     return { progressPercent: updated.progressPercent, lessonCompleted: true };
   }
 
@@ -108,7 +132,8 @@ export class ProgressService {
       where: { enrollmentId, completed: true },
     });
 
-    const progressPercent = totalLessons > 0 ? (completedCount / totalLessons) * 100 : 0;
+    const progressPercent =
+      totalLessons > 0 ? (completedCount / totalLessons) * 100 : 0;
     const status = progressPercent >= 100 ? 'completed' : 'active';
 
     const previous = await this.prisma.enrollment.findUnique({
@@ -123,7 +148,10 @@ export class ProgressService {
 
     // Fire once, only on the active → completed transition.
     if (status === 'completed' && previous?.status !== 'completed') {
-      this.events.emit('course.completed', { studentId: updated.studentId, courseId });
+      this.events.emit('course.completed', {
+        studentId: updated.studentId,
+        courseId,
+      });
     }
 
     return updated;

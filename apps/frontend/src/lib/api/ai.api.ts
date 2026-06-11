@@ -7,26 +7,8 @@ export type ModerationStatus =
   | 'appealing'
   | 'locked';
 
-export interface CourseMaterial {
-  id: string;
-  courseId: string;
-  fileName: string;
-  fileUrl: string;
-  markdownUrl: string | null;
-  fileType: 'pdf' | 'docx';
-  fileSize: string;
-  status: 'uploaded' | 'parsing' | 'parsed' | 'ready' | 'failed';
-  errorMsg: string | null;
-  chunkCount: number;
-  createdAt: string;
-  updatedAt: string;
-  moderationStatus: ModerationStatus;
-  moderationLabel: string | null;
-  moderationScore: number | null;
-  moderationReason: string | null;
-  appealReason: string | null;
-  moderatedAt: string | null;
-}
+/** Trạng thái chuyển đổi file tài liệu của bài học (PDF/DOCX → markdown → index). */
+export type DocumentParseStatus = 'uploaded' | 'parsing' | 'parsed' | 'ready' | 'failed';
 
 export interface AiConversation {
   id: string;
@@ -48,34 +30,18 @@ export interface AiMessage {
         chunkId: string;
         sectionTitle: string | null;
         pageNumber: number | null;
-        materialId: string | null;
+        sectionId?: string | null;
         lessonId: string | null;
       }>
     | null;
   createdAt: string;
 }
 
-export const materialsApi = {
-  list: (courseId: string) =>
-    apiClient.get<CourseMaterial[]>(`/courses/${courseId}/materials`),
-  upload: (courseId: string, file: File) => {
-    const fd = new FormData();
-    fd.append('file', file);
-    return apiClient.post<CourseMaterial>(`/courses/${courseId}/materials`, fd, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-  },
-  remove: (courseId: string, materialId: string) =>
-    apiClient.delete(`/courses/${courseId}/materials/${materialId}`),
-  retry: (courseId: string, materialId: string) =>
-    apiClient.post(`/courses/${courseId}/materials/${materialId}/retry`),
-  appeal: (courseId: string, materialId: string, reason?: string) =>
-    apiClient.post(`/courses/${courseId}/materials/${materialId}/moderation/appeal`, { reason }),
-};
-
 export const moderationApi = {
   appealCourse: (courseId: string, reason?: string) =>
     apiClient.post(`/courses/${courseId}/moderation/appeal`, { reason }),
+  appealLesson: (lessonId: string, reason?: string) =>
+    apiClient.post(`/lessons/${lessonId}/moderation/appeal`, { reason }),
 };
 
 export const MODERATION_LABELS: Record<ModerationStatus, string> = {
@@ -126,22 +92,10 @@ export interface MindmapResult {
   updatedAt?: string;
 }
 
-export interface MindmapMaterial {
-  id: string;
-  fileName: string;
-  chunkCount: number;
-  mindmapStatus: 'pending' | 'generating' | 'ready' | 'failed' | null;
-}
-
 export const mindmapApi = {
-  listMaterials: (courseId: string) =>
-    apiClient.get<MindmapMaterial[]>(`/courses/${courseId}/mindmap/materials`),
-  generate: (courseId: string, materialId: string, force = false) =>
-    apiClient.post<MindmapResult>(
-      `/courses/${courseId}/materials/${materialId}/mindmap${force ? '?force=true' : ''}`,
-    ),
-  get: (courseId: string, materialId: string) =>
-    apiClient.get<MindmapResult>(`/courses/${courseId}/materials/${materialId}/mindmap`),
+  generate: (courseId: string, force = false) =>
+    apiClient.post<MindmapResult>(`/courses/${courseId}/mindmap${force ? '?force=true' : ''}`),
+  get: (courseId: string) => apiClient.get<MindmapResult>(`/courses/${courseId}/mindmap`),
 };
 
 export interface AskStreamHandlers {
@@ -151,10 +105,17 @@ export interface AskStreamHandlers {
   onError?: (msg: string) => void;
 }
 
+/** Phạm vi truy vấn AI: cả khóa (rỗng), theo Phần (sectionId) hoặc theo Bài (lessonId). */
+export interface AskScope {
+  sectionId?: string;
+  lessonId?: string;
+}
+
 export async function streamAsk(
   conversationId: string,
   query: string,
   handlers: AskStreamHandlers,
+  scope?: AskScope,
 ): Promise<void> {
   const baseURL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
   const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
@@ -165,7 +126,7 @@ export async function streamAsk(
       Accept: 'text/event-stream',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ query }),
+    body: JSON.stringify({ query, ...(scope?.sectionId ? { sectionId: scope.sectionId } : {}), ...(scope?.lessonId ? { lessonId: scope.lessonId } : {}) }),
   });
   if (!res.ok || !res.body) {
     const text = await res.text().catch(() => '');

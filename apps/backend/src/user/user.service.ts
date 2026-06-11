@@ -63,19 +63,27 @@ export class UserService {
       throw new BadRequestException('File size must not exceed 5MB');
     }
 
-    const resized = await sharp(file.buffer).resize(400, 400, { fit: 'cover' }).jpeg({ quality: 85 }).toBuffer();
+    const resized = await sharp(file.buffer)
+      .resize(400, 400, { fit: 'cover' })
+      .jpeg({ quality: 85 })
+      .toBuffer();
 
     const ext = 'jpg';
     const key = `avatars/${userId}/${randomUUID()}.${ext}`;
 
-    const existing = await this.prisma.user.findUnique({ where: { id: userId } });
+    const existing = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
     if (existing?.avatarUrl) {
       const oldKey = this.storage.extractKeyFromUrl(existing.avatarUrl);
       await this.storage.deleteFile(oldKey);
     }
 
     const url = await this.storage.uploadFile(key, resized, 'image/jpeg');
-    await this.prisma.user.update({ where: { id: userId }, data: { avatarUrl: url } });
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { avatarUrl: url },
+    });
     return { avatarUrl: url };
   }
 
@@ -84,18 +92,30 @@ export class UserService {
     if (!user) throw new NotFoundException();
 
     const valid = await bcrypt.compare(dto.currentPassword, user.passwordHash);
-    if (!valid) throw new UnauthorizedException('Current password is incorrect');
+    if (!valid)
+      throw new UnauthorizedException('Current password is incorrect');
 
     if (dto.currentPassword === dto.newPassword) {
-      throw new BadRequestException('New password must differ from current password');
+      throw new BadRequestException(
+        'New password must differ from current password',
+      );
     }
 
     const hash = await bcrypt.hash(dto.newPassword, 12);
-    await this.prisma.user.update({ where: { id: userId }, data: { passwordHash: hash } });
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: hash },
+    });
     return { message: 'Password changed successfully' };
   }
 
-  async listUsers(query: { page?: number; limit?: number; role?: string; status?: string; search?: string }) {
+  async listUsers(query: {
+    page?: number;
+    limit?: number;
+    role?: string;
+    status?: string;
+    search?: string;
+  }) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
@@ -115,7 +135,14 @@ export class UserService {
         where,
         skip,
         take: limit,
-        select: { id: true, email: true, fullName: true, role: true, status: true, createdAt: true },
+        select: {
+          id: true,
+          email: true,
+          fullName: true,
+          role: true,
+          status: true,
+          createdAt: true,
+        },
         orderBy: { createdAt: 'desc' },
       }),
       this.prisma.user.count({ where }),
@@ -124,8 +151,13 @@ export class UserService {
     return { users, total, page, limit };
   }
 
-  async updateUserStatus(adminId: string, targetId: string, dto: UpdateUserStatusDto) {
-    if (adminId === targetId) throw new ForbiddenException('Cannot change your own status');
+  async updateUserStatus(
+    adminId: string,
+    targetId: string,
+    dto: UpdateUserStatusDto,
+  ) {
+    if (adminId === targetId)
+      throw new ForbiddenException('Cannot change your own status');
     const user = await this.prisma.user.update({
       where: { id: targetId },
       data: { status: dto.status },
@@ -134,12 +166,26 @@ export class UserService {
   }
 
   private sanitize(user: {
-    id: string; email: string; fullName: string; avatarUrl: string | null;
-    phone: string | null; role: string; status: string; bio: string | null; createdAt: Date;
+    id: string;
+    email: string;
+    fullName: string;
+    avatarUrl: string | null;
+    phone: string | null;
+    role: string;
+    status: string;
+    bio: string | null;
+    createdAt: Date;
   }) {
     return {
-      id: user.id, email: user.email, fullName: user.fullName, avatarUrl: user.avatarUrl,
-      phone: user.phone, role: user.role, status: user.status, bio: user.bio, createdAt: user.createdAt,
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      avatarUrl: user.avatarUrl,
+      phone: user.phone,
+      role: user.role,
+      status: user.status,
+      bio: user.bio,
+      createdAt: user.createdAt,
     };
   }
 }

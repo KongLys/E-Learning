@@ -1,4 +1,9 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { createReadStream } from 'fs';
 import { unlink } from 'fs/promises';
@@ -20,7 +25,12 @@ export class VideoService {
     private lessonService: LessonService,
   ) {}
 
-  async uploadVideo(lessonId: string, userId: string, userRole: string, file: Express.Multer.File) {
+  async uploadVideo(
+    lessonId: string,
+    userId: string,
+    userRole: string,
+    file: Express.Multer.File,
+  ) {
     if (!ALLOWED_VIDEO.includes(file.mimetype)) {
       throw new BadRequestException('Only MP4 and WebM videos are allowed');
     }
@@ -28,23 +38,39 @@ export class VideoService {
       throw new BadRequestException('Video must not exceed 2GB');
     }
 
-    const lesson = await this.prisma.lesson.findUnique({ where: { id: lessonId } });
+    const lesson = await this.prisma.lesson.findUnique({
+      where: { id: lessonId },
+    });
     if (!lesson) throw new NotFoundException('Lesson not found');
-    if (lesson.type !== 'video') throw new BadRequestException('Lesson is not a video type');
+    if (lesson.type !== 'video')
+      throw new BadRequestException('Lesson is not a video type');
 
-    const section = await this.prisma.section.findUnique({ where: { id: lesson.sectionId }, include: { course: true } });
-    if (userRole !== 'admin' && section?.course.instructorId !== userId) throw new ForbiddenException('Access denied');
+    const section = await this.prisma.section.findUnique({
+      where: { id: lesson.sectionId },
+      include: { course: true },
+    });
+    if (userRole !== 'admin' && section?.course.instructorId !== userId)
+      throw new ForbiddenException('Access denied');
 
     const ext = file.mimetype === 'video/mp4' ? 'mp4' : 'webm';
     const key = `videos/${lessonId}/${randomUUID()}.${ext}`;
 
-    const existing = await this.prisma.videoAsset.findUnique({ where: { lessonId } });
-    if (existing?.videoUrl) await this.storage.deleteFile(this.storage.extractKeyFromUrl(existing.videoUrl));
+    const existing = await this.prisma.videoAsset.findUnique({
+      where: { lessonId },
+    });
+    if (existing?.videoUrl)
+      await this.storage.deleteFile(
+        this.storage.extractKeyFromUrl(existing.videoUrl),
+      );
 
     // Stream the temp file to storage (multipart) instead of buffering the whole video in RAM.
     let url: string;
     try {
-      url = await this.storage.uploadFile(key, createReadStream(file.path), file.mimetype);
+      url = await this.storage.uploadFile(
+        key,
+        createReadStream(file.path),
+        file.mimetype,
+      );
     } finally {
       await unlink(file.path).catch(() => undefined);
     }
@@ -52,10 +78,18 @@ export class VideoService {
     const asset = await this.prisma.videoAsset.upsert({
       where: { lessonId },
       update: { videoUrl: url, hlsUrl: url, processingStatus: 'ready' },
-      create: { lessonId, videoUrl: url, hlsUrl: url, processingStatus: 'ready' },
+      create: {
+        lessonId,
+        videoUrl: url,
+        hlsUrl: url,
+        processingStatus: 'ready',
+      },
     });
 
-    await this.prisma.lesson.update({ where: { id: lessonId }, data: { durationSec: asset.durationSec } });
+    await this.prisma.lesson.update({
+      where: { id: lessonId },
+      data: { durationSec: asset.durationSec },
+    });
     await this.lessonService.updateCourseStats(lesson.sectionId);
 
     return asset;
@@ -67,12 +101,19 @@ export class VideoService {
     userRole: string,
     dto: { completionMode: 'percent_90' | 'ended_autonext' },
   ) {
-    const lesson = await this.prisma.lesson.findUnique({ where: { id: lessonId } });
+    const lesson = await this.prisma.lesson.findUnique({
+      where: { id: lessonId },
+    });
     if (!lesson) throw new NotFoundException('Lesson not found');
-    if (lesson.type !== 'video') throw new BadRequestException('Lesson is not a video type');
+    if (lesson.type !== 'video')
+      throw new BadRequestException('Lesson is not a video type');
 
-    const section = await this.prisma.section.findUnique({ where: { id: lesson.sectionId }, include: { course: true } });
-    if (userRole !== 'admin' && section?.course.instructorId !== userId) throw new ForbiddenException('Access denied');
+    const section = await this.prisma.section.findUnique({
+      where: { id: lesson.sectionId },
+      include: { course: true },
+    });
+    if (userRole !== 'admin' && section?.course.instructorId !== userId)
+      throw new ForbiddenException('Access denied');
 
     return this.prisma.videoAsset.upsert({
       where: { lessonId },
@@ -89,12 +130,17 @@ export class VideoService {
     if (!lesson) throw new NotFoundException('Lesson not found');
 
     if (!lesson.isPreview) {
-      const enrolled = await this.lessonService.isEnrolled(userId, lesson.section.courseId);
+      const enrolled = await this.lessonService.isEnrolled(
+        userId,
+        lesson.section.courseId,
+      );
       const isInstructor = lesson.section.course.instructorId === userId;
-      if (!enrolled && !isInstructor) throw new ForbiddenException('Not enrolled in this course');
+      if (!enrolled && !isInstructor)
+        throw new ForbiddenException('Not enrolled in this course');
     }
 
-    if (!lesson.videoAsset?.videoUrl) throw new NotFoundException('Video not uploaded yet');
+    if (!lesson.videoAsset?.videoUrl)
+      throw new NotFoundException('Video not uploaded yet');
     if (lesson.isPreview) return { url: lesson.videoAsset.videoUrl };
 
     const key = this.storage.extractKeyFromUrl(lesson.videoAsset.videoUrl);

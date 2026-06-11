@@ -1,4 +1,8 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   GoogleGenerativeAI,
@@ -25,23 +29,41 @@ export class GeminiService {
   constructor(config: ConfigService) {
     const apiKey = config.get<string>('GEMINI_API_KEY', '');
     if (!apiKey) {
-      this.logger.warn('GEMINI_API_KEY is not set — AI features will fail at runtime');
+      this.logger.warn(
+        'GEMINI_API_KEY is not set — AI features will fail at runtime',
+      );
     }
     this.client = new GoogleGenerativeAI(apiKey);
-    this.chatModelName = config.get<string>('GEMINI_CHAT_MODEL', 'gemini-1.5-flash');
-    this.embedModelName = config.get<string>('GEMINI_EMBED_MODEL', 'gemini-embedding-001');
+    this.chatModelName = config.get<string>(
+      'GEMINI_CHAT_MODEL',
+      'gemini-1.5-flash',
+    );
+    this.embedModelName = config.get<string>(
+      'GEMINI_EMBED_MODEL',
+      'gemini-embedding-001',
+    );
     this.embedDimensions = config.get<number>('GEMINI_EMBED_DIMENSIONS', 768);
     this.embedProvider =
-      config.get<string>('EMBED_PROVIDER', 'gemini') === 'ollama' ? 'ollama' : 'gemini';
-    this.ollamaBaseUrl = config.get<string>('OLLAMA_BASE_URL', 'http://localhost:11434');
-    this.ollamaEmbedModel = config.get<string>('OLLAMA_EMBED_MODEL', 'nomic-embed-text');
+      config.get<string>('EMBED_PROVIDER', 'gemini') === 'ollama'
+        ? 'ollama'
+        : 'gemini';
+    this.ollamaBaseUrl = config.get<string>(
+      'OLLAMA_BASE_URL',
+      'http://localhost:11434',
+    );
+    this.ollamaEmbedModel = config.get<string>(
+      'OLLAMA_EMBED_MODEL',
+      'nomic-embed-text',
+    );
   }
 
   async embedBatch(texts: string[]): Promise<number[][]> {
     if (texts.length === 0) return [];
     if (this.embedProvider === 'ollama') return this.embedBatchOllama(texts);
 
-    const model = this.client.getGenerativeModel({ model: this.embedModelName });
+    const model = this.client.getGenerativeModel({
+      model: this.embedModelName,
+    });
     const BATCH = 100;
     const results: number[][] = [];
     for (let i = 0; i < texts.length; i += BATCH) {
@@ -51,7 +73,7 @@ export class GeminiService {
           requests: slice.map((text) => ({
             content: { role: 'user', parts: [{ text }] },
             outputDimensionality: this.embedDimensions,
-          })) as never,
+          })),
         });
         for (const e of res.embeddings) {
           results.push(e.values);
@@ -81,7 +103,9 @@ export class GeminiService {
           body: JSON.stringify({ model: this.ollamaEmbedModel, input }),
         });
         if (!res.ok) {
-          throw new Error(`Ollama responded ${res.status}: ${await res.text()}`);
+          throw new Error(
+            `Ollama responded ${res.status}: ${await res.text()}`,
+          );
         }
         const data = (await res.json()) as { embeddings?: number[][] };
         if (!data.embeddings || data.embeddings.length !== input.length) {
@@ -89,7 +113,9 @@ export class GeminiService {
         }
         results.push(...data.embeddings);
       } catch (err) {
-        this.logger.error(`Ollama embedding batch failed: ${(err as Error).message}`);
+        this.logger.error(
+          `Ollama embedding batch failed: ${(err as Error).message}`,
+        );
         throw new ServiceUnavailableException('Embedding service unavailable');
       }
     }
@@ -102,7 +128,10 @@ export class GeminiService {
     return res.response.text();
   }
 
-  async *generateStream(prompt: string, opts: GenerateOpts = {}): AsyncGenerator<string> {
+  async *generateStream(
+    prompt: string,
+    opts: GenerateOpts = {},
+  ): AsyncGenerator<string> {
     const model = this.getChatModel(opts);
     const result = await model.generateContentStream(prompt);
     for await (const chunk of result.stream) {

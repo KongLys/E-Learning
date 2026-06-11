@@ -13,14 +13,18 @@ export class MindmapProcessor extends WorkerHost {
   }
 
   async process(job: Job<GenerateMindmapJob>): Promise<void> {
-    const { materialId } = job.data;
-    this.logger.log(`Generating mindmap for ${materialId} (attempt ${job.attemptsMade + 1})`);
+    const { courseId } = job.data;
+    this.logger.log(
+      `Generating mindmap for course ${courseId} (attempt ${job.attemptsMade + 1})`,
+    );
     try {
-      await this.mindmap.generate(materialId, (p) => job.updateProgress(p));
+      await this.mindmap.generate(courseId, (p) => job.updateProgress(p));
     } catch (err) {
       const msg = (err as Error).message;
-      this.logger.error(`Mindmap generation failed for ${materialId}: ${msg}`);
-      await this.mindmap.markFailed(materialId, msg);
+      this.logger.error(
+        `Mindmap generation failed for course ${courseId}: ${msg}`,
+      );
+      await this.mindmap.markFailed(courseId, msg);
       throw err;
     }
   }

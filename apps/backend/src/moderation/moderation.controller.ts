@@ -19,12 +19,17 @@ export class ModerationController {
   }
 
   @HttpCode(200)
-  @Post('courses/:courseId/materials/:materialId/moderation/appeal')
-  appealMaterial(
+  @Post('lessons/:lessonId/moderation/appeal')
+  appealLesson(
     @CurrentUser() user: { userId: string; role: string },
-    @Param('materialId') materialId: string,
+    @Param('lessonId') lessonId: string,
     @Body() dto: AppealDto,
   ) {
-    return this.moderation.appealMaterial(materialId, user.userId, user.role, dto.reason);
+    return this.moderation.appealLesson(
+      lessonId,
+      user.userId,
+      user.role,
+      dto.reason,
+    );
   }
 }

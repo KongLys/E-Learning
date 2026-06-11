@@ -10,13 +10,20 @@ import {
   streamAsk,
   type AiConversation,
   type AiMessage,
-  type MindmapMaterial,
+  type AskScope,
 } from '@/lib/api/ai.api';
+import { learnApi } from '@/lib/api/learn.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorMessage } from '@/components/common/ErrorMessage';
 import { MindMapViewer } from '@/components/learn/MindMapViewer';
 
 type Citation = NonNullable<AiMessage['citations']>[number];
+
+interface SectionWithLessons {
+  id: string;
+  title: string;
+  lessons?: { id: string; title: string }[];
+}
 
 interface PendingMessage {
   role: 'user' | 'assistant';
@@ -33,11 +40,18 @@ export default function CourseAiChatPage() {
   const [streaming, setStreaming] = useState(false);
   const [pending, setPending] = useState<PendingMessage[]>([]);
   const [streamError, setStreamError] = useState('');
+  // Phạm vi truy vấn: '' = cả khóa, 's:{sectionId}' = theo Phần, 'l:{lessonId}' = theo Bài
+  const [scopeKey, setScopeKey] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const conversationsQuery = useQuery({
     queryKey: ['ai-conversations', courseId],
     queryFn: async () => (await aiChatApi.listConversations(courseId)).data,
+  });
+
+  const sectionsQuery = useQuery({
+    queryKey: ['course-sections', courseId],
+    queryFn: async () => (await learnApi.getCourseSections(courseId)).data as SectionWithLessons[],
   });
 
   const messagesQuery = useQuery({
@@ -88,23 +102,34 @@ export default function CourseAiChatPage() {
     let buffer = '';
     let citations: Citation[] = [];
 
-    await streamAsk(convId, q, {
-      onCitations: (cs) => {
-        citations = (cs ?? []) as Citation[];
-        setPending((p) =>
-          p.map((m, i) => (i === p.length - 1 ? { ...m, citations } : m)),
-        );
+    const scope: AskScope | undefined = scopeKey.startsWith('s:')
+      ? { sectionId: scopeKey.slice(2) }
+      : scopeKey.startsWith('l:')
+        ? { lessonId: scopeKey.slice(2) }
+        : undefined;
+
+    await streamAsk(
+      convId,
+      q,
+      {
+        onCitations: (cs) => {
+          citations = (cs ?? []) as Citation[];
+          setPending((p) =>
+            p.map((m, i) => (i === p.length - 1 ? { ...m, citations } : m)),
+          );
+        },
+        onToken: (text) => {
+          buffer += text;
+          setPending((p) =>
+            p.map((m, i) =>
+              i === p.length - 1 ? { ...m, content: buffer, citations } : m,
+            ),
+          );
+        },
+        onError: (msg) => setStreamError(msg),
       },
-      onToken: (text) => {
-        buffer += text;
-        setPending((p) =>
-          p.map((m, i) =>
-            i === p.length - 1 ? { ...m, content: buffer, citations } : m,
-          ),
-        );
-      },
-      onError: (msg) => setStreamError(msg),
-    });
+      scope,
+    );
 
     setStreaming(false);
     setPending([]);
@@ -178,7 +203,7 @@ export default function CourseAiChatPage() {
         <div className="p-4 border-b">
           <h1 className="font-semibold">Hỏi AI về khóa học</h1>
           <p className="text-xs text-gray-500">
-            Trợ lý AI trả lời dựa trên tài liệu khóa học (RAG)
+            Trợ lý AI trả lời dựa trên nội dung và tài liệu của các bài học (RAG)
           </p>
         </div>
 
@@ -194,7 +219,28 @@ export default function CourseAiChatPage() {
           {streamError && <ErrorMessage message={streamError} />}
         </div>
 
-        <div className="border-t p-4">
+        <div className="border-t p-4 space-y-2">
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-500 shrink-0">Phạm vi:</label>
+            <select
+              value={scopeKey}
+              onChange={(e) => setScopeKey(e.target.value)}
+              disabled={streaming}
+              className="border rounded-lg px-2 py-1.5 text-xs max-w-xs truncate focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Cả khóa học</option>
+              {(sectionsQuery.data ?? []).map((s) => (
+                <optgroup key={s.id} label={s.title}>
+                  <option value={`s:${s.id}`}>Phần: {s.title}</option>
+                  {(s.lessons ?? []).map((l) => (
+                    <option key={l.id} value={`l:${l.id}`}>
+                      Bài: {l.title}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
           <div className="flex gap-2">
             <textarea
               value={input}
@@ -256,26 +302,11 @@ function MessageBubble({ m }: { m: AiMessage | PendingMessage }) {
 }
 
 function MindMapTab({ courseId }: { courseId: string }) {
-  const [selected, setSelected] = useState<string | null>(null);
   const [triggered, setTriggered] = useState(false);
 
-  const materialsQuery = useQuery({
-    queryKey: ['mindmap-materials', courseId],
-    queryFn: async () => (await mindmapApi.listMaterials(courseId)).data,
-  });
-
-  // Default to the first available material.
-  useEffect(() => {
-    if (!selected && (materialsQuery.data?.length ?? 0) > 0) {
-      setSelected(materialsQuery.data![0].id);
-    }
-  }, [selected, materialsQuery.data]);
-
   const mindmapQuery = useQuery({
-    queryKey: ['mindmap', courseId, selected],
-    queryFn: async () =>
-      selected ? (await mindmapApi.get(courseId, selected)).data : null,
-    enabled: !!selected,
+    queryKey: ['mindmap', courseId],
+    queryFn: async () => (await mindmapApi.get(courseId)).data,
     refetchInterval: (query) => {
       const s = query.state.data?.status;
       if (s === 'generating') return 2000;
@@ -290,29 +321,17 @@ function MindMapTab({ courseId }: { courseId: string }) {
   }, [status]);
 
   const generate = useMutation({
-    mutationFn: (force: boolean) =>
-      mindmapApi.generate(courseId, selected!, force),
+    mutationFn: (force: boolean) => mindmapApi.generate(courseId, force),
     onSuccess: () => {
       setTriggered(true);
       mindmapQuery.refetch();
     },
   });
 
-  if (materialsQuery.isLoading) {
+  if (mindmapQuery.isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <LoadingSpinner />
-      </div>
-    );
-  }
-
-  const materials = materialsQuery.data ?? [];
-  if (materials.length === 0) {
-    return (
-      <div className="flex-1 flex items-center justify-center p-8">
-        <p className="text-center text-gray-500 text-sm">
-          Chưa có tài liệu nào đã xử lý xong để tạo sơ đồ tư duy.
-        </p>
       </div>
     );
   }
@@ -323,23 +342,12 @@ function MindMapTab({ courseId }: { courseId: string }) {
   return (
     <div className="flex-1 flex flex-col min-h-0 p-4 gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <select
-          value={selected ?? ''}
-          onChange={(e) => {
-            setSelected(e.target.value);
-            setTriggered(false);
-          }}
-          className="border rounded-lg px-3 py-2 text-sm max-w-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          {materials.map((m: MindmapMaterial) => (
-            <option key={m.id} value={m.id}>
-              {m.fileName}
-            </option>
-          ))}
-        </select>
+        <p className="text-sm text-gray-600">
+          Sơ đồ tư duy toàn khóa: Khóa học → Phần → Bài → đề mục nội dung.
+        </p>
         <button
           onClick={() => generate.mutate(ready)}
-          disabled={busy || !selected}
+          disabled={busy}
           className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
         >
           {busy ? 'Đang tạo…' : ready ? 'Tạo lại' : 'Tạo sơ đồ tư duy'}
@@ -355,7 +363,7 @@ function MindMapTab({ courseId }: { courseId: string }) {
         {busy ? (
           <div className="h-full flex flex-col items-center justify-center gap-3 text-gray-500">
             <LoadingSpinner />
-            <p className="text-sm">Đang phân tích tài liệu và tạo sơ đồ tư duy…</p>
+            <p className="text-sm">Đang phân tích nội dung bài học và tạo sơ đồ tư duy…</p>
           </div>
         ) : status === 'failed' ? (
           <div className="h-full flex flex-col items-center justify-center gap-3">
@@ -378,7 +386,8 @@ function MindMapTab({ courseId }: { courseId: string }) {
         ) : (
           <div className="h-full flex items-center justify-center p-8">
             <p className="text-center text-gray-500 text-sm">
-              Chọn tài liệu rồi bấm <span className="font-medium">“Tạo sơ đồ tư duy”</span> để bắt đầu.
+              Bấm <span className="font-medium">“Tạo sơ đồ tư duy”</span> để dựng sơ đồ từ nội dung
+              các bài học trong khóa.
             </p>
           </div>
         )}

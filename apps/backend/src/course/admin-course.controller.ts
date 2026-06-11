@@ -14,7 +14,11 @@ export class AdminCourseController {
     @Query('page') page?: number,
     @Query('limit') limit?: number,
   ) {
-    return this.courseService.listAdminCourses({ status, page: +page! || 1, limit: +limit! || 20 });
+    return this.courseService.listAdminCourses({
+      status,
+      page: +page! || 1,
+      limit: +limit! || 20,
+    });
   }
 
   @Patch(':id/approve')

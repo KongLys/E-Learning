@@ -1,4 +1,9 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { QuizConfigDto } from '../dto/quiz-config.dto';
 import { CreateQuestionDto } from '../dto/create-question.dto';
@@ -7,7 +12,12 @@ import { CreateQuestionDto } from '../dto/create-question.dto';
 export class QuizService {
   constructor(private prisma: PrismaService) {}
 
-  async configQuiz(lessonId: string, userId: string, userRole: string, dto: QuizConfigDto) {
+  async configQuiz(
+    lessonId: string,
+    userId: string,
+    userRole: string,
+    dto: QuizConfigDto,
+  ) {
     await this.assertLessonOwner(lessonId, userId, userRole);
     return this.prisma.quizLesson.upsert({
       where: { lessonId },
@@ -25,9 +35,16 @@ export class QuizService {
     });
   }
 
-  async addQuestion(lessonId: string, userId: string, userRole: string, dto: CreateQuestionDto) {
+  async addQuestion(
+    lessonId: string,
+    userId: string,
+    userRole: string,
+    dto: CreateQuestionDto,
+  ) {
     await this.assertLessonOwner(lessonId, userId, userRole);
-    const quiz = await this.prisma.quizLesson.findUnique({ where: { lessonId } });
+    const quiz = await this.prisma.quizLesson.findUnique({
+      where: { lessonId },
+    });
     if (!quiz) throw new NotFoundException('Quiz not configured');
 
     this.validateOptions(dto);
@@ -41,7 +58,11 @@ export class QuizService {
         points: dto.points ?? 1,
         explanation: dto.explanation,
         options: {
-          create: dto.options.map((o) => ({ content: o.content, isCorrect: o.isCorrect, orderIndex: o.orderIndex })),
+          create: dto.options.map((o) => ({
+            content: o.content,
+            isCorrect: o.isCorrect,
+            orderIndex: o.orderIndex,
+          })),
         },
       },
       include: { options: true },
@@ -50,13 +71,22 @@ export class QuizService {
     return question;
   }
 
-  async updateQuestion(questionId: string, userId: string, userRole: string, dto: CreateQuestionDto) {
+  async updateQuestion(
+    questionId: string,
+    userId: string,
+    userRole: string,
+    dto: CreateQuestionDto,
+  ) {
     const question = await this.prisma.quizQuestion.findUnique({
       where: { id: questionId },
       include: { quizLesson: true },
     });
     if (!question) throw new NotFoundException('Question not found');
-    await this.assertLessonOwner(question.quizLesson.lessonId, userId, userRole);
+    await this.assertLessonOwner(
+      question.quizLesson.lessonId,
+      userId,
+      userRole,
+    );
     this.validateOptions(dto);
 
     await this.prisma.quizOption.deleteMany({ where: { questionId } });
@@ -69,7 +99,11 @@ export class QuizService {
         points: dto.points ?? 1,
         explanation: dto.explanation,
         options: {
-          create: dto.options.map((o) => ({ content: o.content, isCorrect: o.isCorrect, orderIndex: o.orderIndex })),
+          create: dto.options.map((o) => ({
+            content: o.content,
+            isCorrect: o.isCorrect,
+            orderIndex: o.orderIndex,
+          })),
         },
       },
       include: { options: true },
@@ -82,7 +116,11 @@ export class QuizService {
       include: { quizLesson: true },
     });
     if (!question) throw new NotFoundException('Question not found');
-    await this.assertLessonOwner(question.quizLesson.lessonId, userId, userRole);
+    await this.assertLessonOwner(
+      question.quizLesson.lessonId,
+      userId,
+      userRole,
+    );
     await this.prisma.quizQuestion.delete({ where: { id: questionId } });
     return { message: 'Question deleted' };
   }
@@ -99,8 +137,12 @@ export class QuizService {
     });
     if (!quiz) throw new NotFoundException('Quiz not found');
 
-    const lesson = await this.prisma.lesson.findUnique({ where: { id: lessonId }, include: { section: { include: { course: true } } } });
-    const isInstructor = lesson?.section.course.instructorId === userId || userRole === 'admin';
+    const lesson = await this.prisma.lesson.findUnique({
+      where: { id: lessonId },
+      include: { section: { include: { course: true } } },
+    });
+    const isInstructor =
+      lesson?.section.course.instructorId === userId || userRole === 'admin';
 
     if (!isInstructor) {
       quiz.questions = quiz.questions.map((q) => ({
@@ -115,17 +157,27 @@ export class QuizService {
   private validateOptions(dto: CreateQuestionDto) {
     const correctCount = dto.options.filter((o) => o.isCorrect).length;
     if (dto.questionType === 'single' && correctCount !== 1) {
-      throw new BadRequestException('Single-choice question must have exactly one correct answer');
+      throw new BadRequestException(
+        'Single-choice question must have exactly one correct answer',
+      );
     }
     if (dto.questionType === 'multiple' && correctCount < 2) {
-      throw new BadRequestException('Multiple-choice question must have at least two correct answers');
+      throw new BadRequestException(
+        'Multiple-choice question must have at least two correct answers',
+      );
     }
     if (dto.questionType === 'true_false' && dto.options.length !== 2) {
-      throw new BadRequestException('True/false question must have exactly two options');
+      throw new BadRequestException(
+        'True/false question must have exactly two options',
+      );
     }
   }
 
-  private async assertLessonOwner(lessonId: string, userId: string, userRole: string) {
+  private async assertLessonOwner(
+    lessonId: string,
+    userId: string,
+    userRole: string,
+  ) {
     const lesson = await this.prisma.lesson.findUnique({
       where: { id: lessonId },
       include: { section: { include: { course: true } } },

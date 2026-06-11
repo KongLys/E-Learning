@@ -7,8 +7,27 @@ import sanitizeHtml from 'sanitize-html';
 export function sanitizeRichText(html: string): string {
   return sanitizeHtml(html, {
     allowedTags: [
-      'p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'blockquote', 'code', 'pre',
-      'h1', 'h2', 'h3', 'h4', 'ul', 'ol', 'li', 'a', 'img', 'hr',
+      'p',
+      'br',
+      'strong',
+      'b',
+      'em',
+      'i',
+      'u',
+      's',
+      'blockquote',
+      'code',
+      'pre',
+      'h1',
+      'h2',
+      'h3',
+      'h4',
+      'ul',
+      'ol',
+      'li',
+      'a',
+      'img',
+      'hr',
     ],
     allowedAttributes: {
       a: ['href', 'target', 'rel'],
@@ -16,7 +35,10 @@ export function sanitizeRichText(html: string): string {
     },
     allowedSchemes: ['http', 'https', 'mailto', 'data'],
     transformTags: {
-      a: sanitizeHtml.simpleTransform('a', { rel: 'noopener noreferrer', target: '_blank' }),
+      a: sanitizeHtml.simpleTransform('a', {
+        rel: 'noopener noreferrer',
+        target: '_blank',
+      }),
     },
   });
 }

@@ -27,19 +27,28 @@ export class UserController {
   }
 
   @Patch('me')
-  updateMe(@CurrentUser() user: { userId: string }, @Body() dto: UpdateProfileDto) {
+  updateMe(
+    @CurrentUser() user: { userId: string },
+    @Body() dto: UpdateProfileDto,
+  ) {
     return this.userService.updateProfile(user.userId, dto);
   }
 
   @Post('me/avatar')
   @UseInterceptors(FileInterceptor('file'))
-  uploadAvatar(@CurrentUser() user: { userId: string }, @UploadedFile() file: Express.Multer.File) {
+  uploadAvatar(
+    @CurrentUser() user: { userId: string },
+    @UploadedFile() file: Express.Multer.File,
+  ) {
     return this.userService.uploadAvatar(user.userId, file);
   }
 
   @HttpCode(200)
   @Patch('me/password')
-  changePassword(@CurrentUser() user: { userId: string }, @Body() dto: ChangePasswordDto) {
+  changePassword(
+    @CurrentUser() user: { userId: string },
+    @Body() dto: ChangePasswordDto,
+  ) {
     return this.userService.changePassword(user.userId, dto);
   }
 

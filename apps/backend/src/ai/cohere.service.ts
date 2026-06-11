@@ -16,13 +16,22 @@ export class CohereService {
   constructor(config: ConfigService) {
     const apiKey = config.get<string>('COHERE_API_KEY', '');
     if (!apiKey) {
-      this.logger.warn('COHERE_API_KEY is not set — rerank will fallback to identity order');
+      this.logger.warn(
+        'COHERE_API_KEY is not set — rerank will fallback to identity order',
+      );
     }
     this.client = new CohereClient({ token: apiKey });
-    this.model = config.get<string>('COHERE_RERANK_MODEL', 'rerank-multilingual-v3.0');
+    this.model = config.get<string>(
+      'COHERE_RERANK_MODEL',
+      'rerank-multilingual-v3.0',
+    );
   }
 
-  async rerank(query: string, documents: string[], topN: number): Promise<RerankResult[]> {
+  async rerank(
+    query: string,
+    documents: string[],
+    topN: number,
+  ): Promise<RerankResult[]> {
     if (documents.length === 0) return [];
     try {
       const res = await this.client.rerank({
@@ -36,8 +45,12 @@ export class CohereService {
         relevanceScore: r.relevanceScore,
       }));
     } catch (err) {
-      this.logger.error(`Cohere rerank failed: ${(err as Error).message} — falling back to original order`);
-      return documents.slice(0, topN).map((_, i) => ({ index: i, relevanceScore: 0 }));
+      this.logger.error(
+        `Cohere rerank failed: ${(err as Error).message} — falling back to original order`,
+      );
+      return documents
+        .slice(0, topN)
+        .map((_, i) => ({ index: i, relevanceScore: 0 }));
     }
   }
 }

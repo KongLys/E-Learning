@@ -1,4 +1,8 @@
-import { ForbiddenException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { QuizAttemptService } from './quiz-attempt.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -51,23 +55,26 @@ describe('QuizAttemptService', () => {
   describe('submit', () => {
     it('throws NotFoundException when quiz not found', async () => {
       mockPrisma.quizLesson.findUnique.mockResolvedValue(null);
-      await expect(service.submit('student-1', 'quiz-1', { answers: [] }))
-        .rejects.toThrow(NotFoundException);
+      await expect(
+        service.submit('student-1', 'quiz-1', { answers: [] }),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('throws ForbiddenException when not enrolled', async () => {
       mockPrisma.quizLesson.findUnique.mockResolvedValue(makeQuiz());
       mockPrisma.enrollment.findFirst.mockResolvedValue(null);
-      await expect(service.submit('student-1', 'quiz-1', { answers: [] }))
-        .rejects.toThrow(ForbiddenException);
+      await expect(
+        service.submit('student-1', 'quiz-1', { answers: [] }),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('throws UnprocessableEntityException when max_attempts reached', async () => {
       mockPrisma.quizLesson.findUnique.mockResolvedValue(makeQuiz(70, 3));
       mockPrisma.enrollment.findFirst.mockResolvedValue({ id: 'enroll-1' });
       mockPrisma.quizAttempt.count.mockResolvedValue(3);
-      await expect(service.submit('student-1', 'quiz-1', { answers: [] }))
-        .rejects.toThrow(UnprocessableEntityException);
+      await expect(
+        service.submit('student-1', 'quiz-1', { answers: [] }),
+      ).rejects.toThrow(UnprocessableEntityException);
     });
 
     it('grades single question correctly — correct answer → 100%', async () => {
@@ -75,9 +82,14 @@ describe('QuizAttemptService', () => {
       mockPrisma.enrollment.findFirst.mockResolvedValue({ id: 'enroll-1' });
       mockPrisma.quizAttempt.count.mockResolvedValue(0);
       mockPrisma.quizAttempt.create.mockResolvedValue({ id: 'attempt-1' });
-      mockProgressService.markComplete.mockResolvedValue({ progressPercent: 100, lessonCompleted: true });
+      mockProgressService.markComplete.mockResolvedValue({
+        progressPercent: 100,
+        lessonCompleted: true,
+      });
 
-      const dto = { answers: [{ questionId: 'q-1', optionIds: ['o-correct'] }] };
+      const dto = {
+        answers: [{ questionId: 'q-1', optionIds: ['o-correct'] }],
+      };
       const result = await service.submit('student-1', 'quiz-1', dto);
 
       expect(result.score).toBe(100);

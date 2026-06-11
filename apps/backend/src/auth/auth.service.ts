@@ -23,7 +23,9 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto) {
-    const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    const existing = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
     if (existing) throw new ConflictException('Email already in use');
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
@@ -41,13 +43,16 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    const user = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
     if (!user) throw new UnauthorizedException('Invalid credentials');
 
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) throw new UnauthorizedException('Invalid credentials');
 
-    if (user.status !== 'active') throw new UnauthorizedException('Account is not active');
+    if (user.status !== 'active')
+      throw new UnauthorizedException('Account is not active');
 
     const tokens = await this.generateTokens(user);
     return { user: this.sanitizeUser(user), ...tokens };
@@ -64,7 +69,9 @@ export class AuthService {
     }
 
     // Redis check temporarily disabled
-    const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+    });
     if (!user || user.status !== 'active') throw new UnauthorizedException();
 
     const tokens = await this.generateTokens(user);
@@ -76,7 +83,11 @@ export class AuthService {
     return { message: 'Logged out' };
   }
 
-  private async generateTokens(user: { id: string; email: string; role: string }) {
+  private async generateTokens(user: {
+    id: string;
+    email: string;
+    role: string;
+  }) {
     const jti = randomUUID();
     const accessToken = this.jwt.sign(
       { sub: user.id, email: user.email, role: user.role },
@@ -95,7 +106,19 @@ export class AuthService {
     return { accessToken, refreshToken };
   }
 
-  private sanitizeUser(user: { id: string; email: string; fullName: string; role: string; avatarUrl: string | null }) {
-    return { id: user.id, email: user.email, fullName: user.fullName, role: user.role, avatarUrl: user.avatarUrl };
+  private sanitizeUser(user: {
+    id: string;
+    email: string;
+    fullName: string;
+    role: string;
+    avatarUrl: string | null;
+  }) {
+    return {
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      role: user.role,
+      avatarUrl: user.avatarUrl,
+    };
   }
 }

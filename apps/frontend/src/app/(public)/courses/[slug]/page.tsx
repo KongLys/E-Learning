@@ -8,9 +8,25 @@ import { useAuthStore } from '@/store/auth.store';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorMessage } from '@/components/common/ErrorMessage';
 import { PriceDisplay } from '@/components/ui/PriceDisplay';
+import { StarRating } from '@/components/ui/StarRating';
 import { PaymentQrModal } from '@/components/payment/PaymentQrModal';
+import { ReviewSection } from '@/components/review/ReviewSection';
 import { formatDuration } from '@/lib/utils';
 import { useState } from 'react';
+
+const LEVEL_LABELS: Record<string, string> = {
+  beginner: 'Cơ bản',
+  intermediate: 'Trung cấp',
+  advanced: 'Nâng cao',
+};
+
+function CheckIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0 text-semantic-success">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
 
 function LockIcon() {
   return (
@@ -121,11 +137,31 @@ export default function CourseDetailPage() {
       <div className="bg-surface-dark py-10">
         <div className="max-w-300 mx-auto px-6">
           <h1 className="font-display text-3xl md:text-4xl text-white mb-3">{course.title}</h1>
-          {course.instructor && (
-            <p className="text-sm text-white/60 mb-4">
-              Giảng viên: <span className="text-white/90">{course.instructor.fullName}</span>
-            </p>
+          {course.shortDescription && (
+            <p className="text-[15px] text-white/70 mb-4 max-w-3xl">{course.shortDescription}</p>
           )}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-4">
+            {course.instructor && (
+              <p className="text-sm text-white/60">
+                Giảng viên: <span className="text-white/90">{course.instructor.fullName}</span>
+              </p>
+            )}
+            {course.avgRating > 0 && (
+              <span className="rounded-full bg-white/10 px-2.5 py-1">
+                <StarRating rating={course.avgRating} count={course.totalReviews} />
+              </span>
+            )}
+            {course.level && (
+              <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs text-white/80">
+                {LEVEL_LABELS[course.level] ?? course.level}
+              </span>
+            )}
+            {course.category && (
+              <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs text-white/80">
+                {course.category.name}
+              </span>
+            )}
+          </div>
           <div className="flex flex-wrap gap-4 text-sm text-white/60">
             {course.totalLessons > 0 && (
               <span className="flex items-center gap-1.5">
@@ -154,11 +190,50 @@ export default function CourseDetailPage() {
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
           {/* Left: details */}
           <div className="lg:col-span-2 space-y-8">
+            {/* Objectives */}
+            {course.objectives?.length > 0 && (
+              <section className="rounded-2xl border border-hairline bg-surface-card p-6">
+                <h2 className="font-display text-2xl text-ink mb-4">Bạn sẽ học được gì</h2>
+                <ul className="grid grid-cols-1 gap-x-6 gap-y-2.5 sm:grid-cols-2">
+                  {course.objectives.map((obj: string, i: number) => (
+                    <li key={i} className="flex gap-2 text-sm text-body-copy">
+                      <CheckIcon />
+                      <span>{obj}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
             {/* Description */}
             {course.description && (
               <section>
                 <h2 className="font-display text-2xl text-ink mb-3">Giới thiệu khóa học</h2>
-                <p className="text-body-copy leading-relaxed">{course.description}</p>
+                <p className="text-body-copy leading-relaxed whitespace-pre-line">{course.description}</p>
+              </section>
+            )}
+
+            {/* Requirements */}
+            {course.requirements?.length > 0 && (
+              <section>
+                <h2 className="font-display text-2xl text-ink mb-3">Yêu cầu</h2>
+                <ul className="list-disc space-y-1.5 pl-5 text-sm text-body-copy">
+                  {course.requirements.map((req: string, i: number) => (
+                    <li key={i}>{req}</li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {/* Target audience */}
+            {course.targetAudience?.length > 0 && (
+              <section>
+                <h2 className="font-display text-2xl text-ink mb-3">Khóa học này dành cho ai</h2>
+                <ul className="list-disc space-y-1.5 pl-5 text-sm text-body-copy">
+                  {course.targetAudience.map((aud: string, i: number) => (
+                    <li key={i}>{aud}</li>
+                  ))}
+                </ul>
               </section>
             )}
 
@@ -214,6 +289,32 @@ export default function CourseDetailPage() {
                 </div>
               </section>
             )}
+
+            {/* Instructor */}
+            {course.instructor && (course.instructor.bio || course.instructor.fullName) && (
+              <section>
+                <h2 className="font-display text-2xl text-ink mb-3">Giảng viên</h2>
+                <div className="flex items-start gap-4 rounded-2xl border border-hairline bg-surface-card p-5">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-emphasis/10 text-lg font-semibold text-emphasis">
+                    {course.instructor.avatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={course.instructor.avatarUrl} alt={course.instructor.fullName} className="h-full w-full object-cover" />
+                    ) : (
+                      course.instructor.fullName?.charAt(0).toUpperCase()
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[15px] font-semibold text-ink">{course.instructor.fullName}</p>
+                    {course.instructor.bio && (
+                      <p className="mt-1 text-sm leading-relaxed text-body-copy">{course.instructor.bio}</p>
+                    )}
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* Reviews */}
+            <ReviewSection courseId={course.id} canWrite={isEnrolled && !isOwner} />
           </div>
 
           {/* Right: CTA card */}

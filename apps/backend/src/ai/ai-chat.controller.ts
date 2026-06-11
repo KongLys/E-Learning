@@ -1,17 +1,13 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Post,
-  Res,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AiChatService } from './ai-chat.service';
 
 interface AskBody {
   query: string;
+  /** Giới hạn phạm vi truy vấn theo Phần hoặc Bài (tùy chọn). */
+  sectionId?: string;
+  lessonId?: string;
 }
 
 interface CreateConversationBody {
@@ -54,7 +50,16 @@ export class AiChatController {
     @Body() body: AskBody,
     @Res() res: Response,
   ) {
-    const { stream, citations, persist } = await this.chat.ask(id, user.userId, body.query);
+    const scope =
+      body.sectionId || body.lessonId
+        ? { sectionId: body.sectionId, lessonId: body.lessonId }
+        : undefined;
+    const { stream, citations, persist } = await this.chat.ask(
+      id,
+      user.userId,
+      body.query,
+      scope,
+    );
 
     res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache, no-transform');
@@ -73,7 +78,9 @@ export class AiChatController {
         res.write(`event: token\ndata: ${JSON.stringify(piece)}\n\n`);
       }
       await persist(full);
-      res.write(`event: done\ndata: ${JSON.stringify({ length: full.length })}\n\n`);
+      res.write(
+        `event: done\ndata: ${JSON.stringify({ length: full.length })}\n\n`,
+      );
     } catch (err) {
       const msg = (err as Error).message;
       res.write(`event: error\ndata: ${JSON.stringify({ message: msg })}\n\n`);

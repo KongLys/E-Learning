@@ -30,7 +30,11 @@ export class NotificationListener {
   }
 
   @OnEvent('question.created')
-  async onQuestionCreated(event: { instructorId: string; lessonTitle: string; questionId: string }) {
+  async onQuestionCreated(event: {
+    instructorId: string;
+    lessonTitle: string;
+    questionId: string;
+  }) {
     const notif = await this.notifService.create(
       event.instructorId,
       'quick_question',
@@ -55,23 +59,23 @@ export class NotificationListener {
   @OnEvent('moderation.rejected')
   async onModerationRejected(event: {
     ownerId: string;
-    contentType: 'course' | 'material';
+    contentType: 'course' | 'lesson';
     contentId: string;
     title: string;
     courseId?: string;
     status: 'rejected' | 'pending';
     reason?: string;
   }) {
-    const isMaterial = event.contentType === 'material';
+    const isLesson = event.contentType === 'lesson';
     const pending = event.status === 'pending';
-    const link = isMaterial
-      ? `/instructor/courses/${event.courseId ?? ''}/materials`
+    const link = isLesson
+      ? `/instructor/courses/${event.courseId ?? ''}/curriculum/${event.contentId}`
       : `/instructor/courses/${event.contentId}/edit`;
     const notif = await this.notifService.create(
       event.ownerId,
       'moderation_rejected',
       pending ? 'Nội dung đang chờ kiểm duyệt' : 'Nội dung không phù hợp',
-      `${isMaterial ? 'Tài liệu' : 'Khóa học'} "${event.title}": ${event.reason ?? 'Không phù hợp với quy định.'}${pending ? '' : ' Bạn có thể kiến nghị duyệt lại.'}`,
+      `${isLesson ? 'Bài học' : 'Khóa học'} "${event.title}": ${event.reason ?? 'Không phù hợp với quy định.'}${pending ? '' : ' Bạn có thể kiến nghị duyệt lại.'}`,
       link,
     );
     this.gateway.pushToUser(event.ownerId, notif);
@@ -79,7 +83,7 @@ export class NotificationListener {
 
   @OnEvent('moderation.appeal')
   async onModerationAppeal(event: {
-    contentType: 'course' | 'material';
+    contentType: 'course' | 'lesson';
     contentId: string;
     title: string;
   }) {
@@ -87,7 +91,7 @@ export class NotificationListener {
       where: { role: 'admin' },
       select: { id: true },
     });
-    const label = event.contentType === 'material' ? 'tài liệu' : 'khóa học';
+    const label = event.contentType === 'lesson' ? 'bài học' : 'khóa học';
     await Promise.all(
       admins.map(async (admin) => {
         const notif = await this.notifService.create(
@@ -105,13 +109,13 @@ export class NotificationListener {
   @OnEvent('moderation.resolved')
   async onModerationResolved(event: {
     ownerId: string;
-    contentType: 'course' | 'material';
+    contentType: 'course' | 'lesson';
     contentId: string;
     title: string;
     decision: 'approved' | 'locked';
     reason?: string;
   }) {
-    const label = event.contentType === 'material' ? 'Tài liệu' : 'Khóa học';
+    const label = event.contentType === 'lesson' ? 'Bài học' : 'Khóa học';
     const approved = event.decision === 'approved';
     const notif = await this.notifService.create(
       event.ownerId,

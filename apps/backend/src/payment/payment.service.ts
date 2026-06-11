@@ -30,7 +30,8 @@ export class PaymentService {
     });
     if (!order) throw new NotFoundException('Order not found');
     if (order.userId !== userId) throw new ForbiddenException('Access denied');
-    if (order.status !== 'pending') throw new UnprocessableEntityException('Order is not in pending state');
+    if (order.status !== 'pending')
+      throw new UnprocessableEntityException('Order is not in pending state');
 
     const transferCode = this.sepayService.generateTransferCode();
     const amount = Number(order.totalAmount);
@@ -41,7 +42,10 @@ export class PaymentService {
       create: { orderId: order.id, amount, gateway: 'sepay', transferCode },
     });
 
-    await this.prisma.order.update({ where: { id: order.id }, data: { status: 'processing' } });
+    await this.prisma.order.update({
+      where: { id: order.id },
+      data: { status: 'processing' },
+    });
 
     const qrUrl = this.sepayService.buildQrUrl(amount, transferCode);
     const account = this.sepayService.getAccountInfo();
@@ -73,7 +77,9 @@ export class PaymentService {
 
     const transferCode = this.sepayService.extractTransferCode(payload.content);
     if (!transferCode) {
-      this.logger.warn(`SePay webhook: no transfer code in content "${payload.content}"`);
+      this.logger.warn(
+        `SePay webhook: no transfer code in content "${payload.content}"`,
+      );
       return { success: false };
     }
 
@@ -82,7 +88,9 @@ export class PaymentService {
       include: { order: { include: { items: true } } },
     });
     if (!payment) {
-      this.logger.warn(`SePay webhook: no payment for transferCode ${transferCode}`);
+      this.logger.warn(
+        `SePay webhook: no payment for transferCode ${transferCode}`,
+      );
       return { success: false };
     }
 
@@ -115,7 +123,10 @@ export class PaymentService {
     });
 
     for (const item of order.items) {
-      this.eventEmitter.emit('order.paid', new OrderPaidEvent(order.userId, item.courseId));
+      this.eventEmitter.emit(
+        'order.paid',
+        new OrderPaidEvent(order.userId, item.courseId),
+      );
     }
 
     return { success: true };

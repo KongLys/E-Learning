@@ -1,10 +1,16 @@
-import { Injectable, Logger, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
 
 export type ModerationLabel = 'it' | 'spam_toxic' | 'others';
-export type ContentType = 'course' | 'material';
+export type ContentType = 'course' | 'lesson';
 
 interface ClassifyResponse {
   label: ModerationLabel;
@@ -23,7 +29,8 @@ export interface ModerationOutcome {
 const REASONS: Record<ModerationLabel, string | null> = {
   it: null,
   spam_toxic: 'Nội dung bị phát hiện là spam hoặc không phù hợp (toxic).',
-  others: 'Nội dung không thuộc lĩnh vực Công nghệ thông tin nên không được duyệt.',
+  others:
+    'Nội dung không thuộc lĩnh vực Công nghệ thông tin nên không được duyệt.',
 };
 
 const PENDING_REASON =
@@ -45,11 +52,16 @@ export class ModerationService {
     private events: EventEmitter2,
   ) {
     this.enabled = config.get<string>('MODERATION_ENABLED', 'true') === 'true';
-    this.serviceUrl = config.get<string>('MODERATION_SERVICE_URL', 'http://localhost:8000');
+    this.serviceUrl = config.get<string>(
+      'MODERATION_SERVICE_URL',
+      'http://localhost:8000',
+    );
     this.apiKey = config.get<string>('MODERATION_API_KEY', '');
     this.timeoutMs = config.get<number>('MODERATION_TIMEOUT_MS', 15000);
-    this.failOpen = config.get<string>('MODERATION_FAIL_OPEN', 'true') === 'true';
-    this.debugEnabled = config.get<string>('MODERATION_DEBUG', 'false') === 'true';
+    this.failOpen =
+      config.get<string>('MODERATION_FAIL_OPEN', 'true') === 'true';
+    this.debugEnabled =
+      config.get<string>('MODERATION_DEBUG', 'false') === 'true';
   }
 
   /**
@@ -59,7 +71,11 @@ export class ModerationService {
    */
   debugLog(message: string, data?: Record<string, unknown>) {
     if (!this.debugEnabled) return;
-    this.logger.log(data ? `[moderation] ${message} ${JSON.stringify(data)}` : `[moderation] ${message}`);
+    this.logger.log(
+      data
+        ? `[moderation] ${message} ${JSON.stringify(data)}`
+        : `[moderation] ${message}`,
+    );
   }
 
   // ─── Classification ──────────────────────────────────────────────────────
@@ -79,7 +95,8 @@ export class ModerationService {
       const j = Math.floor(Math.random() * (i + 1));
       [middle[i], middle[j]] = [middle[j], middle[i]];
     }
-    for (let i = 0; i < middle.length && picked.size < 9; i++) picked.add(middle[i]);
+    for (let i = 0; i < middle.length && picked.size < 9; i++)
+      picked.add(middle[i]);
     return [...picked].sort((a, b) => a - b).map((idx) => chunks[idx]);
   }
 
@@ -127,7 +144,9 @@ export class ModerationService {
       });
       return json;
     } catch (err) {
-      this.logger.warn(`Moderation service call failed: ${(err as Error).message}`);
+      this.logger.warn(
+        `Moderation service call failed: ${(err as Error).message}`,
+      );
       return null;
     } finally {
       clearTimeout(timer);
@@ -149,7 +168,9 @@ export class ModerationService {
   /** Classify text and map to a stored moderation outcome. */
   async evaluate(segments: string[]): Promise<ModerationOutcome> {
     if (!this.enabled) {
-      this.debugLog('evaluate skipped — MODERATION_ENABLED=false → auto-approve');
+      this.debugLog(
+        'evaluate skipped — MODERATION_ENABLED=false → auto-approve',
+      );
       return { status: 'approved' };
     }
 
@@ -160,8 +181,15 @@ export class ModerationService {
       // fail-closed rejects outright.
       outcome = this.failOpen
         ? { status: 'pending', reason: PENDING_REASON }
-        : { status: 'rejected', label: 'others', reason: REASONS.others ?? undefined };
-      this.debugLog('evaluate → service unavailable', { failOpen: this.failOpen, status: outcome.status });
+        : {
+            status: 'rejected',
+            label: 'others',
+            reason: REASONS.others ?? undefined,
+          };
+      this.debugLog('evaluate → service unavailable', {
+        failOpen: this.failOpen,
+        status: outcome.status,
+      });
       return outcome;
     }
 
@@ -194,7 +222,10 @@ export class ModerationService {
     title: string,
     description?: string | null,
   ): Promise<ModerationOutcome> {
-    this.debugLog('moderateCourse: start', { courseId, titleLen: title.length });
+    this.debugLog('moderateCourse: start', {
+      courseId,
+      titleLen: title.length,
+    });
     const text = [title, description].filter(Boolean).join('\n');
     const outcome = await this.evaluate([text]);
     await this.prisma.course.update({
@@ -218,18 +249,31 @@ export class ModerationService {
         reason: outcome.reason,
       });
     }
-    this.debugLog('moderateCourse: done', { courseId, status: outcome.status, label: outcome.label });
+    this.debugLog('moderateCourse: done', {
+      courseId,
+      status: outcome.status,
+      label: outcome.label,
+    });
     return outcome;
   }
 
   // ─── Instructor appeal flow ──────────────────────────────────────────────
 
-  async appealCourse(courseId: string, userId: string, role: string, reason?: string) {
-    const course = await this.prisma.course.findUnique({ where: { id: courseId } });
+  async appealCourse(
+    courseId: string,
+    userId: string,
+    role: string,
+    reason?: string,
+  ) {
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
+    });
     if (!course) throw new NotFoundException('Course not found');
     this.assertOwner(course.instructorId, userId, role);
     if (course.moderationStatus !== 'rejected') {
-      throw new BadRequestException('Chỉ nội dung bị từ chối mới có thể kiến nghị duyệt lại');
+      throw new BadRequestException(
+        'Chỉ nội dung bị từ chối mới có thể kiến nghị duyệt lại',
+      );
     }
     const updated = await this.prisma.course.update({
       where: { id: courseId },
@@ -244,26 +288,35 @@ export class ModerationService {
     return this.serializeCourse(updated);
   }
 
-  async appealMaterial(materialId: string, userId: string, role: string, reason?: string) {
-    const material = await this.prisma.courseMaterial.findUnique({
-      where: { id: materialId },
-      include: { course: { select: { instructorId: true } } },
+  async appealLesson(
+    lessonId: string,
+    userId: string,
+    role: string,
+    reason?: string,
+  ) {
+    const lesson = await this.prisma.lesson.findUnique({
+      where: { id: lessonId },
+      include: {
+        section: { select: { course: { select: { instructorId: true } } } },
+      },
     });
-    if (!material) throw new NotFoundException('Material not found');
-    this.assertOwner(material.course.instructorId, userId, role);
-    if (material.moderationStatus !== 'rejected') {
-      throw new BadRequestException('Chỉ tài liệu bị từ chối mới có thể kiến nghị duyệt lại');
+    if (!lesson) throw new NotFoundException('Lesson not found');
+    this.assertOwner(lesson.section.course.instructorId, userId, role);
+    if (lesson.moderationStatus !== 'rejected') {
+      throw new BadRequestException(
+        'Chỉ bài học bị từ chối mới có thể kiến nghị duyệt lại',
+      );
     }
-    const updated = await this.prisma.courseMaterial.update({
-      where: { id: materialId },
+    const updated = await this.prisma.lesson.update({
+      where: { id: lessonId },
       data: { moderationStatus: 'appealing', appealReason: reason ?? null },
     });
     this.events.emit('moderation.appeal', {
-      contentType: 'material' as ContentType,
-      contentId: materialId,
-      title: material.fileName,
+      contentType: 'lesson' as ContentType,
+      contentId: lessonId,
+      title: lesson.title,
     });
-    this.debugLog('appealMaterial', { materialId, by: userId });
+    this.debugLog('appealLesson', { lessonId, by: userId });
     return { id: updated.id, moderationStatus: updated.moderationStatus };
   }
 
@@ -276,23 +329,40 @@ export class ModerationService {
     const where = { moderationStatus: { in: statuses } };
 
     const wantCourses = !query.type || query.type === 'course';
-    const wantMaterials = !query.type || query.type === 'material';
+    const wantLessons = !query.type || query.type === 'lesson';
 
-    const [courses, materials] = await Promise.all([
+    const [courses, lessons] = await Promise.all([
       wantCourses
         ? this.prisma.course.findMany({
             where,
             orderBy: { moderatedAt: 'desc' },
-            include: { instructor: { select: { id: true, fullName: true, email: true } } },
+            include: {
+              instructor: { select: { id: true, fullName: true, email: true } },
+            },
           })
         : Promise.resolve([]),
-      wantMaterials
-        ? this.prisma.courseMaterial.findMany({
-            // Exclude materials still being parsed (transient `pending`).
-            where: { ...where, status: { notIn: ['uploaded', 'parsing'] } },
+      wantLessons
+        ? this.prisma.lesson.findMany({
+            // Chỉ đưa vào hàng chờ những bài đã có kết quả phân lớp / kiến nghị,
+            // bỏ qua 'pending' thuần (chưa từng index) để admin không bị ngợp.
+            where: { ...where, moderatedAt: { not: null } },
             orderBy: { moderatedAt: 'desc' },
             include: {
-              course: { select: { id: true, title: true, instructor: { select: { id: true, fullName: true, email: true } } } },
+              documentAsset: { select: { markdownUrl: true } },
+              section: {
+                select: {
+                  title: true,
+                  course: {
+                    select: {
+                      id: true,
+                      title: true,
+                      instructor: {
+                        select: { id: true, fullName: true, email: true },
+                      },
+                    },
+                  },
+                },
+              },
             },
           })
         : Promise.resolve([]),
@@ -300,19 +370,20 @@ export class ModerationService {
 
     return {
       courses: courses.map((c) => this.serializeCourse(c)),
-      materials: materials.map((m) => ({
-        id: m.id,
-        courseId: m.courseId,
-        courseTitle: m.course.title,
-        fileName: m.fileName,
-        markdownUrl: m.markdownUrl,
-        instructor: m.course.instructor,
-        moderationStatus: m.moderationStatus,
-        moderationLabel: m.moderationLabel,
-        moderationScore: m.moderationScore,
-        moderationReason: m.moderationReason,
-        appealReason: m.appealReason,
-        moderatedAt: m.moderatedAt,
+      lessons: lessons.map((l) => ({
+        id: l.id,
+        title: l.title,
+        courseId: l.section.course.id,
+        courseTitle: l.section.course.title,
+        sectionTitle: l.section.title,
+        markdownUrl: l.documentAsset?.markdownUrl ?? null,
+        instructor: l.section.course.instructor,
+        moderationStatus: l.moderationStatus,
+        moderationLabel: l.moderationLabel,
+        moderationScore: l.moderationScore,
+        moderationReason: l.moderationReason,
+        appealReason: l.appealReason,
+        moderatedAt: l.moderatedAt,
       })),
     };
   }
@@ -322,39 +393,88 @@ export class ModerationService {
     if (type === 'course') {
       const course = await this.prisma.course.update({
         where: { id },
-        data: { moderationStatus: 'approved', moderationReason: null, moderatedAt: new Date() },
+        data: {
+          moderationStatus: 'approved',
+          moderationReason: null,
+          moderatedAt: new Date(),
+        },
       });
-      this.emitResolved(course.instructorId, 'course', id, course.title, 'approved');
+      this.emitResolved(
+        course.instructorId,
+        'course',
+        id,
+        course.title,
+        'approved',
+      );
       return { id, moderationStatus: 'approved' };
     }
-    const material = await this.prisma.courseMaterial.update({
+    const lesson = await this.prisma.lesson.update({
       where: { id },
-      data: { moderationStatus: 'approved', moderationReason: null, moderatedAt: new Date() },
-      include: { course: { select: { instructorId: true, title: true } } },
+      data: {
+        moderationStatus: 'approved',
+        moderationReason: null,
+        moderatedAt: new Date(),
+      },
+      include: {
+        section: { select: { course: { select: { instructorId: true } } } },
+      },
     });
-    this.emitResolved(material.course.instructorId, 'material', id, material.fileName, 'approved');
-    // Re-run indexing now that the material is allowed (handled by MaterialService listener).
-    this.events.emit('moderation.material.reindex', { materialId: id });
+    this.emitResolved(
+      lesson.section.course.instructorId,
+      'lesson',
+      id,
+      lesson.title,
+      'approved',
+    );
+    // Re-run indexing now that the lesson is allowed (handled by LessonService listener).
+    this.events.emit('moderation.lesson.reindex', { lessonId: id });
     return { id, moderationStatus: 'approved' };
   }
 
   async reject(type: ContentType, id: string, reason?: string) {
     this.debugLog('admin reject (lock)', { type, id });
-    const finalReason = reason ?? 'Nội dung không phù hợp với quy định của hệ thống.';
+    const finalReason =
+      reason ?? 'Nội dung không phù hợp với quy định của hệ thống.';
     if (type === 'course') {
       const course = await this.prisma.course.update({
         where: { id },
-        data: { moderationStatus: 'locked', moderationReason: finalReason, moderatedAt: new Date() },
+        data: {
+          moderationStatus: 'locked',
+          moderationReason: finalReason,
+          moderatedAt: new Date(),
+        },
       });
-      this.emitResolved(course.instructorId, 'course', id, course.title, 'locked', finalReason);
+      this.emitResolved(
+        course.instructorId,
+        'course',
+        id,
+        course.title,
+        'locked',
+        finalReason,
+      );
       return { id, moderationStatus: 'locked' };
     }
-    const material = await this.prisma.courseMaterial.update({
+    const lesson = await this.prisma.lesson.update({
       where: { id },
-      data: { moderationStatus: 'locked', moderationReason: finalReason, moderatedAt: new Date() },
-      include: { course: { select: { instructorId: true } } },
+      data: {
+        moderationStatus: 'locked',
+        moderationReason: finalReason,
+        moderatedAt: new Date(),
+      },
+      include: {
+        section: { select: { course: { select: { instructorId: true } } } },
+      },
     });
-    this.emitResolved(material.course.instructorId, 'material', id, material.fileName, 'locked', finalReason);
+    // Bài bị khóa không được phép tồn tại trong vector store (kể cả khi đã index trước đó).
+    await this.prisma.courseChunk.deleteMany({ where: { lessonId: id } });
+    this.emitResolved(
+      lesson.section.course.instructorId,
+      'lesson',
+      id,
+      lesson.title,
+      'locked',
+      finalReason,
+    );
     return { id, moderationStatus: 'locked' };
   }
 

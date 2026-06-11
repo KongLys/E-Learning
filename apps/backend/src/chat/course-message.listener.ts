@@ -37,17 +37,29 @@ export class CourseMessageListener {
     try {
       const course = await this.prisma.course.findUnique({
         where: { id: courseId },
-        select: { instructorId: true, welcomeMessage: true, congratulationsMessage: true },
+        select: {
+          instructorId: true,
+          welcomeMessage: true,
+          congratulationsMessage: true,
+        },
       });
       if (!course) return;
 
-      const html = kind === 'welcome' ? course.welcomeMessage : course.congratulationsMessage;
+      const html =
+        kind === 'welcome'
+          ? course.welcomeMessage
+          : course.congratulationsMessage;
       const content = htmlToPlainText(html);
       if (!content) return; // instructor left this message empty → nothing to send
 
       // The enrollment exists at this point, so the conversation guard passes.
-      const conversation = await this.chat.getOrCreateConversation(course.instructorId, studentId);
-      await this.chat.createMessage(conversation.id, course.instructorId, { content });
+      const conversation = await this.chat.getOrCreateConversation(
+        course.instructorId,
+        studentId,
+      );
+      await this.chat.createMessage(conversation.id, course.instructorId, {
+        content,
+      });
     } catch (err) {
       this.logger.warn(
         `Không thể gửi tin nhắn "${kind}" cho học viên ${studentId} (khóa ${courseId}): ${err instanceof Error ? err.message : err}`,
