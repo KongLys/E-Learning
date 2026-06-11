@@ -263,6 +263,7 @@ model VideoAsset {
   videoUrl         String? @map("video_url")
   hlsUrl           String? @map("hls_url")
   thumbnailUrl     String? @map("thumbnail_url")
+  fileName         String? @map("file_name")
   transcript       String? @db.Text
   durationSec      Int     @default(0) @map("duration_sec")
   processingStatus String  @default("pending") @map("processing_status")
@@ -279,6 +280,7 @@ model DocumentAsset {
   id        String  @id @default(uuid())
   lessonId  String  @unique @map("lesson_id")
   fileUrl        String? @map("file_url")
+  fileName       String? @map("file_name")
   fileType       String  @default("pdf") @map("file_type")
   pageCount      Int     @default(0) @map("page_count")
   fileSize       BigInt  @default(0) @map("file_size")

@@ -109,6 +109,8 @@ export class SectionService {
             durationSec: true,
             isPreview: true,
             orderIndex: true,
+            videoAsset: { select: { videoUrl: true, fileName: true } },
+            documentAsset: { select: { fileUrl: true, fileName: true, fileType: true } },
           },
         },
       },

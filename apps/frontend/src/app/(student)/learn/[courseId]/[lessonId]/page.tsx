@@ -190,10 +190,22 @@ export default function LearnPage() {
               {/* File đính kèm */}
               {docUrlData?.data?.url ? (
                 lesson.documentAsset?.fileType === 'pdf' ? (
-                  <iframe src={docUrlData.data.url} className="w-full h-150 rounded-2xl ring-1 ring-gray-100" title="PDF" />
+                  <div className="space-y-2">
+                    {lesson.documentAsset?.fileName && (
+                      <p className="text-xs text-gray-500 flex items-center gap-1">
+                        📄 <span className="font-medium text-gray-700">{lesson.documentAsset.fileName}</span>
+                      </p>
+                    )}
+                    <iframe src={docUrlData.data.url} className="w-full h-150 rounded-2xl ring-1 ring-gray-100" title={lesson.documentAsset?.fileName ?? 'PDF'} />
+                  </div>
                 ) : (
                   <div className="text-center text-gray-600 py-10 rounded-2xl bg-slate-50">
-                    <p className="mb-3">Tài liệu Word (.docx)</p>
+                    <p className="mb-1 text-sm font-medium text-gray-800">
+                      📄 {lesson.documentAsset?.fileName ?? 'Tài liệu Word (.docx)'}
+                    </p>
+                    {lesson.documentAsset?.fileName && (
+                      <p className="mb-3 text-xs text-gray-400">DOCX</p>
+                    )}
                     <a href={docUrlData.data.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline font-medium">Tải về để đọc</a>
                   </div>
                 )

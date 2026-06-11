@@ -31,10 +31,19 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import type { ButtonHTMLAttributes } from 'react';
 
+interface LessonAsset {
+  videoUrl?: string | null;
+  fileName?: string | null;
+  fileUrl?: string | null;
+  fileType?: string | null;
+}
+
 interface Lesson {
   id: string;
   title: string;
   type: LessonType;
+  videoAsset?: LessonAsset | null;
+  documentAsset?: LessonAsset | null;
 }
 
 interface Section {
@@ -656,9 +665,25 @@ export default function CourseCurriculumPage() {
                                       <Link
                                         href={`/instructor/courses/${id}/curriculum/${lesson.id}`}
                                         title="Mở trang soạn nội dung bài học"
-                                        className="min-w-0 flex-1 truncate text-sm text-gray-800 hover:text-blue-600"
+                                        className="min-w-0 flex-1 truncate"
                                       >
-                                        {lesson.title}
+                                        <span className="block text-sm text-gray-800 hover:text-blue-600 truncate">
+                                          {lesson.title}
+                                        </span>
+                                        {lesson.type === 'video' && (
+                                          <span className={`block truncate text-xs ${lesson.videoAsset?.videoUrl ? 'text-green-600' : 'text-gray-400'}`}>
+                                            {lesson.videoAsset?.videoUrl
+                                              ? `📹 ${lesson.videoAsset.fileName ?? 'video đã tải lên'}`
+                                              : '📹 Chưa có video'}
+                                          </span>
+                                        )}
+                                        {lesson.type === 'document' && (
+                                          <span className={`block truncate text-xs ${lesson.documentAsset?.fileUrl ? 'text-green-600' : 'text-gray-400'}`}>
+                                            {lesson.documentAsset?.fileUrl
+                                              ? `📄 ${lesson.documentAsset.fileName ?? `${lesson.documentAsset.fileType?.toUpperCase() ?? 'tài liệu'} đã tải lên`}`
+                                              : '📄 Chưa có file'}
+                                          </span>
+                                        )}
                                       </Link>
                                       <div className="flex shrink-0 items-center gap-0.5">
                                         <IconButton

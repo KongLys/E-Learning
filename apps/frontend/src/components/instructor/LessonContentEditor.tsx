@@ -12,6 +12,7 @@ import {
 } from '@/lib/api/ai.api';
 import { RichTextEditor } from '@/components/common/RichTextEditor';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { QuizBuilder } from './QuizBuilder';
 import { LESSON_TYPE_META, type LessonType } from './lessonTypeMeta';
 
@@ -31,25 +32,36 @@ const PARSE_COLOR: Record<DocumentParseStatus, string> = {
   failed: 'bg-red-100 text-red-700',
 };
 
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 interface LessonContentEditorProps {
   courseId: string;
   lesson: { id: string; title: string; type: LessonType };
 }
 
-/**
- * Trình soạn nội dung của một bài học (tiêu đề, mục tiêu/mô tả, và phần riêng theo
- * loại bài: video / tài liệu / quiz). Dùng chung cho trang builder chi tiết.
- */
 export function LessonContentEditor({ courseId, lesson }: LessonContentEditorProps) {
   const qc = useQueryClient();
   const [error, setError] = useState('');
-  const [uploadPct, setUploadPct] = useState<number | null>(null);
+  const [videoPct, setVideoPct] = useState<number | null>(null);
+  const [docPct, setDocPct] = useState<number | null>(null);
+  const [deleteVideoConfirm, setDeleteVideoConfirm] = useState(false);
+  const [deleteDocConfirm, setDeleteDocConfirm] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['lesson-edit', lesson.id],
     queryFn: () => instructorApi.getLesson(lesson.id),
   });
   const detail: any = data?.data;
+
+  const { data: videoUrlData } = useQuery({
+    queryKey: ['instructor-video-url', lesson.id],
+    queryFn: () => instructorApi.getVideoUrl(lesson.id),
+    enabled: lesson.type === 'video' && !!detail?.videoAsset?.videoUrl,
+  });
 
   // ----- Common: title + description -----
   const [title, setTitle] = useState(lesson.title);
@@ -74,6 +86,7 @@ export function LessonContentEditor({ courseId, lesson }: LessonContentEditorPro
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['lesson-edit', lesson.id] });
     qc.invalidateQueries({ queryKey: ['course-edit', courseId] });
+    qc.invalidateQueries({ queryKey: ['instructor-video-url', lesson.id] });
   };
   const onErr = (e: any) => setError(e?.response?.data?.message ?? 'Có lỗi xảy ra');
 
@@ -96,15 +109,27 @@ export function LessonContentEditor({ courseId, lesson }: LessonContentEditorPro
   });
 
   const uploadVideo = useMutation({
-    mutationFn: (file: File) => instructorApi.uploadVideo(lesson.id, file, setUploadPct),
-    onSuccess: () => { setUploadPct(null); setError(''); invalidate(); },
-    onError: (e) => { setUploadPct(null); onErr(e); },
+    mutationFn: (file: File) => instructorApi.uploadVideo(lesson.id, file, setVideoPct),
+    onSuccess: () => { setVideoPct(null); setError(''); invalidate(); },
+    onError: (e) => { setVideoPct(null); onErr(e); },
   });
 
   const uploadDoc = useMutation({
-    mutationFn: (file: File) => instructorApi.uploadDocument(lesson.id, file, setUploadPct),
-    onSuccess: () => { setUploadPct(null); setError(''); invalidate(); },
-    onError: (e) => { setUploadPct(null); onErr(e); },
+    mutationFn: (file: File) => instructorApi.uploadDocument(lesson.id, file, setDocPct),
+    onSuccess: () => { setDocPct(null); setError(''); invalidate(); },
+    onError: (e) => { setDocPct(null); onErr(e); },
+  });
+
+  const deleteVideoMut = useMutation({
+    mutationFn: () => instructorApi.deleteVideo(lesson.id),
+    onSuccess: () => { setDeleteVideoConfirm(false); setError(''); invalidate(); },
+    onError: (e) => { setDeleteVideoConfirm(false); onErr(e); },
+  });
+
+  const deleteDocMut = useMutation({
+    mutationFn: () => instructorApi.deleteDocument(lesson.id),
+    onSuccess: () => { setDeleteDocConfirm(false); setError(''); invalidate(); },
+    onError: (e) => { setDeleteDocConfirm(false); onErr(e); },
   });
 
   const appeal = useMutation({
@@ -114,6 +139,10 @@ export function LessonContentEditor({ courseId, lesson }: LessonContentEditorPro
   });
 
   if (isLoading) return <div className="py-12"><LoadingSpinner /></div>;
+
+  const videoAsset = detail?.videoAsset;
+  const docAsset = detail?.documentAsset;
+  const previewVideoUrl: string | undefined = videoUrlData?.data?.url;
 
   return (
     <div className="space-y-6">
@@ -155,17 +184,40 @@ export function LessonContentEditor({ courseId, lesson }: LessonContentEditorPro
       {lesson.type === 'video' && (
         <section className="space-y-3 border-t border-gray-100 pt-5">
           <h3 className="text-sm font-semibold text-gray-700">Video bài giảng</h3>
-          {detail?.videoAsset?.videoUrl ? (
-            <p className="text-xs text-green-600">✓ Đã tải video lên</p>
+
+          {/* File đã upload */}
+          {videoAsset?.videoUrl ? (
+            <div className="flex items-center justify-between gap-2 rounded-xl bg-green-50 px-3 py-2">
+              <span className="text-xs text-green-700 truncate">
+                📹 {videoAsset.fileName ?? 'video'}
+              </span>
+              <button
+                onClick={() => setDeleteVideoConfirm(true)}
+                className="shrink-0 text-xs text-red-500 hover:text-red-700"
+              >
+                Xóa
+              </button>
+            </div>
           ) : (
             <p className="text-xs text-gray-400">Chưa có video</p>
           )}
+
+          {/* Progress bar */}
+          {videoPct !== null && (
+            <div className="space-y-1">
+              <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-blue-500 transition-all duration-200"
+                  style={{ width: `${videoPct}%` }}
+                />
+              </div>
+              <p className="text-xs text-blue-600">Đang tải lên {videoPct}%</p>
+            </div>
+          )}
+
+          {/* Upload button */}
           <label className="inline-block cursor-pointer text-sm text-blue-600 hover:underline">
-            {uploadPct !== null
-              ? `Đang tải ${uploadPct}%`
-              : detail?.videoAsset?.videoUrl
-                ? 'Thay video khác'
-                : 'Tải video lên'}
+            {videoAsset?.videoUrl ? 'Thay video khác' : 'Tải video lên'}
             <input
               type="file"
               accept="video/mp4,video/webm"
@@ -173,6 +225,19 @@ export function LessonContentEditor({ courseId, lesson }: LessonContentEditorPro
               onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadVideo.mutate(f); }}
             />
           </label>
+
+          {/* Video preview */}
+          {previewVideoUrl && (
+            <div className="space-y-1">
+              <p className="text-xs text-gray-500">Xem trước</p>
+              <video
+                src={`${previewVideoUrl}#t=1`}
+                controls
+                preload="metadata"
+                className="w-full max-h-72 rounded-xl bg-black"
+              />
+            </div>
+          )}
 
           <div className="space-y-2">
             <label className="text-xs text-gray-500">Điều kiện hoàn thành</label>
@@ -208,9 +273,9 @@ export function LessonContentEditor({ courseId, lesson }: LessonContentEditorPro
 
           {/* Trạng thái AI: chuyển đổi tài liệu + kiểm duyệt nội dung bài */}
           <div className="flex flex-wrap items-center gap-2 text-xs">
-            {detail?.documentAsset?.fileUrl && detail?.documentAsset?.parseStatus && (
-              <span className={`px-2 py-1 rounded-full font-medium ${PARSE_COLOR[detail.documentAsset.parseStatus as DocumentParseStatus]}`}>
-                {PARSE_LABEL[detail.documentAsset.parseStatus as DocumentParseStatus]}
+            {docAsset?.fileUrl && docAsset?.parseStatus && (
+              <span className={`px-2 py-1 rounded-full font-medium ${PARSE_COLOR[docAsset.parseStatus as DocumentParseStatus]}`}>
+                {PARSE_LABEL[docAsset.parseStatus as DocumentParseStatus]}
               </span>
             )}
             {detail?.moderationStatus && (
@@ -234,17 +299,45 @@ export function LessonContentEditor({ courseId, lesson }: LessonContentEditorPro
           {detail?.moderationReason && detail?.moderationStatus !== 'approved' && (
             <p className="text-xs text-red-600">{detail.moderationReason}</p>
           )}
-          {detail?.documentAsset?.errorMsg && detail?.documentAsset?.parseStatus === 'failed' && (
-            <p className="text-xs text-red-600">{detail.documentAsset.errorMsg}</p>
+          {docAsset?.errorMsg && docAsset?.parseStatus === 'failed' && (
+            <p className="text-xs text-red-600">{docAsset.errorMsg}</p>
           )}
 
-          {detail?.documentAsset?.fileUrl ? (
-            <p className="text-xs text-green-600">✓ Đã tải file ({detail.documentAsset.fileType?.toUpperCase()})</p>
+          {/* File đã upload */}
+          {docAsset?.fileUrl ? (
+            <div className="flex items-center justify-between gap-2 rounded-xl bg-green-50 px-3 py-2">
+              <span className="text-xs text-green-700 truncate">
+                📄 {docAsset.fileName ?? 'tài liệu'}
+                {' · '}{docAsset.fileType?.toUpperCase()}
+                {docAsset.fileSize ? ` · ${formatFileSize(Number(docAsset.fileSize))}` : ''}
+              </span>
+              <button
+                onClick={() => setDeleteDocConfirm(true)}
+                className="shrink-0 text-xs text-red-500 hover:text-red-700"
+              >
+                Xóa
+              </button>
+            </div>
           ) : (
             <p className="text-xs text-gray-400">Chưa có file</p>
           )}
+
+          {/* Progress bar */}
+          {docPct !== null && (
+            <div className="space-y-1">
+              <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-blue-500 transition-all duration-200"
+                  style={{ width: `${docPct}%` }}
+                />
+              </div>
+              <p className="text-xs text-blue-600">Đang tải lên {docPct}%</p>
+            </div>
+          )}
+
+          {/* Upload button */}
           <label className="inline-block cursor-pointer text-sm text-blue-600 hover:underline">
-            {uploadPct !== null ? `Đang tải ${uploadPct}%` : 'Tải file PDF / DOCX'}
+            Tải file PDF / DOCX
             <input
               type="file"
               accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -285,6 +378,30 @@ export function LessonContentEditor({ courseId, lesson }: LessonContentEditorPro
           </h3>
           <QuizBuilder lessonId={lesson.id} onError={setError} />
         </section>
+      )}
+
+      {/* ConfirmDialog xóa video */}
+      {deleteVideoConfirm && (
+        <ConfirmDialog
+          title="Xóa video?"
+          message={`File "${videoAsset?.fileName ?? 'video'}" sẽ bị xóa khỏi hệ thống. Bạn có thể upload lại sau.`}
+          confirmLabel="Xóa video"
+          isPending={deleteVideoMut.isPending}
+          onConfirm={() => deleteVideoMut.mutate()}
+          onCancel={() => setDeleteVideoConfirm(false)}
+        />
+      )}
+
+      {/* ConfirmDialog xóa tài liệu */}
+      {deleteDocConfirm && (
+        <ConfirmDialog
+          title="Xóa tài liệu?"
+          message={`File "${docAsset?.fileName ?? 'tài liệu'}" sẽ bị xóa khỏi hệ thống. Bạn có thể upload lại sau.`}
+          confirmLabel="Xóa tài liệu"
+          isPending={deleteDocMut.isPending}
+          onConfirm={() => deleteDocMut.mutate()}
+          onCancel={() => setDeleteDocConfirm(false)}
+        />
       )}
     </div>
   );

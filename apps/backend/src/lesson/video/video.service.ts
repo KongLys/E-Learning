@@ -77,18 +77,63 @@ export class VideoService {
 
     const asset = await this.prisma.videoAsset.upsert({
       where: { lessonId },
-      update: { videoUrl: url, hlsUrl: url, processingStatus: 'ready' },
+      update: { videoUrl: url, hlsUrl: url, processingStatus: 'ready', fileName: file.originalname },
       create: {
         lessonId,
         videoUrl: url,
         hlsUrl: url,
         processingStatus: 'ready',
+        fileName: file.originalname,
       },
     });
 
     await this.prisma.lesson.update({
       where: { id: lessonId },
       data: { durationSec: asset.durationSec },
+    });
+    await this.lessonService.updateCourseStats(lesson.sectionId);
+
+    return asset;
+  }
+
+  async deleteVideo(lessonId: string, userId: string, userRole: string) {
+    const lesson = await this.prisma.lesson.findUnique({
+      where: { id: lessonId },
+    });
+    if (!lesson) throw new NotFoundException('Lesson not found');
+    if (lesson.type !== 'video')
+      throw new BadRequestException('Lesson is not a video type');
+
+    const section = await this.prisma.section.findUnique({
+      where: { id: lesson.sectionId },
+      include: { course: true },
+    });
+    if (userRole !== 'admin' && section?.course.instructorId !== userId)
+      throw new ForbiddenException('Access denied');
+
+    const existing = await this.prisma.videoAsset.findUnique({
+      where: { lessonId },
+    });
+    if (existing?.videoUrl)
+      await this.storage.deleteFile(
+        this.storage.extractKeyFromUrl(existing.videoUrl),
+      );
+
+    const asset = await this.prisma.videoAsset.update({
+      where: { lessonId },
+      data: {
+        videoUrl: null,
+        hlsUrl: null,
+        thumbnailUrl: null,
+        fileName: null,
+        durationSec: 0,
+        processingStatus: 'pending',
+      },
+    });
+
+    await this.prisma.lesson.update({
+      where: { id: lessonId },
+      data: { durationSec: 0 },
     });
     await this.lessonService.updateCourseStats(lesson.sectionId);
 

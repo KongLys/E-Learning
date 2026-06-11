@@ -5,7 +5,7 @@ import { useHasHydrated } from '@/lib/hooks/useHasHydrated';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { Navbar } from '@/components/layout/Navbar';
-import { Footer } from '@/components/layout/Footer';
+// import { Footer } from '@/components/layout/Footer';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
@@ -24,7 +24,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
     <>
       <Navbar />
       <main className="flex-1">{children}</main>
-      <Footer />
+      {/* <Footer /> */}
     </>
   );
 }

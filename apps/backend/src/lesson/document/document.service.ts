@@ -101,6 +101,7 @@ export class DocumentService {
       where: { lessonId },
       update: {
         fileUrl: url,
+        fileName: file.originalname,
         fileType,
         pageCount,
         fileSize: BigInt(file.size),
@@ -109,6 +110,7 @@ export class DocumentService {
       create: {
         lessonId,
         fileUrl: url,
+        fileName: file.originalname,
         fileType,
         pageCount,
         fileSize: BigInt(file.size),
@@ -118,6 +120,49 @@ export class DocumentService {
     // Tài liệu mới phải kiểm duyệt lại rồi vector hóa cho AI
     await this.lessonService.resetLessonModeration(lessonId);
     await this.lessonService.enqueueLessonIndex(lessonId);
+
+    return { ...asset, fileSize: asset.fileSize.toString() };
+  }
+
+  async deleteDocument(lessonId: string, userId: string, userRole: string) {
+    const lesson = await this.prisma.lesson.findUnique({
+      where: { id: lessonId },
+    });
+    if (!lesson) throw new NotFoundException('Lesson not found');
+    if (lesson.type !== 'document')
+      throw new BadRequestException('Lesson is not a document type');
+
+    const section = await this.prisma.section.findUnique({
+      where: { id: lesson.sectionId },
+      include: { course: true },
+    });
+    if (userRole !== 'admin' && section?.course.instructorId !== userId)
+      throw new ForbiddenException('Access denied');
+
+    const existing = await this.prisma.documentAsset.findUnique({
+      where: { lessonId },
+    });
+    if (existing?.fileUrl)
+      await this.storage.deleteFile(
+        this.storage.extractKeyFromUrl(existing.fileUrl),
+      );
+
+    const asset = await this.prisma.documentAsset.update({
+      where: { lessonId },
+      data: {
+        fileUrl: null,
+        fileName: null,
+        fileType: 'pdf',
+        pageCount: 0,
+        fileSize: BigInt(0),
+        markdownUrl: null,
+        llamaParseJobId: null,
+        parseStatus: 'uploaded',
+        errorMsg: null,
+      },
+    });
+
+    await this.lessonService.resetLessonModeration(lessonId);
 
     return { ...asset, fileSize: asset.fileSize.toString() };
   }

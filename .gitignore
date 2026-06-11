@@ -19,3 +19,4 @@ plan/
 *.gguf
 *.h5
 *.msgpack
+*.venv

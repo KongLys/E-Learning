@@ -103,6 +103,14 @@ export class LessonController {
     return this.videoService.uploadVideo(id, u.userId, u.role, file);
   }
 
+  @Delete('lessons/:id/video')
+  deleteVideo(
+    @CurrentUser() u: { userId: string; role: string },
+    @Param('id') id: string,
+  ) {
+    return this.videoService.deleteVideo(id, u.userId, u.role);
+  }
+
   @Get('lessons/:id/video-url')
   getVideoUrl(@CurrentUser() u: { userId: string }, @Param('id') id: string) {
     return this.videoService.getSignedVideoUrl(id, u.userId);
@@ -126,6 +134,14 @@ export class LessonController {
     @UploadedFile() file: Express.Multer.File,
   ) {
     return this.documentService.uploadDocument(id, u.userId, u.role, file);
+  }
+
+  @Delete('lessons/:id/document')
+  deleteDocument(
+    @CurrentUser() u: { userId: string; role: string },
+    @Param('id') id: string,
+  ) {
+    return this.documentService.deleteDocument(id, u.userId, u.role);
   }
 
   @Get('lessons/:id/document-url')

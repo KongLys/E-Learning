@@ -43,6 +43,9 @@ export const instructorApi = {
     });
   },
   getLesson: (lessonId: string) => apiClient.get(`/lessons/${lessonId}`),
+  getVideoUrl: (lessonId: string) => apiClient.get(`/lessons/${lessonId}/video-url`),
+  deleteVideo: (lessonId: string) => apiClient.delete(`/lessons/${lessonId}/video`),
+  deleteDocument: (lessonId: string) => apiClient.delete(`/lessons/${lessonId}/document`),
   configVideo: (lessonId: string, dto: { completionMode: 'percent_90' | 'ended_autonext' }) =>
     apiClient.post(`/lessons/${lessonId}/video/config`, dto),
   configDocument: (lessonId: string, dto: { contentHtml?: string; minReadTimeSec?: number }) =>

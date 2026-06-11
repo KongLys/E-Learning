@@ -3,7 +3,6 @@ import {
   Injectable,
   BadRequestException,
   NotFoundException,
-  UnprocessableEntityException,
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { OnEvent } from '@nestjs/event-emitter';
@@ -133,16 +132,6 @@ export class LessonService {
     const lesson = await this.findLessonOrFail(lessonId);
     await this.assertCourseOwnerBySection(lesson.sectionId, userId, userRole);
 
-    const section = await this.prisma.section.findUnique({
-      where: { id: lesson.sectionId },
-      include: { course: true },
-    });
-    if (section?.course.status === 'published') {
-      throw new UnprocessableEntityException(
-        'Cannot delete lesson from a published course',
-      );
-    }
-
     if (lesson.type === 'video') {
       const asset = await this.prisma.videoAsset.findUnique({
         where: { lessonId },
@@ -199,26 +188,29 @@ export class LessonService {
         videoAsset: true,
         documentAsset: true,
         quizLesson: true,
-        section: { select: { course: { select: { id: true, title: true } } } },
+        section: { select: { course: { select: { id: true, title: true, instructorId: true } } } },
       },
     });
     if (!lesson) throw new NotFoundException('Lesson not found');
 
-    if (!lesson.isPreview && userId) {
-      const section = await this.prisma.section.findUnique({
-        where: { id: lesson.sectionId },
-      });
-      const enrolled = await this.prisma.enrollment.findFirst({
-        where: {
-          studentId: userId,
-          courseId: section!.courseId,
-          status: 'active',
-        },
-      });
-      if (!enrolled)
-        throw new ForbiddenException('You are not enrolled in this course');
-    } else if (!lesson.isPreview && !userId) {
-      throw new ForbiddenException('Authentication required');
+    if (!lesson.isPreview) {
+      if (!userId) throw new ForbiddenException('Authentication required');
+
+      const isInstructor = lesson.section.course.instructorId === userId;
+      if (!isInstructor) {
+        const section = await this.prisma.section.findUnique({
+          where: { id: lesson.sectionId },
+        });
+        const enrolled = await this.prisma.enrollment.findFirst({
+          where: {
+            studentId: userId,
+            courseId: section!.courseId,
+            status: 'active',
+          },
+        });
+        if (!enrolled)
+          throw new ForbiddenException('You are not enrolled in this course');
+      }
     }
 
     return lesson;
