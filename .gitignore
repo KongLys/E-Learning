@@ -8,3 +8,14 @@ coverage/
 .DS_Store
 plan/
 .claude/
+
+# ML model weights / training artifacts (too large for git — keep locally / download separately)
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.gguf
+*.h5
+*.msgpack
