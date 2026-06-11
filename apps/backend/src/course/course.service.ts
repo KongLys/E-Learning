@@ -340,6 +340,7 @@ export class CourseService {
     search?: string;
     sort?: string;
     price?: string;
+    studentId?: string;
   }) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 12;
@@ -358,6 +359,17 @@ export class CourseService {
     }
     if (query.price === 'free') where.price = 0;
     if (query.price === 'paid') where.price = { gt: 0 };
+
+    // Exclude courses the student has already enrolled in
+    if (query.studentId) {
+      const enrolled = await this.prisma.enrollment.findMany({
+        where: { studentId: query.studentId, status: 'active' },
+        select: { courseId: true },
+      });
+      if (enrolled.length > 0) {
+        where.id = { notIn: enrolled.map((e) => e.courseId) };
+      }
+    }
 
     const orderBy: Record<string, string> =
       query.sort === 'popular'

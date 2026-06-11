@@ -17,6 +17,7 @@ import { CourseService } from './course.service';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
 import { Public } from '../auth/decorators/public.decorator';
+import { OptionalAuth } from '../auth/decorators/optional-auth.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
@@ -24,9 +25,10 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 export class CourseController {
   constructor(private courseService: CourseService) {}
 
-  @Public()
+  @OptionalAuth()
   @Get('courses')
   listPublic(
+    @CurrentUser() user: { userId: string; role: string } | undefined,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('category') category?: string,
@@ -35,6 +37,7 @@ export class CourseController {
     @Query('sort') sort?: string,
     @Query('price') price?: string,
   ) {
+    const studentId = user?.role === 'student' ? user.userId : undefined;
     return this.courseService.listPublicCourses({
       page: +page! || 1,
       limit: +limit! || 12,
@@ -43,6 +46,7 @@ export class CourseController {
       search,
       sort,
       price,
+      studentId,
     });
   }
 

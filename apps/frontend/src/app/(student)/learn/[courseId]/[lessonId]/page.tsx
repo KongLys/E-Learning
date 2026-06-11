@@ -138,12 +138,14 @@ export default function LearnPage() {
         <Link href={`/my-courses`} className="font-medium text-gray-700 hover:text-gray-900 flex-1 truncate" title="Quay lại khóa học của tôi">
           {courseTitle ?? '← Khóa học của tôi'}
         </Link>
-        <Link
-          href={`/learn/${courseId}/ai`}
-          className="text-sm bg-purple-600 text-white px-3 py-1.5 rounded hover:bg-purple-700"
-        >
-          ✦ Hỏi AI
-        </Link>
+        {lesson.type !== 'quiz' && (
+          <Link
+            href={`/learn/${courseId}/ai`}
+            className="text-sm bg-purple-600 text-white px-3 py-1.5 rounded hover:bg-purple-700"
+          >
+            ✦ Hỏi AI
+          </Link>
+        )}
       </header>
 
       <div className="flex flex-1 overflow-hidden">
@@ -227,6 +229,14 @@ export default function LearnPage() {
             </div>
           )}
 
+          {/* Tiêu đề bài học + hành động (quiz: hiện trên đầu) */}
+          {lesson.type === 'quiz' && (
+            <>
+              <h2 className="text-xl lg:text-2xl font-bold text-gray-900 leading-snug">{lesson.title}</h2>
+              {lesson.description && <p className="text-sm text-gray-600 -mt-3">{lesson.description}</p>}
+            </>
+          )}
+
           {lesson.type === 'quiz' && quizData?.data && (
             <QuizUI
               lessonId={lessonId}
@@ -235,19 +245,23 @@ export default function LearnPage() {
             />
           )}
 
-          {/* Tiêu đề bài học + hành động */}
-          <div className="flex items-start justify-between gap-4 pt-1">
-            <h2 className="text-xl lg:text-2xl font-bold text-gray-900 leading-snug">{lesson.title}</h2>
-            {lesson.type === 'video' && (
-              <button
-                onClick={saveNote}
-                className="shrink-0 inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700"
-              >
-                🗒 Lưu ghi chú
-              </button>
-            )}
-          </div>
-          {lesson.description && <p className="text-sm text-gray-600 -mt-3">{lesson.description}</p>}
+          {/* Tiêu đề bài học + hành động (video/document: hiện dưới nội dung) */}
+          {lesson.type !== 'quiz' && (
+            <>
+              <div className="flex items-start justify-between gap-4 pt-1">
+                <h2 className="text-xl lg:text-2xl font-bold text-gray-900 leading-snug">{lesson.title}</h2>
+                {lesson.type === 'video' && (
+                  <button
+                    onClick={saveNote}
+                    className="shrink-0 inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700"
+                  >
+                    🗒 Lưu ghi chú
+                  </button>
+                )}
+              </div>
+              {lesson.description && <p className="text-sm text-gray-600 -mt-3">{lesson.description}</p>}
+            </>
+          )}
 
           {/* Video: tabs Phụ đề / Ghi chú / Hỏi đáp */}
           {lesson.type === 'video' && (

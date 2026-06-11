@@ -28,20 +28,28 @@ export function VideoPlayer({ lessonId, videoUrl, initialPositionSec = 0, onTime
 
     let hls: Hls | null = null;
 
-    if (Hls.isSupported()) {
+    const isHls = videoUrl.includes('.m3u8');
+
+    if (isHls && Hls.isSupported()) {
       hls = new Hls();
       hls.loadSource(videoUrl);
       hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         if (initialPositionSec > 0) video.currentTime = initialPositionSec;
       });
-    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    } else if (isHls && video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = videoUrl;
       video.addEventListener('loadedmetadata', () => {
         if (initialPositionSec > 0) video.currentTime = initialPositionSec;
-      });
+      }, { once: true });
     } else {
+      // Plain MP4/WebM — native video avoids CORS issues with presigned URLs
       video.src = videoUrl;
+      if (initialPositionSec > 0) {
+        video.addEventListener('loadedmetadata', () => {
+          video.currentTime = initialPositionSec;
+        }, { once: true });
+      }
     }
 
     return () => { hls?.destroy(); };
