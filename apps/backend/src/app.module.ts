@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ScheduleModule } from '@nestjs/schedule';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import * as Joi from 'joi';
@@ -95,6 +96,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
     SectionModule,
     LessonModule,
     EventEmitterModule.forRoot(),
+    ScheduleModule.forRoot(),
     EnrollmentModule,
     ProgressModule,
     QuizAttemptModule,

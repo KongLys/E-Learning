@@ -52,6 +52,8 @@ export const orderApi = {
   initiatePayment: (orderId: string) =>
     apiClient.post<SepayPaymentInfo>('/payments/initiate', { orderId }),
   getOrder: (orderId: string) => apiClient.get(`/orders/${orderId}`),
+  cancelOrder: (orderId: string) =>
+    apiClient.post(`/orders/${orderId}/cancel`),
   validateCoupon: (code: string, courseId: string) =>
     apiClient.post<CouponPreview>('/coupons/validate', { code, courseId }),
 };

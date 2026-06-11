@@ -12,8 +12,10 @@ export const adminApi = {
 
   getCourses: (params?: { status?: string; page?: number; limit?: number }) =>
     apiClient.get('/admin/courses', { params }),
+  getCourseDetail: (id: string) => apiClient.get(`/courses/${id}/manage`),
   approveCourse: (id: string) => apiClient.patch(`/admin/courses/${id}/approve`),
   rejectCourse: (id: string, reason: string) => apiClient.patch(`/admin/courses/${id}/reject`, { reason }),
+  deleteCourse: (id: string) => apiClient.delete(`/courses/${id}`),
 
   getOrders: (params?: { status?: string; page?: number; limit?: number }) =>
     apiClient.get('/admin/orders', { params }),

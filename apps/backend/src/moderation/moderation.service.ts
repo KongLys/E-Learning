@@ -28,9 +28,9 @@ export interface ModerationOutcome {
 
 const REASONS: Record<ModerationLabel, string | null> = {
   it: null,
-  spam_toxic: 'Nội dung bị phát hiện là spam hoặc không phù hợp (toxic).',
+  spam_toxic: 'Nội dung không phù hợp — bị phát hiện là spam hoặc có nội dung độc hại.',
   others:
-    'Nội dung không thuộc lĩnh vực Công nghệ thông tin nên không được duyệt.',
+    'Nội dung không phù hợp — không thuộc lĩnh vực Công nghệ thông tin nên không được duyệt.',
 };
 
 const PENDING_REASON =

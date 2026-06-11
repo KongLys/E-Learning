@@ -1,4 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
+import { ModerationStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { Roles } from '../auth/decorators/roles.decorator';
 
@@ -12,6 +13,8 @@ export class AdminController {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
+    const MOD_STATUSES: ModerationStatus[] = [ModerationStatus.pending, ModerationStatus.appealing];
+
     const [
       totalUsers,
       totalPublishedCourses,
@@ -20,6 +23,8 @@ export class AdminController {
       pendingCourses,
       lockedUsers,
       pendingReports,
+      pendingModerationCourses,
+      pendingModerationLessons,
     ] = await Promise.all([
       this.prisma.user.count(),
       this.prisma.course.count({ where: { status: 'published' } }),
@@ -31,6 +36,15 @@ export class AdminController {
       this.prisma.course.count({ where: { status: 'pending' } }),
       this.prisma.user.count({ where: { status: 'locked' } }),
       this.prisma.reviewReport.count({ where: { status: 'pending' } }),
+      this.prisma.course.count({
+        where: { moderationStatus: { in: MOD_STATUSES } },
+      }),
+      this.prisma.lesson.count({
+        where: {
+          moderationStatus: { in: MOD_STATUSES },
+          moderatedAt: { not: null },
+        },
+      }),
     ]);
 
     return {
@@ -41,6 +55,7 @@ export class AdminController {
       pendingCourses,
       lockedUsers,
       pendingReports,
+      pendingModeration: pendingModerationCourses + pendingModerationLessons,
     };
   }
 }

@@ -11,6 +11,8 @@ export const instructorApi = {
   },
   publishCourse: (id: string) => apiClient.patch(`/courses/${id}/publish`),
   submitCourse: (id: string) => apiClient.post(`/courses/${id}/submit`),
+  unpublishCourse: (id: string) => apiClient.post(`/courses/${id}/unpublish`),
+  deleteCourse: (id: string) => apiClient.delete(`/courses/${id}`),
   getCourseById: (id: string) => apiClient.get(`/courses/${id}/manage`),
 
   // Sections

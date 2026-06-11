@@ -167,6 +167,43 @@ export class OrderService {
     return { orders: orders.map(this.formatOrder), total, page, limit };
   }
 
+  async cancelOrder(orderId: string, userId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { payment: true },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+    if (order.userId !== userId) throw new ForbiddenException('Access denied');
+
+    // Idempotent: nếu đã không còn pending thì trả về trạng thái hiện tại
+    if (order.status !== 'pending' && order.status !== 'processing') {
+      return this.formatOrder({
+        ...order,
+        items: await this.prisma.orderItem.findMany({
+          where: { orderId },
+          include: { course: { select: { id: true, title: true, thumbnailUrl: true } } },
+        }),
+      });
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.order.update({
+        where: { id: orderId },
+        data: { status: 'cancelled' },
+      }),
+      ...(order.payment && order.payment.status === 'initiated'
+        ? [
+            this.prisma.payment.update({
+              where: { id: order.payment.id },
+              data: { status: 'failed' },
+            }),
+          ]
+        : []),
+    ]);
+
+    return { message: 'Order cancelled' };
+  }
+
   async refundOrder(orderId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },

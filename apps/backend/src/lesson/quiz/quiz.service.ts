@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { QuizConfigDto } from '../dto/quiz-config.dto';
 import { CreateQuestionDto } from '../dto/create-question.dto';
+import { assertCourseEditable } from '../../common/course-editable.util';
 
 @Injectable()
 export class QuizService {
@@ -18,7 +19,8 @@ export class QuizService {
     userRole: string,
     dto: QuizConfigDto,
   ) {
-    await this.assertLessonOwner(lessonId, userId, userRole);
+    const lesson = await this.assertLessonOwner(lessonId, userId, userRole);
+    assertCourseEditable(lesson.section.course.status);
     return this.prisma.quizLesson.upsert({
       where: { lessonId },
       update: {
@@ -41,7 +43,8 @@ export class QuizService {
     userRole: string,
     dto: CreateQuestionDto,
   ) {
-    await this.assertLessonOwner(lessonId, userId, userRole);
+    const lesson = await this.assertLessonOwner(lessonId, userId, userRole);
+    assertCourseEditable(lesson.section.course.status);
     const quiz = await this.prisma.quizLesson.findUnique({
       where: { lessonId },
     });
@@ -82,11 +85,12 @@ export class QuizService {
       include: { quizLesson: true },
     });
     if (!question) throw new NotFoundException('Question not found');
-    await this.assertLessonOwner(
+    const lesson = await this.assertLessonOwner(
       question.quizLesson.lessonId,
       userId,
       userRole,
     );
+    assertCourseEditable(lesson.section.course.status);
     this.validateOptions(dto);
 
     await this.prisma.quizOption.deleteMany({ where: { questionId } });
@@ -116,11 +120,12 @@ export class QuizService {
       include: { quizLesson: true },
     });
     if (!question) throw new NotFoundException('Question not found');
-    await this.assertLessonOwner(
+    const lesson = await this.assertLessonOwner(
       question.quizLesson.lessonId,
       userId,
       userRole,
     );
+    assertCourseEditable(lesson.section.course.status);
     await this.prisma.quizQuestion.delete({ where: { id: questionId } });
     return { message: 'Question deleted' };
   }

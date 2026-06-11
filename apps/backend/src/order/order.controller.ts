@@ -28,6 +28,14 @@ export class OrderController {
   ) {
     return this.orderService.getOrderById(id, u.userId, u.role);
   }
+
+  @Post(':id/cancel')
+  cancelOrder(
+    @CurrentUser() u: { userId: string },
+    @Param('id') id: string,
+  ) {
+    return this.orderService.cancelOrder(id, u.userId);
+  }
 }
 
 @Controller('admin/orders')

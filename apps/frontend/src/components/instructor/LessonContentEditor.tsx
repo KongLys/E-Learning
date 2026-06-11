@@ -41,9 +41,11 @@ function formatFileSize(bytes: number): string {
 interface LessonContentEditorProps {
   courseId: string;
   lesson: { id: string; title: string; type: LessonType };
+  courseStatus?: string;
 }
 
-export function LessonContentEditor({ courseId, lesson }: LessonContentEditorProps) {
+export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonContentEditorProps) {
+  const readOnly = courseStatus === 'published' || courseStatus === 'pending';
   const qc = useQueryClient();
   const [error, setError] = useState('');
   const [videoPct, setVideoPct] = useState<number | null>(null);
@@ -146,6 +148,14 @@ export function LessonContentEditor({ courseId, lesson }: LessonContentEditorPro
 
   return (
     <div className="space-y-6">
+      {/* Read-only banner */}
+      {readOnly && (
+        <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          <span>🔒</span>
+          <span>Khóa học đang {courseStatus === 'published' ? 'xuất bản' : 'chờ duyệt'} — nội dung chỉ đọc. Hủy xuất bản để chỉnh sửa.</span>
+        </div>
+      )}
+
       {error && (
         <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>
       )}
@@ -158,7 +168,8 @@ export function LessonContentEditor({ courseId, lesson }: LessonContentEditorPro
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full text-sm bg-white rounded-xl px-3 py-2.5 outline-none ring-1 ring-gray-200 focus:ring-2 focus:ring-blue-400"
+            disabled={readOnly}
+            className="w-full text-sm bg-white rounded-xl px-3 py-2.5 outline-none ring-1 ring-gray-200 focus:ring-2 focus:ring-blue-400 disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
           />
         </div>
         <div>
@@ -166,18 +177,21 @@ export function LessonContentEditor({ courseId, lesson }: LessonContentEditorPro
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
+            disabled={readOnly}
             rows={3}
             placeholder="Học viên có thể làm được gì sau khi hoàn thành bài học này?"
-            className="w-full text-sm bg-white rounded-xl px-3 py-2.5 outline-none ring-1 ring-gray-200 focus:ring-2 focus:ring-blue-400"
+            className="w-full text-sm bg-white rounded-xl px-3 py-2.5 outline-none ring-1 ring-gray-200 focus:ring-2 focus:ring-blue-400 disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
           />
         </div>
-        <button
-          onClick={() => saveBasics.mutate()}
-          disabled={saveBasics.isPending}
-          className="text-xs bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50"
-        >
-          {saveBasics.isPending ? 'Đang lưu...' : 'Lưu thông tin'}
-        </button>
+        {!readOnly && (
+          <button
+            onClick={() => saveBasics.mutate()}
+            disabled={saveBasics.isPending}
+            className="text-xs bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50"
+          >
+            {saveBasics.isPending ? 'Đang lưu...' : 'Lưu thông tin'}
+          </button>
+        )}
       </section>
 
       {/* ===== VIDEO ===== */}
@@ -191,12 +205,14 @@ export function LessonContentEditor({ courseId, lesson }: LessonContentEditorPro
               <span className="text-xs text-green-700 truncate">
                 📹 {videoAsset.fileName ?? 'video'}
               </span>
-              <button
-                onClick={() => setDeleteVideoConfirm(true)}
-                className="shrink-0 text-xs text-red-500 hover:text-red-700"
-              >
-                Xóa
-              </button>
+              {!readOnly && (
+                <button
+                  onClick={() => setDeleteVideoConfirm(true)}
+                  className="shrink-0 text-xs text-red-500 hover:text-red-700"
+                >
+                  Xóa
+                </button>
+              )}
             </div>
           ) : (
             <p className="text-xs text-gray-400">Chưa có video</p>
@@ -216,15 +232,17 @@ export function LessonContentEditor({ courseId, lesson }: LessonContentEditorPro
           )}
 
           {/* Upload button */}
-          <label className="inline-block cursor-pointer text-sm text-blue-600 hover:underline">
-            {videoAsset?.videoUrl ? 'Thay video khác' : 'Tải video lên'}
-            <input
-              type="file"
-              accept="video/mp4,video/webm"
-              className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadVideo.mutate(f); }}
-            />
-          </label>
+          {!readOnly && (
+            <label className="inline-block cursor-pointer text-sm text-blue-600 hover:underline">
+              {videoAsset?.videoUrl ? 'Thay video khác' : 'Tải video lên'}
+              <input
+                type="file"
+                accept="video/mp4,video/webm"
+                className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadVideo.mutate(f); }}
+              />
+            </label>
+          )}
 
           {/* Video preview */}
           {previewVideoUrl && (
@@ -239,30 +257,32 @@ export function LessonContentEditor({ courseId, lesson }: LessonContentEditorPro
             </div>
           )}
 
-          <div className="space-y-2">
-            <label className="text-xs text-gray-500">Điều kiện hoàn thành</label>
-            {([
-              ['percent_90', 'Xem đủ 90% thời lượng video'],
-              ['ended_autonext', 'Xem hết video, tự động chuyển bài kế tiếp'],
-            ] as const).map(([val, label]) => (
-              <label key={val} className="flex items-center gap-2 text-sm cursor-pointer">
-                <input
-                  type="radio"
-                  name="completionMode"
-                  checked={completionMode === val}
-                  onChange={() => setCompletionMode(val)}
-                />
-                {label}
-              </label>
-            ))}
-            <button
-              onClick={() => saveVideoConfig.mutate()}
-              disabled={saveVideoConfig.isPending}
-              className="block text-xs bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50"
-            >
-              {saveVideoConfig.isPending ? 'Đang lưu...' : 'Lưu cấu hình video'}
-            </button>
-          </div>
+          {!readOnly && (
+            <div className="space-y-2">
+              <label className="text-xs text-gray-500">Điều kiện hoàn thành</label>
+              {([
+                ['percent_90', 'Xem đủ 90% thời lượng video'],
+                ['ended_autonext', 'Xem hết video, tự động chuyển bài kế tiếp'],
+              ] as const).map(([val, label]) => (
+                <label key={val} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="radio"
+                    name="completionMode"
+                    checked={completionMode === val}
+                    onChange={() => setCompletionMode(val)}
+                  />
+                  {label}
+                </label>
+              ))}
+              <button
+                onClick={() => saveVideoConfig.mutate()}
+                disabled={saveVideoConfig.isPending}
+                className="block text-xs bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                {saveVideoConfig.isPending ? 'Đang lưu...' : 'Lưu cấu hình video'}
+              </button>
+            </div>
+          )}
         </section>
       )}
 
@@ -311,12 +331,14 @@ export function LessonContentEditor({ courseId, lesson }: LessonContentEditorPro
                 {' · '}{docAsset.fileType?.toUpperCase()}
                 {docAsset.fileSize ? ` · ${formatFileSize(Number(docAsset.fileSize))}` : ''}
               </span>
-              <button
-                onClick={() => setDeleteDocConfirm(true)}
-                className="shrink-0 text-xs text-red-500 hover:text-red-700"
-              >
-                Xóa
-              </button>
+              {!readOnly && (
+                <button
+                  onClick={() => setDeleteDocConfirm(true)}
+                  className="shrink-0 text-xs text-red-500 hover:text-red-700"
+                >
+                  Xóa
+                </button>
+              )}
             </div>
           ) : (
             <p className="text-xs text-gray-400">Chưa có file</p>
@@ -336,20 +358,23 @@ export function LessonContentEditor({ courseId, lesson }: LessonContentEditorPro
           )}
 
           {/* Upload button */}
-          <label className="inline-block cursor-pointer text-sm text-blue-600 hover:underline">
-            Tải file PDF / DOCX
-            <input
-              type="file"
-              accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-              className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadDoc.mutate(f); }}
-            />
-          </label>
+          {!readOnly && (
+            <label className="inline-block cursor-pointer text-sm text-blue-600 hover:underline">
+              Tải file PDF / DOCX
+              <input
+                type="file"
+                accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadDoc.mutate(f); }}
+              />
+            </label>
+          )}
 
           <div>
             <label className="text-xs text-gray-500">Nội dung để người học đọc (tuỳ chọn)</label>
-            <RichTextEditor value={contentHtml} onChange={setContentHtml} placeholder="Soạn nội dung..." />
+            <RichTextEditor value={contentHtml} onChange={setContentHtml} readOnly={readOnly} placeholder="Soạn nội dung..." />
           </div>
+          {!readOnly && (
           <div>
             <label className="text-xs text-gray-500">Thời gian đọc tối thiểu để hoàn thành (giây)</label>
             <input
@@ -360,18 +385,21 @@ export function LessonContentEditor({ courseId, lesson }: LessonContentEditorPro
               className="w-32 text-sm bg-white rounded-xl px-3 py-2.5 outline-none ring-1 ring-gray-200 focus:ring-2 focus:ring-blue-400 block"
             />
           </div>
-          <button
-            onClick={() => saveDocConfig.mutate()}
-            disabled={saveDocConfig.isPending}
-            className="text-xs bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50"
-          >
-            {saveDocConfig.isPending ? 'Đang lưu...' : 'Lưu nội dung tài liệu'}
-          </button>
+          )}
+          {!readOnly && (
+            <button
+              onClick={() => saveDocConfig.mutate()}
+              disabled={saveDocConfig.isPending}
+              className="text-xs bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50"
+            >
+              {saveDocConfig.isPending ? 'Đang lưu...' : 'Lưu nội dung tài liệu'}
+            </button>
+          )}
         </section>
       )}
 
       {/* ===== QUIZ ===== */}
-      {lesson.type === 'quiz' && (
+      {lesson.type === 'quiz' && !readOnly && (
         <section className="border-t border-gray-100 pt-5">
           <h3 className="text-sm font-semibold text-gray-700 mb-3">
             {LESSON_TYPE_META.quiz.label}

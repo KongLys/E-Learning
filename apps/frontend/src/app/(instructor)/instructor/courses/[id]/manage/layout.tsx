@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { useParams, usePathname } from 'next/navigation';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { instructorApi } from '@/lib/api/instructor.api';
-import { Check } from 'lucide-react';
+import { Check, AlertTriangle } from 'lucide-react';
 
 type NavItem = { segment: string; label: string };
 type NavGroup = { heading: string; items: NavItem[] };
@@ -33,6 +33,7 @@ export default function ManageCourseLayout({ children }: { children: React.React
   const { id } = useParams<{ id: string }>();
   const pathname = usePathname();
   const base = `/instructor/courses/${id}/manage`;
+  const qc = useQueryClient();
 
   const { data } = useQuery({
     queryKey: ['course-thumbnail', id],
@@ -40,11 +41,25 @@ export default function ManageCourseLayout({ children }: { children: React.React
   });
   const status: string | undefined = data?.status;
   const editable = status === 'draft' || status === 'rejected';
+  const isPublished = status === 'published';
+  const isPending = status === 'pending';
 
   const submitMutation = useMutation({
     mutationFn: () => instructorApi.submitCourse(id),
-    onSuccess: () => alert('Khóa học đã được gửi để duyệt!'),
+    onSuccess: () => {
+      alert('Khóa học đã được gửi để duyệt!');
+      qc.invalidateQueries({ queryKey: ['course-thumbnail', id] });
+    },
     onError: (err: any) => alert(err?.response?.data?.message ?? 'Gửi duyệt thất bại'),
+  });
+
+  const unpublishMutation = useMutation({
+    mutationFn: () => instructorApi.unpublishCourse(id),
+    onSuccess: () => {
+      alert('Đã hủy xuất bản. Bây giờ bạn có thể chỉnh sửa nội dung.');
+      qc.invalidateQueries({ queryKey: ['course-thumbnail', id] });
+    },
+    onError: (err: any) => alert(err?.response?.data?.message ?? 'Hủy xuất bản thất bại'),
   });
 
   return (
@@ -93,7 +108,34 @@ export default function ManageCourseLayout({ children }: { children: React.React
       </aside>
 
       {/* Section content */}
-      <section className="min-w-0 flex-1">
+      <section className="min-w-0 flex-1 space-y-4">
+        {/* Published / pending banner */}
+        {(isPublished || isPending) && (
+          <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-500" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-amber-800">
+                {isPublished
+                  ? 'Khóa học đang xuất bản — nội dung chỉ đọc'
+                  : 'Khóa học đang chờ duyệt — nội dung chỉ đọc'}
+              </p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                {isPublished
+                  ? 'Để chỉnh sửa nội dung, hãy hủy xuất bản trước.'
+                  : 'Để chỉnh sửa, hãy rút về nháp bằng cách hủy xuất bản.'}
+              </p>
+            </div>
+            {isPublished && (
+              <button
+                onClick={() => unpublishMutation.mutate()}
+                disabled={unpublishMutation.isPending}
+                className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 disabled:opacity-50 transition-colors"
+              >
+                {unpublishMutation.isPending ? 'Đang xử lý...' : 'Hủy xuất bản'}
+              </button>
+            )}
+          </div>
+        )}
         <div className="rounded-xl border border-gray-200 bg-white p-6 sm:p-8">{children}</div>
       </section>
     </div>

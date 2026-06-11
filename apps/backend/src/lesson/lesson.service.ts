@@ -16,6 +16,7 @@ import {
   LESSON_INDEX_QUEUE,
   IndexLessonJob,
 } from '../ai/processors/lesson-index.processor';
+import { assertCourseEditable } from '../common/course-editable.util';
 
 @Injectable()
 export class LessonService {
@@ -78,7 +79,8 @@ export class LessonService {
     userRole: string,
     dto: CreateLessonDto,
   ) {
-    await this.assertSectionOwner(sectionId, userId, userRole);
+    const section = await this.assertSectionOwner(sectionId, userId, userRole);
+    assertCourseEditable(section.course.status);
     const maxIdx = await this.prisma.lesson.aggregate({
       where: { sectionId },
       _max: { orderIndex: true },
@@ -111,7 +113,8 @@ export class LessonService {
     dto: UpdateLessonDto,
   ) {
     const lesson = await this.findLessonOrFail(lessonId);
-    await this.assertCourseOwnerBySection(lesson.sectionId, userId, userRole);
+    const section = await this.assertCourseOwnerBySection(lesson.sectionId, userId, userRole);
+    assertCourseEditable(section.course.status);
     const updated = await this.prisma.lesson.update({
       where: { id: lessonId },
       data: {
@@ -130,7 +133,8 @@ export class LessonService {
 
   async deleteLesson(lessonId: string, userId: string, userRole: string) {
     const lesson = await this.findLessonOrFail(lessonId);
-    await this.assertCourseOwnerBySection(lesson.sectionId, userId, userRole);
+    const section = await this.assertCourseOwnerBySection(lesson.sectionId, userId, userRole);
+    assertCourseEditable(section.course.status);
 
     if (lesson.type === 'video') {
       const asset = await this.prisma.videoAsset.findUnique({
@@ -166,7 +170,8 @@ export class LessonService {
     userRole: string,
     lessonIds: string[],
   ) {
-    await this.assertSectionOwner(sectionId, userId, userRole);
+    const section = await this.assertSectionOwner(sectionId, userId, userRole);
+    assertCourseEditable(section.course.status);
     await Promise.all(
       lessonIds.map((id, index) =>
         this.prisma.lesson.update({
@@ -181,7 +186,7 @@ export class LessonService {
     });
   }
 
-  async getLesson(lessonId: string, userId?: string) {
+  async getLesson(lessonId: string, userId?: string, userRole?: string) {
     const lesson = await this.prisma.lesson.findUnique({
       where: { id: lessonId },
       include: {
@@ -192,6 +197,9 @@ export class LessonService {
       },
     });
     if (!lesson) throw new NotFoundException('Lesson not found');
+
+    // Admin bypass: admin can view any lesson without enrollment
+    if (userRole === 'admin') return lesson;
 
     if (!lesson.isPreview) {
       if (!userId) throw new ForbiddenException('Authentication required');

@@ -8,22 +8,24 @@ interface RichTextEditorProps {
   value: string;
   onChange: (html: string) => void;
   placeholder?: string;
+  readOnly?: boolean;
 }
 
 const btn = (active: boolean) =>
   `px-2 py-1 text-xs rounded border ${active ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`;
 
-export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorProps) {
+export function RichTextEditor({ value, onChange, placeholder, readOnly }: RichTextEditorProps) {
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [StarterKit],
     content: value,
+    editable: !readOnly,
     editorProps: {
       attributes: {
-        class: 'prose prose-sm max-w-none min-h-[160px] px-3 py-2 focus:outline-none',
+        class: `prose prose-sm max-w-none min-h-[160px] px-3 py-2 focus:outline-none${readOnly ? ' bg-gray-50 cursor-default' : ''}`,
       },
     },
-    onUpdate: ({ editor }) => onChange(editor.getHTML()),
+    onUpdate: ({ editor }) => { if (!readOnly) onChange(editor.getHTML()); },
   });
 
   // Đồng bộ khi value bên ngoài thay đổi (vd: load dữ liệu xong)
@@ -36,7 +38,8 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
   if (!editor) return null;
 
   return (
-    <div className="border border-gray-300 rounded-lg overflow-hidden">
+    <div className={`border border-gray-300 rounded-lg overflow-hidden${readOnly ? ' opacity-75' : ''}`}>
+      {!readOnly && (
       <div className="flex flex-wrap gap-1 border-b border-gray-200 bg-gray-50 px-2 py-1.5">
         <button type="button" onClick={() => editor.chain().focus().toggleBold().run()} className={btn(editor.isActive('bold'))}>B</button>
         <button type="button" onClick={() => editor.chain().focus().toggleItalic().run()} className={btn(editor.isActive('italic'))}><em>I</em></button>
@@ -48,6 +51,7 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
         <button type="button" onClick={() => editor.chain().focus().toggleBlockquote().run()} className={btn(editor.isActive('blockquote'))}>❝</button>
         <button type="button" onClick={() => editor.chain().focus().toggleCodeBlock().run()} className={btn(editor.isActive('codeBlock'))}>{'</>'}</button>
       </div>
+      )}
       {editor.isEmpty && placeholder && (
         <div className="px-3 pt-2 text-sm text-gray-400 pointer-events-none absolute">{placeholder}</div>
       )}

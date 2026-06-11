@@ -71,12 +71,23 @@ export class NotificationListener {
     const link = isLesson
       ? `/instructor/courses/${event.courseId ?? ''}/curriculum/${event.contentId}`
       : `/instructor/courses/${event.contentId}/edit`;
+    // Khi bị từ chối (không phải pending chờ manual) → đính kèm metadata để frontend hiển thị nút kiến nghị
+    const actionData =
+      !pending
+        ? {
+            action: 'appeal' as const,
+            contentType: event.contentType,
+            contentId: event.contentId,
+            courseId: event.courseId ?? (isLesson ? undefined : event.contentId),
+          }
+        : undefined;
     const notif = await this.notifService.create(
       event.ownerId,
       'moderation_rejected',
       pending ? 'Nội dung đang chờ kiểm duyệt' : 'Nội dung không phù hợp',
       `${isLesson ? 'Bài học' : 'Khóa học'} "${event.title}": ${event.reason ?? 'Không phù hợp với quy định.'}${pending ? '' : ' Bạn có thể kiến nghị duyệt lại.'}`,
       link,
+      actionData,
     );
     this.gateway.pushToUser(event.ownerId, notif);
   }

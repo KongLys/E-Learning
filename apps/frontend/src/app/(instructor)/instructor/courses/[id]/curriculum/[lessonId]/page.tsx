@@ -95,7 +95,7 @@ export default function CurriculumDetailPage() {
             <div className="py-12"><LoadingSpinner /></div>
           ) : currentLesson ? (
             <div className="rounded-2xl border border-gray-100 bg-white p-6 sm:p-8">
-              <LessonContentEditor courseId={id} lesson={currentLesson} />
+              <LessonContentEditor courseId={id} lesson={currentLesson} courseStatus={courseData?.status} />
             </div>
           ) : (
             <p className="text-sm text-gray-500">Không tìm thấy bài học. Chọn một bài học ở thanh bên.</p>

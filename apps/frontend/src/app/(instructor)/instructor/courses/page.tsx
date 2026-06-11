@@ -12,6 +12,7 @@ import {
   type ModerationStatus,
 } from '@/lib/api/ai.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { PriceDisplay } from '@/components/ui/PriceDisplay';
 import Link from 'next/link';
 import { Plus, Search, X } from 'lucide-react';
@@ -126,6 +127,8 @@ export default function InstructorCoursesPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [sort, setSort] = useState<SortOrder>('newest');
   const [showCreate, setShowCreate] = useState(false);
+  const [courseToDelete, setCourseToDelete] = useState<{ id: string; title: string } | null>(null);
+  const [courseToUnpublish, setCourseToUnpublish] = useState<{ id: string; title: string } | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['instructor-courses'],
@@ -137,6 +140,26 @@ export default function InstructorCoursesPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['instructor-courses'] }),
     onError: (err: { response?: { data?: { message?: string } } }) =>
       alert(err?.response?.data?.message ?? 'Gửi kiến nghị thất bại'),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (courseId: string) => instructorApi.deleteCourse(courseId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['instructor-courses'] });
+      setCourseToDelete(null);
+    },
+    onError: (err: any) =>
+      alert(err?.response?.data?.message ?? 'Xóa khóa học thất bại'),
+  });
+
+  const unpublishMutation = useMutation({
+    mutationFn: (courseId: string) => instructorApi.unpublishCourse(courseId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['instructor-courses'] });
+      setCourseToUnpublish(null);
+    },
+    onError: (err: any) =>
+      alert(err?.response?.data?.message ?? 'Hủy xuất bản thất bại'),
   });
 
   const allCourses: any[] = data?.data?.courses ?? data?.data ?? [];
@@ -268,7 +291,23 @@ export default function InstructorCoursesPage() {
                       </button>
                     )}
                     <Link href={`/instructor/courses/${course.id}/manage/goals`} className="mr-3 text-xs text-purple-600 hover:underline">Sửa</Link>
-                    <Link href={`/courses/${course.slug}`} className="text-xs text-gray-500 hover:text-gray-700">Xem</Link>
+                    <Link href={`/courses/${course.slug}`} className="mr-3 text-xs text-gray-500 hover:text-gray-700">Xem</Link>
+                    {course.status === 'published' && (
+                      <button
+                        onClick={() => setCourseToUnpublish({ id: course.id, title: course.title })}
+                        className="mr-3 text-xs text-orange-500 hover:underline"
+                      >
+                        Hủy xuất bản
+                      </button>
+                    )}
+                    {(course.status === 'draft' || course.status === 'rejected') && (
+                      <button
+                        onClick={() => setCourseToDelete({ id: course.id, title: course.title })}
+                        className="text-xs text-red-500 hover:underline"
+                      >
+                        Xóa
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -278,6 +317,28 @@ export default function InstructorCoursesPage() {
       )}
 
       {showCreate && <CreateCourseModal onClose={() => setShowCreate(false)} />}
+
+      {courseToDelete && (
+        <ConfirmDialog
+          title={`Xóa khóa học "${courseToDelete.title}"?`}
+          message="Toàn bộ bài học, tài liệu, video và dữ liệu liên quan sẽ bị xóa vĩnh viễn. Hành động này không thể hoàn tác."
+          confirmLabel="Xóa vĩnh viễn"
+          isPending={deleteMutation.isPending}
+          onConfirm={() => deleteMutation.mutate(courseToDelete.id)}
+          onCancel={() => setCourseToDelete(null)}
+        />
+      )}
+
+      {courseToUnpublish && (
+        <ConfirmDialog
+          title={`Hủy xuất bản "${courseToUnpublish.title}"?`}
+          message="Khóa học sẽ về trạng thái bản nháp. Học viên mới sẽ không thấy khóa học này. Bạn có thể sửa và gửi duyệt lại sau."
+          confirmLabel="Hủy xuất bản"
+          isPending={unpublishMutation.isPending}
+          onConfirm={() => unpublishMutation.mutate(courseToUnpublish.id)}
+          onCancel={() => setCourseToUnpublish(null)}
+        />
+      )}
     </div>
   );
 }

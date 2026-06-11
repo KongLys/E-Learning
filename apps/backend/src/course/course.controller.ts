@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
@@ -89,6 +90,23 @@ export class CourseController {
   @Post('courses/:id/submit')
   submit(@CurrentUser() user: { userId: string }, @Param('id') id: string) {
     return this.courseService.submitForReview(id, user.userId);
+  }
+
+  @Delete('courses/:id')
+  deleteCourse(
+    @CurrentUser() user: { userId: string; role: string },
+    @Param('id') id: string,
+  ) {
+    return this.courseService.deleteCourse(id, user.userId, user.role);
+  }
+
+  @HttpCode(200)
+  @Post('courses/:id/unpublish')
+  unpublish(
+    @CurrentUser() user: { userId: string; role: string },
+    @Param('id') id: string,
+  ) {
+    return this.courseService.unpublishCourse(id, user.userId, user.role);
   }
 
   @HttpCode(200)

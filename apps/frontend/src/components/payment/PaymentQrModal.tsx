@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { orderApi, type SepayPaymentInfo } from '@/lib/api/course.api';
 import { formatVND } from '@/lib/utils';
@@ -59,6 +59,22 @@ export function PaymentQrModal({ payment, courseId, onClose, onPaid }: PaymentQr
 
   const status: string | undefined = data?.data?.status;
   const isPaid = status === 'paid';
+
+  // Dùng ref để cleanup effect có thể đọc giá trị mới nhất khi unmount.
+  const paidRef = useRef(false);
+  useEffect(() => {
+    if (isPaid) paidRef.current = true;
+  }, [isPaid]);
+
+  // Huỷ đơn hàng khi user đóng modal mà chưa thanh toán xong.
+  useEffect(() => {
+    return () => {
+      if (!paidRef.current) {
+        orderApi.cancelOrder(payment.orderId).catch(() => {});
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (isPaid) onPaid();

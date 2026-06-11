@@ -3,6 +3,14 @@
 import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { notificationApi } from '@/lib/api/notification.api';
+import { moderationApi } from '@/lib/api/ai.api';
+
+type NotificationActionData = {
+  action: 'appeal';
+  contentType: 'course' | 'lesson';
+  contentId: string;
+  courseId?: string;
+};
 
 type NotificationItem = {
   id: string;
@@ -10,6 +18,7 @@ type NotificationItem = {
   body: string;
   isRead: boolean;
   createdAt: string;
+  data?: NotificationActionData;
 };
 
 function BellIcon() {
@@ -52,6 +61,18 @@ export function NotificationBell() {
       qc.invalidateQueries({ queryKey: ['notif-unread-count'] });
       qc.invalidateQueries({ queryKey: ['notifications'] });
     },
+  });
+
+  const appealMutation = useMutation({
+    mutationFn: async ({ contentType, contentId }: NotificationActionData) => {
+      const reason = window.prompt('Lý do kiến nghị (không bắt buộc):') ?? undefined;
+      if (contentType === 'course') {
+        return moderationApi.appealCourse(contentId, reason);
+      }
+      return moderationApi.appealLesson(contentId, reason);
+    },
+    onSuccess: () => alert('Đã gửi kiến nghị thành công!'),
+    onError: (err: any) => alert(err?.response?.data?.message ?? 'Gửi kiến nghị thất bại'),
   });
 
   useEffect(() => {
@@ -97,12 +118,25 @@ export function NotificationBell() {
             {notifications.slice(0, 10).map((n) => (
               <div
                 key={n.id}
-                onClick={() => { if (!n.isRead) markReadMutation.mutate(n.id); setOpen(false); }}
-                className={`px-4 py-3 cursor-pointer hover:bg-canvas transition-colors ${!n.isRead ? 'bg-canvas-soft' : ''}`}
+                className={`px-4 py-3 hover:bg-canvas transition-colors ${!n.isRead ? 'bg-canvas-soft' : ''}`}
               >
-                <p className="text-sm font-medium text-ink">{n.title}</p>
-                <p className="text-xs text-muted mt-0.5 line-clamp-2">{n.body}</p>
-                <p className="text-xs text-muted-soft mt-1">{new Date(n.createdAt).toLocaleDateString('vi-VN')}</p>
+                <div
+                  className="cursor-pointer"
+                  onClick={() => { if (!n.isRead) markReadMutation.mutate(n.id); setOpen(false); }}
+                >
+                  <p className="text-sm font-medium text-ink">{n.title}</p>
+                  <p className="text-xs text-muted mt-0.5 line-clamp-2">{n.body}</p>
+                  <p className="text-xs text-muted-soft mt-1">{new Date(n.createdAt).toLocaleDateString('vi-VN')}</p>
+                </div>
+                {n.data?.action === 'appeal' && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); appealMutation.mutate(n.data!); }}
+                    disabled={appealMutation.isPending}
+                    className="mt-1.5 text-xs text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50"
+                  >
+                    Kiến nghị lại
+                  </button>
+                )}
               </div>
             ))}
           </div>

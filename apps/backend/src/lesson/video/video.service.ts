@@ -11,6 +11,7 @@ import type { Express } from 'express';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../storage/storage.service';
 import { LessonService } from '../lesson.service';
+import { assertCourseEditable } from '../../common/course-editable.util';
 
 const ALLOWED_VIDEO = ['video/mp4', 'video/webm'];
 const MAX_VIDEO_SIZE = 2 * 1024 * 1024 * 1024;
@@ -51,6 +52,7 @@ export class VideoService {
     });
     if (userRole !== 'admin' && section?.course.instructorId !== userId)
       throw new ForbiddenException('Access denied');
+    if (section?.course) assertCourseEditable(section.course.status);
 
     const ext = file.mimetype === 'video/mp4' ? 'mp4' : 'webm';
     const key = `videos/${lessonId}/${randomUUID()}.${ext}`;
@@ -110,6 +112,7 @@ export class VideoService {
     });
     if (userRole !== 'admin' && section?.course.instructorId !== userId)
       throw new ForbiddenException('Access denied');
+    if (section?.course) assertCourseEditable(section.course.status);
 
     const existing = await this.prisma.videoAsset.findUnique({
       where: { lessonId },
@@ -159,6 +162,7 @@ export class VideoService {
     });
     if (userRole !== 'admin' && section?.course.instructorId !== userId)
       throw new ForbiddenException('Access denied');
+    if (section?.course) assertCourseEditable(section.course.status);
 
     return this.prisma.videoAsset.upsert({
       where: { lessonId },
@@ -167,14 +171,14 @@ export class VideoService {
     });
   }
 
-  async getSignedVideoUrl(lessonId: string, userId: string) {
+  async getSignedVideoUrl(lessonId: string, userId: string, userRole?: string) {
     const lesson = await this.prisma.lesson.findUnique({
       where: { id: lessonId },
       include: { videoAsset: true, section: { include: { course: true } } },
     });
     if (!lesson) throw new NotFoundException('Lesson not found');
 
-    if (!lesson.isPreview) {
+    if (userRole !== 'admin' && !lesson.isPreview) {
       const enrolled = await this.lessonService.isEnrolled(
         userId,
         lesson.section.courseId,
@@ -186,7 +190,8 @@ export class VideoService {
 
     if (!lesson.videoAsset?.videoUrl)
       throw new NotFoundException('Video not uploaded yet');
-    if (lesson.isPreview) return { url: lesson.videoAsset.videoUrl };
+    // Admin and preview lessons get the direct URL; others get a signed URL
+    if (userRole === 'admin' || lesson.isPreview) return { url: lesson.videoAsset.videoUrl };
 
     const key = this.storage.extractKeyFromUrl(lesson.videoAsset.videoUrl);
     const signedUrl = await this.storage.getSignedUrl(key, VIDEO_URL_TTL);

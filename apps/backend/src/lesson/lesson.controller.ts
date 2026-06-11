@@ -88,8 +88,8 @@ export class LessonController {
   }
 
   @Get('lessons/:id')
-  getLesson(@CurrentUser() u: { userId: string }, @Param('id') id: string) {
-    return this.lessonService.getLesson(id, u.userId);
+  getLesson(@CurrentUser() u: { userId: string; role: string }, @Param('id') id: string) {
+    return this.lessonService.getLesson(id, u.userId, u.role);
   }
 
   // Video
@@ -112,8 +112,8 @@ export class LessonController {
   }
 
   @Get('lessons/:id/video-url')
-  getVideoUrl(@CurrentUser() u: { userId: string }, @Param('id') id: string) {
-    return this.videoService.getSignedVideoUrl(id, u.userId);
+  getVideoUrl(@CurrentUser() u: { userId: string; role: string }, @Param('id') id: string) {
+    return this.videoService.getSignedVideoUrl(id, u.userId, u.role);
   }
 
   @Post('lessons/:id/video/config')
@@ -146,10 +146,10 @@ export class LessonController {
 
   @Get('lessons/:id/document-url')
   getDocumentUrl(
-    @CurrentUser() u: { userId: string },
+    @CurrentUser() u: { userId: string; role: string },
     @Param('id') id: string,
   ) {
-    return this.documentService.getSignedDocumentUrl(id, u.userId);
+    return this.documentService.getSignedDocumentUrl(id, u.userId, u.role);
   }
 
   @Post('lessons/:id/document/config')

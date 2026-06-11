@@ -12,6 +12,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../storage/storage.service';
 import { LessonService } from '../lesson.service';
 import { sanitizeRichText } from '../../common/sanitize-html.util';
+import { assertCourseEditable } from '../../common/course-editable.util';
 
 const MAX_PDF_SIZE = 100 * 1024 * 1024;
 const DOCX_MIME =
@@ -53,6 +54,7 @@ export class DocumentService {
     });
     if (userRole !== 'admin' && section?.course.instructorId !== userId)
       throw new ForbiddenException('Access denied');
+    if (section?.course) assertCourseEditable(section.course.status);
 
     const isPdf = file.mimetype === 'application/pdf';
     const fileType = isPdf ? 'pdf' : 'docx';
@@ -138,6 +140,7 @@ export class DocumentService {
     });
     if (userRole !== 'admin' && section?.course.instructorId !== userId)
       throw new ForbiddenException('Access denied');
+    if (section?.course) assertCourseEditable(section.course.status);
 
     const existing = await this.prisma.documentAsset.findUnique({
       where: { lessonId },
@@ -186,6 +189,7 @@ export class DocumentService {
     });
     if (userRole !== 'admin' && section?.course.instructorId !== userId)
       throw new ForbiddenException('Access denied');
+    if (section?.course) assertCourseEditable(section.course.status);
 
     const data: { contentHtml?: string; minReadTimeSec?: number } = {};
     if (dto.contentHtml !== undefined)
@@ -206,14 +210,14 @@ export class DocumentService {
     return { ...asset, fileSize: asset.fileSize.toString() };
   }
 
-  async getSignedDocumentUrl(lessonId: string, userId: string) {
+  async getSignedDocumentUrl(lessonId: string, userId: string, userRole?: string) {
     const lesson = await this.prisma.lesson.findUnique({
       where: { id: lessonId },
       include: { documentAsset: true, section: { include: { course: true } } },
     });
     if (!lesson) throw new NotFoundException('Lesson not found');
 
-    if (!lesson.isPreview) {
+    if (userRole !== 'admin' && !lesson.isPreview) {
       const enrolled = await this.lessonService.isEnrolled(
         userId,
         lesson.section.courseId,
@@ -225,7 +229,8 @@ export class DocumentService {
 
     if (!lesson.documentAsset?.fileUrl)
       throw new NotFoundException('Document not uploaded yet');
-    if (lesson.isPreview) return { url: lesson.documentAsset.fileUrl };
+    // Admin and preview lessons get the direct URL
+    if (userRole === 'admin' || lesson.isPreview) return { url: lesson.documentAsset.fileUrl };
 
     const key = this.storage.extractKeyFromUrl(lesson.documentAsset.fileUrl);
     const signedUrl = await this.storage.getSignedUrl(key, DOCUMENT_URL_TTL);

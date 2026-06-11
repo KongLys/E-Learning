@@ -10,13 +10,13 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import Link from 'next/link';
 import { LayoutDashboard, Users, BookOpen, ShoppingCart, ShieldCheck, Flag } from 'lucide-react';
 
-function AdminSidebar({ pendingCourses, pendingReports }: { pendingCourses: number; pendingReports: number }) {
+function AdminSidebar({ pendingCourses, pendingReports, pendingModeration }: { pendingCourses: number; pendingReports: number; pendingModeration: number }) {
   const pathname = usePathname();
   const nav = [
     { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/admin/users', label: 'Người dùng', icon: Users },
     { href: '/admin/courses', label: 'Khóa học', icon: BookOpen, badge: pendingCourses },
-    { href: '/admin/moderation', label: 'Kiểm duyệt', icon: ShieldCheck },
+    { href: '/admin/moderation', label: 'Kiểm duyệt', icon: ShieldCheck, badge: pendingModeration },
     { href: '/admin/reports', label: 'Báo cáo', icon: Flag, badge: pendingReports },
     { href: '/admin/orders', label: 'Đơn hàng', icon: ShoppingCart },
   ];
@@ -80,6 +80,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <AdminSidebar
         pendingCourses={statsData?.data?.pendingCourses ?? 0}
         pendingReports={statsData?.data?.pendingReports ?? 0}
+        pendingModeration={statsData?.data?.pendingModeration ?? 0}
       />
       <div className="flex-1 flex flex-col">
         <header className="h-12 bg-white border-b flex items-center px-6">

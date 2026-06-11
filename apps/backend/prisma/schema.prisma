@@ -66,6 +66,7 @@ enum OrderStatus {
   failed
   cancelled
   refunded
+  expired
 }
 
 enum PaymentStatus {
@@ -572,6 +573,7 @@ model Notification {
   title     String
   body      String
   linkUrl   String?  @map("link_url")
+  data      Json?
   isRead    Boolean  @default(false) @map("is_read")
   createdAt DateTime @default(now()) @map("created_at")
 

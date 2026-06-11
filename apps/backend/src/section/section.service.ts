@@ -3,12 +3,12 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
-  UnprocessableEntityException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSectionDto } from './dto/create-section.dto';
 import { UpdateSectionDto } from './dto/update-section.dto';
 import { ReorderSectionsDto } from './dto/reorder-sections.dto';
+import { assertCourseEditable } from '../common/course-editable.util';
 
 @Injectable()
 export class SectionService {
@@ -20,7 +20,8 @@ export class SectionService {
     userRole: string,
     dto: CreateSectionDto,
   ) {
-    await this.assertCourseOwner(courseId, userId, userRole);
+    const course = await this.assertCourseOwner(courseId, userId, userRole);
+    assertCourseEditable(course.status);
     const maxIndex = await this.prisma.section.aggregate({
       where: { courseId },
       _max: { orderIndex: true },
@@ -38,7 +39,8 @@ export class SectionService {
     userRole: string,
     dto: UpdateSectionDto,
   ) {
-    await this.assertCourseOwner(courseId, userId, userRole);
+    const course = await this.assertCourseOwner(courseId, userId, userRole);
+    assertCourseEditable(course.status);
     return this.prisma.section.update({
       where: { id: sectionId },
       data: { title: dto.title },
@@ -52,11 +54,7 @@ export class SectionService {
     userRole: string,
   ) {
     const course = await this.assertCourseOwner(courseId, userId, userRole);
-    if (['published', 'pending'].includes(course.status)) {
-      throw new UnprocessableEntityException(
-        'Cannot delete section from a published or pending course',
-      );
-    }
+    assertCourseEditable(course.status);
     await this.prisma.section.delete({ where: { id: sectionId } });
     return { message: 'Section deleted' };
   }
@@ -67,7 +65,8 @@ export class SectionService {
     userRole: string,
     dto: ReorderSectionsDto,
   ) {
-    await this.assertCourseOwner(courseId, userId, userRole);
+    const course = await this.assertCourseOwner(courseId, userId, userRole);
+    assertCourseEditable(course.status);
 
     const sections = await this.prisma.section.findMany({
       where: { courseId },

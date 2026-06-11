@@ -13,8 +13,8 @@ import { StorageService } from '../storage/storage.service';
 import { ModerationService } from '../moderation/moderation.service';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
+import { assertCourseEditable } from '../common/course-editable.util';
 
-const EDITABLE_STATUSES = ['draft', 'rejected'];
 const SUBMIT_VALID_STATUSES = ['draft', 'rejected'];
 
 @Injectable()
@@ -62,11 +62,7 @@ export class CourseService {
   ) {
     const course = await this.findOrFail(courseId);
     this.assertOwnerOrAdmin(course, userId, userRole);
-    if (!EDITABLE_STATUSES.includes(course.status)) {
-      throw new UnprocessableEntityException(
-        `Course cannot be edited in status: ${course.status}`,
-      );
-    }
+    assertCourseEditable(course.status);
     const updated = await this.prisma.course.update({
       where: { id: courseId },
       data: {
@@ -151,6 +147,32 @@ export class CourseService {
       );
     }
 
+    // Chặn gửi duyệt khi có bài học bị từ chối / bị khóa
+    const rejectedLessonCount = await this.prisma.lesson.count({
+      where: {
+        section: { courseId },
+        moderationStatus: { in: ['rejected', 'locked'] },
+      },
+    });
+    if (rejectedLessonCount > 0) {
+      throw new UnprocessableEntityException(
+        `Khóa học có ${rejectedLessonCount} bài học bị từ chối — vui lòng kiến nghị hoặc chỉnh sửa bài học trước khi gửi duyệt`,
+      );
+    }
+
+    // Chặn gửi duyệt khi bài học vẫn đang chờ kiểm duyệt AI
+    const pendingLessonCount = await this.prisma.lesson.count({
+      where: {
+        section: { courseId },
+        moderationStatus: { in: ['pending', 'appealing'] },
+      },
+    });
+    if (pendingLessonCount > 0) {
+      throw new UnprocessableEntityException(
+        `Khóa học có ${pendingLessonCount} bài học đang chờ kiểm duyệt — vui lòng đợi hệ thống xử lý xong trước khi gửi duyệt`,
+      );
+    }
+
     const sectionCount = await this.prisma.section.count({
       where: { courseId },
     });
@@ -176,6 +198,97 @@ export class CourseService {
     return this.prisma.course.update({
       where: { id: courseId },
       data: { status: 'pending' },
+    });
+  }
+
+  async deleteCourse(courseId: string, userId: string, userRole: string) {
+    const course = await this.findOrFail(courseId);
+    this.assertOwnerOrAdmin(course, userId, userRole);
+
+    // Giảng viên chỉ được xóa khóa chưa xuất bản; admin xóa được tất cả
+    if (userRole !== 'admin' && !['draft', 'rejected'].includes(course.status)) {
+      throw new UnprocessableEntityException(
+        'Chỉ admin mới có thể xóa khóa học đã xuất bản. Vui lòng hủy xuất bản hoặc liên hệ admin.',
+      );
+    }
+
+    // Thu thập key file R2 trước khi xóa DB
+    const lessons = await this.prisma.lesson.findMany({
+      where: { section: { courseId } },
+      select: {
+        id: true,
+        videoAsset: { select: { videoUrl: true } },
+        documentAsset: { select: { fileUrl: true, markdownUrl: true } },
+      },
+    });
+
+    const storageKeys: string[] = [];
+    if (course.thumbnailUrl) {
+      storageKeys.push(this.storage.extractKeyFromUrl(course.thumbnailUrl));
+    }
+    for (const lesson of lessons) {
+      if (lesson.videoAsset?.videoUrl) {
+        storageKeys.push(
+          this.storage.extractKeyFromUrl(lesson.videoAsset.videoUrl),
+        );
+      }
+      if (lesson.documentAsset?.fileUrl) {
+        storageKeys.push(
+          this.storage.extractKeyFromUrl(lesson.documentAsset.fileUrl),
+        );
+      }
+      if (lesson.documentAsset?.markdownUrl) {
+        storageKeys.push(
+          this.storage.extractKeyFromUrl(lesson.documentAsset.markdownUrl),
+        );
+      }
+    }
+
+    const lessonIds = lessons.map((l) => l.id);
+
+    // Transaction: xóa children không có cascade trước, sau đó xóa course
+    await this.prisma.$transaction(async (tx) => {
+      if (lessonIds.length > 0) {
+        // QuizAttempt (cascade → QuizAttemptAnswer)
+        await tx.quizAttempt.deleteMany({
+          where: { quizLesson: { lessonId: { in: lessonIds } } },
+        });
+        // Note, QuickQuestion (cascade → QuestionReply), LessonProgress (lesson-side)
+        await tx.note.deleteMany({ where: { lessonId: { in: lessonIds } } });
+        await tx.quickQuestion.deleteMany({
+          where: { lessonId: { in: lessonIds } },
+        });
+        await tx.lessonProgress.deleteMany({
+          where: { lessonId: { in: lessonIds } },
+        });
+      }
+      // Enrollment (cascade → LessonProgress enrollment-side)
+      await tx.enrollment.deleteMany({ where: { courseId } });
+      // Review (cascade → ReviewReport)
+      await tx.review.deleteMany({ where: { courseId } });
+      // OrderItem
+      await tx.orderItem.deleteMany({ where: { courseId } });
+      // Course (cascade → Section/Lesson/assets/AI/community/chunks...)
+      await tx.course.delete({ where: { id: courseId } });
+    });
+
+    // Xóa file trên R2 sau khi DB commit (best-effort)
+    await Promise.all(storageKeys.map((k) => this.storage.deleteFile(k)));
+
+    return { message: 'Course deleted' };
+  }
+
+  async unpublishCourse(courseId: string, userId: string, userRole: string) {
+    const course = await this.findOrFail(courseId);
+    this.assertOwnerOrAdmin(course, userId, userRole);
+    if (course.status !== 'published') {
+      throw new UnprocessableEntityException(
+        'Chỉ khóa học đang xuất bản mới có thể hủy xuất bản',
+      );
+    }
+    return this.prisma.course.update({
+      where: { id: courseId },
+      data: { status: 'draft' },
     });
   }
 
@@ -323,10 +436,33 @@ export class CourseService {
               select: {
                 id: true,
                 title: true,
+                description: true,
                 type: true,
                 durationSec: true,
                 isPreview: true,
                 orderIndex: true,
+                moderationStatus: true,
+                moderationLabel: true,
+                moderationReason: true,
+                videoAsset: {
+                  select: {
+                    fileName: true,
+                    durationSec: true,
+                    processingStatus: true,
+                    videoUrl: true,
+                  },
+                },
+                documentAsset: {
+                  select: {
+                    fileName: true,
+                    fileType: true,
+                    fileSize: true,
+                    pageCount: true,
+                    parseStatus: true,
+                    contentHtml: true,
+                    fileUrl: true,
+                  },
+                },
               },
             },
           },
@@ -335,7 +471,23 @@ export class CourseService {
     });
     if (!course) throw new NotFoundException('Course not found');
     this.assertOwnerOrAdmin(course, userId, userRole);
-    return course;
+    // Serialize BigInt fileSize fields to string to avoid JSON serialization errors
+    const serialized = {
+      ...course,
+      sections: course.sections.map((s) => ({
+        ...s,
+        lessons: s.lessons.map((l) => ({
+          ...l,
+          documentAsset: l.documentAsset
+            ? {
+                ...l.documentAsset,
+                fileSize: l.documentAsset.fileSize?.toString() ?? null,
+              }
+            : null,
+        })),
+      })),
+    };
+    return serialized;
   }
 
   async getInstructorCourses(instructorId: string) {
