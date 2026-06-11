@@ -34,10 +34,24 @@ export interface SepayPaymentInfo {
   accountName: string;
 }
 
+export interface CouponPreview {
+  code: string;
+  discountPct: number;
+  originalAmount: number;
+  discountAmount: number;
+  finalAmount: number;
+}
+
 export const orderApi = {
-  createOrder: (courseIds: string[], idempotencyKey: string) =>
-    apiClient.post('/orders', { courseIds, idempotencyKey }),
+  createOrder: (
+    courseIds: string[],
+    idempotencyKey: string,
+    discountCode?: string,
+  ) =>
+    apiClient.post('/orders', { courseIds, idempotencyKey, discountCode }),
   initiatePayment: (orderId: string) =>
     apiClient.post<SepayPaymentInfo>('/payments/initiate', { orderId }),
   getOrder: (orderId: string) => apiClient.get(`/orders/${orderId}`),
+  validateCoupon: (code: string, courseId: string) =>
+    apiClient.post<CouponPreview>('/coupons/validate', { code, courseId }),
 };

@@ -3,7 +3,13 @@
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { courseApi, enrollmentApi, orderApi, type SepayPaymentInfo } from '@/lib/api/course.api';
+import {
+  courseApi,
+  enrollmentApi,
+  orderApi,
+  type SepayPaymentInfo,
+  type CouponPreview,
+} from '@/lib/api/course.api';
 import { useAuthStore } from '@/store/auth.store';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorMessage } from '@/components/common/ErrorMessage';
@@ -11,7 +17,7 @@ import { PriceDisplay } from '@/components/ui/PriceDisplay';
 import { StarRating } from '@/components/ui/StarRating';
 import { PaymentQrModal } from '@/components/payment/PaymentQrModal';
 import { ReviewSection } from '@/components/review/ReviewSection';
-import { formatDuration } from '@/lib/utils';
+import { formatDuration, formatVND } from '@/lib/utils';
 import { useState } from 'react';
 
 const LEVEL_LABELS: Record<string, string> = {
@@ -92,6 +98,9 @@ export default function CourseDetailPage() {
   const [enrollError, setEnrollError] = useState('');
   const [openSection, setOpenSection] = useState<string | null>(null);
   const [payment, setPayment] = useState<SepayPaymentInfo | null>(null);
+  const [couponInput, setCouponInput] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<CouponPreview | null>(null);
+  const [couponError, setCouponError] = useState('');
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['course', slug],
@@ -115,14 +124,35 @@ export default function CourseDetailPage() {
     onError: (err: any) => setEnrollError(err?.response?.data?.message ?? 'Lỗi đăng ký'),
   });
 
+  const validateCouponMutation = useMutation({
+    mutationFn: () => orderApi.validateCoupon(couponInput.trim(), course.id),
+    onSuccess: ({ data }) => {
+      setAppliedCoupon(data);
+      setCouponError('');
+    },
+    onError: (err: any) => {
+      setAppliedCoupon(null);
+      setCouponError(err?.response?.data?.message ?? 'Mã không hợp lệ');
+    },
+  });
+
   const checkoutMutation = useMutation({
     mutationFn: async () => {
       const key = `${user!.id}-${course.id}-${Date.now()}`;
-      const { data: order } = await orderApi.createOrder([course.id], key);
+      const { data: order } = await orderApi.createOrder(
+        [course.id],
+        key,
+        appliedCoupon?.code,
+      );
+      // Mã giảm 100% → đơn 0đ đã được thanh toán và ghi danh ngay, bỏ qua QR.
+      if (order.status === 'paid') return null;
       const { data: paymentInfo } = await orderApi.initiatePayment(order.orderId);
       return paymentInfo;
     },
-    onSuccess: (paymentInfo) => setPayment(paymentInfo),
+    onSuccess: (paymentInfo) => {
+      if (paymentInfo) setPayment(paymentInfo);
+      else router.push(`/learn/${course.id}`);
+    },
     onError: (err: any) => setEnrollError(err?.response?.data?.message ?? 'Lỗi thanh toán'),
   });
 
@@ -320,7 +350,11 @@ export default function CourseDetailPage() {
           {/* Right: CTA card */}
           <div className="lg:sticky lg:top-24 self-start">
             <div className="bg-surface-card rounded-2xl border border-hairline p-6 shadow-[0_4px_16px_rgba(0,0,0,0.06)] space-y-5">
-              <PriceDisplay price={Number(course.price)} className="text-2xl" />
+              <PriceDisplay
+                price={appliedCoupon ? appliedCoupon.finalAmount : Number(course.price)}
+                originalPrice={appliedCoupon ? appliedCoupon.originalAmount : undefined}
+                className="text-2xl"
+              />
 
               {enrollError && <ErrorMessage message={enrollError} />}
 
@@ -354,13 +388,61 @@ export default function CourseDetailPage() {
                   {enrollMutation.isPending ? 'Đang đăng ký...' : 'Học miễn phí'}
                 </button>
               ) : (
-                <button
-                  onClick={() => checkoutMutation.mutate()}
-                  disabled={checkoutMutation.isPending}
-                  className="w-full inline-flex h-11 items-center justify-center rounded-pill bg-emphasis text-white text-[15px] font-medium hover:bg-ink transition-colors disabled:opacity-50"
-                >
-                  {checkoutMutation.isPending ? 'Đang xử lý...' : 'Mua ngay'}
-                </button>
+                <div className="space-y-3">
+                  {/* Mã giảm giá */}
+                  <div className="space-y-1.5">
+                    {appliedCoupon ? (
+                      <div className="flex items-center justify-between rounded-xl border border-semantic-success/30 bg-semantic-success/5 px-3 py-2">
+                        <span className="text-sm">
+                          <span className="font-semibold text-semantic-success">{appliedCoupon.code}</span>
+                          <span className="text-muted">
+                            {' '}· giảm {appliedCoupon.discountPct}% (−{formatVND(appliedCoupon.discountAmount)})
+                          </span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAppliedCoupon(null);
+                            setCouponInput('');
+                            setCouponError('');
+                          }}
+                          className="text-xs text-muted hover:text-ink shrink-0"
+                        >
+                          Bỏ
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <input
+                          value={couponInput}
+                          onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && couponInput.trim()) validateCouponMutation.mutate();
+                          }}
+                          placeholder="Mã giảm giá"
+                          className="flex-1 h-10 rounded-pill border border-hairline px-4 text-sm uppercase placeholder:normal-case focus:outline-none focus:border-emphasis"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => validateCouponMutation.mutate()}
+                          disabled={!couponInput.trim() || validateCouponMutation.isPending}
+                          className="h-10 px-4 rounded-pill border border-emphasis text-emphasis text-sm font-medium hover:bg-emphasis hover:text-white transition-colors disabled:opacity-50"
+                        >
+                          {validateCouponMutation.isPending ? '...' : 'Áp dụng'}
+                        </button>
+                      </div>
+                    )}
+                    {couponError && <p className="text-xs text-red-600">{couponError}</p>}
+                  </div>
+
+                  <button
+                    onClick={() => checkoutMutation.mutate()}
+                    disabled={checkoutMutation.isPending}
+                    className="w-full inline-flex h-11 items-center justify-center rounded-pill bg-emphasis text-white text-[15px] font-medium hover:bg-ink transition-colors disabled:opacity-50"
+                  >
+                    {checkoutMutation.isPending ? 'Đang xử lý...' : 'Mua ngay'}
+                  </button>
+                </div>
               )}
 
               {/* Community is enrollment-gated (backend enforces it too). */}

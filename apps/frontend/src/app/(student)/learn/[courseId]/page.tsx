@@ -21,7 +21,9 @@ export default function LearnCoursePage() {
 
   const { data: sectionsData, isLoading: sectionsLoading } = useQuery({
     queryKey: ['course-sections', courseId],
-    queryFn: () => apiClient.get(`/courses/${courseId}/sections`),
+    // Return the array body so this cache entry has a consistent shape across
+    // all pages that share this query key (lesson page + AI chat page).
+    queryFn: async () => (await apiClient.get(`/courses/${courseId}/sections`)).data,
     enabled: !progressLoading && !lastLessonId,
   });
 
@@ -35,7 +37,7 @@ export default function LearnCoursePage() {
 
     if (sectionsLoading || !sectionsData) return;
 
-    const sections: any[] = sectionsData.data ?? [];
+    const sections: any[] = sectionsData ?? [];
     const firstLesson = sections
       .flatMap((s: any) => s.lessons ?? [])
       .sort((a: any, b: any) => a.orderIndex - b.orderIndex)[0];
@@ -45,7 +47,7 @@ export default function LearnCoursePage() {
     }
   }, [progressLoading, lastLessonId, sectionsLoading, sectionsData, courseId, router]);
 
-  const sections: any[] = sectionsData?.data ?? [];
+  const sections: any[] = sectionsData ?? [];
   const hasLessons = sections.some((s: any) => s.lessons?.length > 0);
   const isLoading = progressLoading || sectionsLoading;
 

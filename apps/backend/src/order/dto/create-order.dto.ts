@@ -1,4 +1,10 @@
-import { ArrayNotEmpty, IsArray, IsString, IsUUID } from 'class-validator';
+import {
+  ArrayNotEmpty,
+  IsArray,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 
 export class CreateOrderDto {
   @IsArray()
@@ -8,4 +14,8 @@ export class CreateOrderDto {
 
   @IsString()
   idempotencyKey: string;
+
+  @IsOptional()
+  @IsString()
+  discountCode?: string;
 }

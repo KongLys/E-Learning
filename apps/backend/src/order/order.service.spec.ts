@@ -1,12 +1,15 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { OrderService } from './order.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { CouponService } from '../coupon/coupon.service';
 
 const mockPrisma = {
   order: {
@@ -21,6 +24,13 @@ const mockPrisma = {
   payment: { update: jest.fn() },
 };
 
+const mockCoupon = {
+  applyCouponToCourse: jest.fn(),
+  redeemByCode: jest.fn(),
+};
+
+const mockEmitter = { emit: jest.fn() };
+
 describe('OrderService', () => {
   let service: OrderService;
 
@@ -29,6 +39,8 @@ describe('OrderService', () => {
       providers: [
         OrderService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: CouponService, useValue: mockCoupon },
+        { provide: EventEmitter2, useValue: mockEmitter },
       ],
     }).compile();
 
@@ -174,6 +186,103 @@ describe('OrderService', () => {
       const result = await service.createOrder('student-1', 'student', dto);
       expect(result.orderId).toBe('order-new');
       expect(result.totalAmount).toBe(299000);
+    });
+
+    it('applies a discount code to a single-course order', async () => {
+      const couponDto = { ...dto, discountCode: 'SALE10' };
+      mockPrisma.order.findUnique.mockResolvedValue(null);
+      mockPrisma.course.findMany.mockResolvedValue([
+        { id: 'course-1', price: 300000, title: 'Test', instructorId: 'inst-x' },
+      ]);
+      mockPrisma.enrollment.findFirst.mockResolvedValue(null);
+      mockCoupon.applyCouponToCourse.mockResolvedValue({
+        code: 'SALE10',
+        couponId: 'coupon-1',
+        discountAmount: 30000,
+      });
+      mockPrisma.order.create.mockResolvedValue({
+        id: 'order-disc',
+        totalAmount: 270000,
+        discountCode: 'SALE10',
+        discountAmount: 30000,
+        currency: 'VND',
+        status: 'pending',
+        idempotencyKey: 'key-1',
+        paidAt: null,
+        createdAt: new Date(),
+        items: [{ courseId: 'course-1', price: 300000, discount: 30000 }],
+        payment: null,
+      });
+
+      const result = await service.createOrder('student-1', 'student', couponDto);
+
+      expect(mockCoupon.applyCouponToCourse).toHaveBeenCalledWith(
+        'SALE10',
+        expect.objectContaining({ id: 'course-1' }),
+      );
+      // Đơn chưa thanh toán → chưa ghi nhận lượt dùng mã.
+      expect(mockCoupon.redeemByCode).not.toHaveBeenCalled();
+      const createArg = mockPrisma.order.create.mock.calls[0][0].data;
+      expect(createArg.totalAmount).toBe(270000);
+      expect(createArg.discountAmount).toBe(30000);
+      expect(result.totalAmount).toBe(270000);
+      expect(result.discountAmount).toBe(30000);
+    });
+
+    it('rejects a discount code on multi-course orders', async () => {
+      const couponDto = {
+        courseIds: ['course-1', 'course-2'],
+        idempotencyKey: 'key-1',
+        discountCode: 'SALE10',
+      };
+      mockPrisma.order.findUnique.mockResolvedValue(null);
+      mockPrisma.course.findMany.mockResolvedValue([
+        { id: 'course-1', price: 100000, instructorId: 'inst-x' },
+        { id: 'course-2', price: 200000, instructorId: 'inst-x' },
+      ]);
+      mockPrisma.enrollment.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.createOrder('student-1', 'student', couponDto),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('auto-completes and enrolls a 100%-off (zero total) order', async () => {
+      const couponDto = { ...dto, discountCode: 'FREE100' };
+      mockPrisma.order.findUnique.mockResolvedValue(null);
+      mockPrisma.course.findMany.mockResolvedValue([
+        { id: 'course-1', price: 300000, title: 'Test', instructorId: 'inst-x' },
+      ]);
+      mockPrisma.enrollment.findFirst.mockResolvedValue(null);
+      mockCoupon.applyCouponToCourse.mockResolvedValue({
+        code: 'FREE100',
+        couponId: 'coupon-2',
+        discountAmount: 300000,
+      });
+      mockPrisma.order.create.mockResolvedValue({
+        id: 'order-free',
+        totalAmount: 0,
+        discountCode: 'FREE100',
+        discountAmount: 300000,
+        currency: 'VND',
+        status: 'paid',
+        idempotencyKey: 'key-1',
+        paidAt: new Date(),
+        createdAt: new Date(),
+        items: [{ courseId: 'course-1', price: 300000, discount: 300000 }],
+        payment: null,
+      });
+
+      const result = await service.createOrder('student-1', 'student', couponDto);
+
+      const createArg = mockPrisma.order.create.mock.calls[0][0].data;
+      expect(createArg.status).toBe('paid');
+      expect(mockCoupon.redeemByCode).toHaveBeenCalledWith('FREE100');
+      expect(mockEmitter.emit).toHaveBeenCalledWith(
+        'order.paid',
+        expect.objectContaining({ userId: 'student-1', courseId: 'course-1' }),
+      );
+      expect(result.status).toBe('paid');
     });
   });
 });

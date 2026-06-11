@@ -32,7 +32,10 @@ export default function LearnPage() {
 
   const { data: sectionsData } = useQuery({
     queryKey: ['course-sections', courseId],
-    queryFn: () => learnApi.getCourseSections(courseId),
+    // Return the array body (not the full axios response) so this cache entry
+    // has the same shape everywhere it's read — the AI chat page shares this
+    // query key and calls .map() on the cached value.
+    queryFn: async () => (await learnApi.getCourseSections(courseId)).data,
   });
 
   const { data: progressData } = useQuery({
@@ -61,7 +64,7 @@ export default function LearnPage() {
   const lesson = lessonData?.data;
   const progress = progressData?.data;
   const lessonProgress: any[] = progress?.lessonProgress ?? [];
-  const sections: any[] = sectionsData?.data ?? [];
+  const sections: any[] = sectionsData ?? [];
 
   // Danh sách bài học phẳng (theo thứ tự) để xác định bài kế tiếp
   const flatLessons: { id: string }[] = sections.flatMap((s: any) => s.lessons ?? []);

@@ -134,23 +134,82 @@ export class CouponService {
     return lines.join('\n');
   }
 
-  async validateCoupon(
+  /**
+   * Tìm coupon theo code và kiểm tra mọi điều kiện áp dụng cho một khóa cụ thể.
+   * Ném BadRequest với thông báo tiếng Việt để frontend hiển thị trực tiếp.
+   */
+  private async resolveValidCoupon(
     code: string,
-    courseId: string,
-  ): Promise<{ discountPct: number; couponId: string } | null> {
+    course: { id: string; instructorId: string },
+  ) {
     const coupon = await this.prisma.coupon.findUnique({
-      where: { code: code.toUpperCase() },
+      where: { code: code.trim().toUpperCase() },
     });
-    if (!coupon) return null;
-    if (coupon.expiresAt && coupon.expiresAt < new Date()) return null;
-    if (coupon.maxUses > 0 && coupon.usedCount >= coupon.maxUses) return null;
-    if (coupon.courseId && coupon.courseId !== courseId) return null;
-    return { discountPct: coupon.discountPct, couponId: coupon.id };
+    if (!coupon) throw new BadRequestException('Mã giảm giá không tồn tại');
+    if (coupon.expiresAt && coupon.expiresAt < new Date())
+      throw new BadRequestException('Mã giảm giá đã hết hạn');
+    if (coupon.maxUses > 0 && coupon.usedCount >= coupon.maxUses)
+      throw new BadRequestException('Mã giảm giá đã hết lượt sử dụng');
+    // Mã của instructor chỉ áp được cho khóa do chính họ giảng dạy.
+    if (coupon.instructorId !== course.instructorId)
+      throw new BadRequestException('Mã không áp dụng cho khóa học này');
+    // Mã gắn với một khóa cụ thể thì phải đúng khóa đó.
+    if (coupon.courseId && coupon.courseId !== course.id)
+      throw new BadRequestException('Mã không áp dụng cho khóa học này');
+    return coupon;
   }
 
-  async incrementUsed(couponId: string) {
-    await this.prisma.coupon.update({
-      where: { id: couponId },
+  private computeDiscount(price: number, discountPct: number) {
+    return Math.min(price, Math.round((price * discountPct) / 100));
+  }
+
+  /**
+   * Học viên xem trước hiệu lực của mã trước khi mua.
+   * Trả về số tiền giảm và giá cuối; ném lỗi nếu mã không hợp lệ.
+   */
+  async previewCoupon(code: string, courseId: string) {
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
+      select: { id: true, price: true, instructorId: true, status: true },
+    });
+    if (!course || course.status !== 'published')
+      throw new NotFoundException('Khóa học không tồn tại');
+
+    const coupon = await this.resolveValidCoupon(code, course);
+    const originalAmount = Number(course.price);
+    const discountAmount = this.computeDiscount(
+      originalAmount,
+      coupon.discountPct,
+    );
+    return {
+      code: coupon.code,
+      discountPct: coupon.discountPct,
+      originalAmount,
+      discountAmount,
+      finalAmount: originalAmount - discountAmount,
+    };
+  }
+
+  /**
+   * Áp mã cho một khóa khi tạo đơn hàng (gọi từ OrderService).
+   * Re-validate tại thời điểm đặt hàng để chống điều kiện đua.
+   */
+  async applyCouponToCourse(
+    code: string,
+    course: { id: string; instructorId: string; price: unknown },
+  ) {
+    const coupon = await this.resolveValidCoupon(code, course);
+    const discountAmount = this.computeDiscount(
+      Number(course.price),
+      coupon.discountPct,
+    );
+    return { code: coupon.code, couponId: coupon.id, discountAmount };
+  }
+
+  /** Ghi nhận đã sử dụng 1 lượt — gọi khi đơn hàng thanh toán thành công. */
+  async redeemByCode(code: string) {
+    await this.prisma.coupon.updateMany({
+      where: { code: code.trim().toUpperCase() },
       data: { usedCount: { increment: 1 } },
     });
   }

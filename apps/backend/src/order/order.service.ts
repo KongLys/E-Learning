@@ -1,16 +1,24 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { CouponService } from '../coupon/coupon.service';
+import { OrderPaidEvent } from '../enrollment/enrollment.listener';
 
 @Injectable()
 export class OrderService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private couponService: CouponService,
+    private eventEmitter: EventEmitter2,
+  ) {}
 
   async createOrder(userId: string, userRole: string, dto: CreateOrderDto) {
     if (userRole === 'admin')
@@ -50,15 +58,42 @@ export class OrderService {
         'Cannot create order for free courses — use direct enrollment',
       );
 
+    // Áp mã giảm giá (nếu có). Coupon gắn theo từng khóa nên chỉ hỗ trợ đơn 1 khóa.
+    let discountCode: string | null = null;
+    let discountAmount = 0;
+    if (dto.discountCode) {
+      if (courses.length !== 1)
+        throw new BadRequestException(
+          'Mã giảm giá chỉ áp dụng cho đơn 1 khóa học',
+        );
+      const applied = await this.couponService.applyCouponToCourse(
+        dto.discountCode,
+        courses[0],
+      );
+      discountCode = applied.code;
+      discountAmount = applied.discountAmount;
+    }
+    const finalAmount = Math.max(0, totalAmount - discountAmount);
+
+    // Mã giảm 100% → đơn 0đ: tạo đơn đã thanh toán và ghi danh ngay,
+    // không qua cổng thanh toán (SePay không xử lý 0đ).
+    const isFullyDiscounted = discountCode !== null && finalAmount === 0;
+
     const order = await this.prisma.order.create({
       data: {
         userId,
-        totalAmount,
+        totalAmount: finalAmount,
+        discountCode,
+        discountAmount,
         idempotencyKey: dto.idempotencyKey,
+        status: isFullyDiscounted ? 'paid' : 'pending',
+        paidAt: isFullyDiscounted ? new Date() : null,
         items: {
           create: courses.map((c) => ({
             courseId: c.id,
             price: Number(c.price),
+            // Discount chỉ áp cho đơn 1 khóa nên gán trọn cho item duy nhất.
+            discount: discountCode ? discountAmount : 0,
           })),
         },
       },
@@ -66,6 +101,16 @@ export class OrderService {
         items: { include: { course: { select: { id: true, title: true } } } },
       },
     });
+
+    if (isFullyDiscounted && discountCode) {
+      await this.couponService.redeemByCode(discountCode);
+      for (const item of order.items) {
+        this.eventEmitter.emit(
+          'order.paid',
+          new OrderPaidEvent(userId, item.courseId),
+        );
+      }
+    }
 
     return this.formatOrder(order);
   }
@@ -150,6 +195,8 @@ export class OrderService {
     return {
       orderId: order.id,
       totalAmount: Number(order.totalAmount),
+      discountCode: order.discountCode ?? null,
+      discountAmount: Number(order.discountAmount ?? 0),
       currency: order.currency,
       status: order.status,
       idempotencyKey: order.idempotencyKey,

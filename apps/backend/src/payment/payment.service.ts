@@ -12,6 +12,7 @@ import { SepayService } from './sepay/sepay.service';
 import { InitiatePaymentDto } from './dto/initiate-payment.dto';
 import { SepayWebhookDto } from './dto/sepay-webhook.dto';
 import { OrderPaidEvent } from '../enrollment/enrollment.listener';
+import { CouponService } from '../coupon/coupon.service';
 
 @Injectable()
 export class PaymentService {
@@ -21,6 +22,7 @@ export class PaymentService {
     private prisma: PrismaService,
     private sepayService: SepayService,
     private eventEmitter: EventEmitter2,
+    private couponService: CouponService,
   ) {}
 
   async initiatePayment(userId: string, dto: InitiatePaymentDto) {
@@ -121,6 +123,12 @@ export class PaymentService {
       where: { id: order.id },
       data: { status: 'paid', paidAt: new Date() },
     });
+
+    // Ghi nhận 1 lượt dùng mã giảm giá khi đơn thực sự được thanh toán
+    // (không tính cho đơn bị bỏ dở ở trạng thái pending).
+    if (order.discountCode) {
+      await this.couponService.redeemByCode(order.discountCode);
+    }
 
     for (const item of order.items) {
       this.eventEmitter.emit(
