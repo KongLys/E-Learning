@@ -10,6 +10,8 @@ import {
 import { Upload } from '@aws-sdk/lib-storage';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Readable } from 'stream';
+import { pipeline } from 'stream/promises';
+import { createWriteStream } from 'fs';
 
 @Injectable()
 export class StorageService implements OnModuleInit {
@@ -75,6 +77,18 @@ export class StorageService implements OnModuleInit {
     });
     await upload.done();
     return this.getPublicUrl(key);
+  }
+
+  /**
+   * Streams an object to a local file path without buffering it in memory —
+   * use for large objects such as video (e.g. when feeding to Gemini File API).
+   */
+  async downloadToFile(key: string, destPath: string): Promise<void> {
+    const res = await this.client.send(
+      new GetObjectCommand({ Bucket: this.bucket, Key: key }),
+    );
+    const body = res.Body as Readable;
+    await pipeline(body, createWriteStream(destPath));
   }
 
   /** Buffers a whole object into memory — only use for small files (e.g. PDFs for parsing). */

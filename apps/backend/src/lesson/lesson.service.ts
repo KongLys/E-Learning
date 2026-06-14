@@ -16,6 +16,10 @@ import {
   LESSON_INDEX_QUEUE,
   IndexLessonJob,
 } from '../ai/processors/lesson-index.processor';
+import {
+  VIDEO_TRANSCRIBE_QUEUE,
+  TranscribeVideoJob,
+} from '../ai/processors/video-transcribe.processor';
 import { assertCourseEditable } from '../common/course-editable.util';
 
 @Injectable()
@@ -26,7 +30,25 @@ export class LessonService {
     private vector: VectorStoreService,
     @InjectQueue(LESSON_INDEX_QUEUE)
     private lessonIndexQueue: Queue<IndexLessonJob>,
+    @InjectQueue(VIDEO_TRANSCRIBE_QUEUE)
+    private videoTranscribeQueue: Queue<TranscribeVideoJob>,
   ) {}
+
+  /** Đẩy video vào hàng đợi tạo phụ đề + phân tích nội dung; lỗi hàng đợi không chặn upload. */
+  async enqueueVideoTranscribe(lessonId: string) {
+    try {
+      await this.videoTranscribeQueue.add(
+        'transcribe',
+        { lessonId },
+        { removeOnComplete: true, removeOnFail: 50 },
+      );
+    } catch (err) {
+      console.error(
+        `[VideoTranscribe] enqueue failed for ${lessonId}:`,
+        (err as Error).message,
+      );
+    }
+  }
 
   /** Đẩy bài học vào hàng đợi vector hóa; lỗi hàng đợi không làm hỏng thao tác lưu. */
   async enqueueLessonIndex(lessonId: string) {

@@ -14,6 +14,10 @@ import {
   LessonIndexProcessor,
   LESSON_INDEX_QUEUE,
 } from './processors/lesson-index.processor';
+import {
+  VideoTranscribeProcessor,
+  VIDEO_TRANSCRIBE_QUEUE,
+} from './processors/video-transcribe.processor';
 import { MindmapService } from './mindmap/mindmap.service';
 import { MindmapController } from './mindmap/mindmap.controller';
 import { MindmapProcessor } from './mindmap/mindmap.processor';
@@ -44,6 +48,7 @@ import { ModerationModule } from '../moderation/moderation.module';
     }),
     BullModule.registerQueue({ name: MINDMAP_QUEUE }),
     BullModule.registerQueue({ name: LESSON_INDEX_QUEUE }),
+    BullModule.registerQueue({ name: VIDEO_TRANSCRIBE_QUEUE }),
   ],
   controllers: [AiChatController, MindmapController],
   providers: [
@@ -55,6 +60,7 @@ import { ModerationModule } from '../moderation/moderation.module';
     RagService,
     AiChatService,
     LessonIndexProcessor,
+    VideoTranscribeProcessor,
     MindmapService,
     MindmapProcessor,
   ],

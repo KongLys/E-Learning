@@ -54,6 +54,9 @@ export const instructorApi = {
     apiClient.post(`/lessons/${lessonId}/document/config`, dto),
   getQuiz: (lessonId: string) => apiClient.get(`/lessons/${lessonId}/quiz`),
   configQuiz: (lessonId: string, dto: any) => apiClient.post(`/lessons/${lessonId}/quiz/config`, dto),
+  // Quiz ôn tập (AI) cho bài video/tài liệu
+  getReviewQuiz: (lessonId: string) => apiClient.get(`/lessons/${lessonId}/review-quiz`),
+  generateReviewQuiz: (lessonId: string) => apiClient.post(`/lessons/${lessonId}/review-quiz`),
   addQuizQuestion: (lessonId: string, dto: any) => apiClient.post(`/lessons/${lessonId}/quiz/questions`, dto),
   updateQuizQuestion: (qId: string, dto: any) => apiClient.patch(`/quiz/questions/${qId}`, dto),
   deleteQuizQuestion: (qId: string) => apiClient.delete(`/quiz/questions/${qId}`),

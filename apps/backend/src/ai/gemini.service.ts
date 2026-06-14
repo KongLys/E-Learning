@@ -6,19 +6,47 @@ import {
 import { ConfigService } from '@nestjs/config';
 import {
   GoogleGenerativeAI,
+  SchemaType,
   type GenerativeModel,
 } from '@google/generative-ai';
+import { GoogleAIFileManager, FileState } from '@google/generative-ai/server';
 
 export interface GenerateOpts {
   temperature?: number;
   maxOutputTokens?: number;
   systemInstruction?: string;
+  // Ghi đè provider/model cho từng lời gọi (vd quiz ôn tập mặc định Ollama,
+  // độc lập với CHAT_PROVIDER dùng cho RAG/chat). Bỏ trống = dùng cấu hình mặc định.
+  provider?: 'gemini' | 'ollama';
+  model?: string;
+}
+
+export interface TranscriptCue {
+  startSec: number;
+  endSec: number;
+  text: string;
+}
+
+export interface TranscriptChapter {
+  startSec: number;
+  endSec: number;
+  title: string;
+  summary: string;
+}
+
+export interface MediaTranscript {
+  language: string;
+  durationSec: number;
+  cues: TranscriptCue[];
+  chapters: TranscriptChapter[];
 }
 
 @Injectable()
 export class GeminiService {
   private readonly logger = new Logger(GeminiService.name);
   private readonly client: GoogleGenerativeAI;
+  private readonly apiKey: string;
+  private readonly transcribeModelName: string;
   private readonly chatModelName: string;
   private readonly embedModelName: string;
   private readonly embedDimensions: number;
@@ -43,9 +71,14 @@ export class GeminiService {
         'GEMINI_API_KEY is not set — Gemini-backed AI features will fail at runtime',
       );
     }
+    this.apiKey = apiKey;
     this.client = new GoogleGenerativeAI(apiKey);
     this.chatModelName = config.get<string>(
       'GEMINI_CHAT_MODEL',
+      'gemini-1.5-flash',
+    );
+    this.transcribeModelName = config.get<string>(
+      'GEMINI_TRANSCRIBE_MODEL',
       'gemini-1.5-flash',
     );
     this.embedModelName = config.get<string>(
@@ -65,6 +98,140 @@ export class GeminiService {
       'OLLAMA_CHAT_MODEL',
       'qwen2.5:7b',
     );
+  }
+
+  /**
+   * Dùng Gemini File API để phụ đề hoá + phân tích nội dung một file media.
+   * Upload file lên Gemini, chờ ACTIVE, rồi yêu cầu model trả JSON gồm:
+   *  - cues: phụ đề có timestamp (giữ nguyên ngôn ngữ gốc, tự nhận diện)
+   *  - chapters: phân đoạn nội dung theo khung thời gian (tiêu đề + tóm tắt)
+   * Luôn xoá file đã upload trên Gemini sau khi xong (best-effort).
+   */
+  async transcribeMedia(
+    filePath: string,
+    mimeType: string,
+  ): Promise<MediaTranscript> {
+    if (!this.apiKey) {
+      throw new ServiceUnavailableException(
+        'GEMINI_API_KEY chưa cấu hình — không thể tạo phụ đề',
+      );
+    }
+
+    const fileManager = new GoogleAIFileManager(this.apiKey);
+    const uploaded = await fileManager.uploadFile(filePath, { mimeType });
+
+    // File lớn cần thời gian xử lý phía Gemini — poll tới khi ACTIVE.
+    let file = await fileManager.getFile(uploaded.file.name);
+    const deadline = Date.now() + 10 * 60 * 1000;
+    while (file.state === FileState.PROCESSING) {
+      if (Date.now() > deadline) {
+        await fileManager.deleteFile(file.name).catch(() => undefined);
+        throw new Error('Gemini file processing timed out');
+      }
+      await new Promise((r) => setTimeout(r, 5000));
+      file = await fileManager.getFile(uploaded.file.name);
+    }
+    if (file.state === FileState.FAILED) {
+      await fileManager.deleteFile(file.name).catch(() => undefined);
+      throw new Error('Gemini failed to process the uploaded media');
+    }
+
+    try {
+      const model = this.client.getGenerativeModel({
+        model: this.transcribeModelName,
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 8192,
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: SchemaType.OBJECT,
+            properties: {
+              language: { type: SchemaType.STRING },
+              durationSec: { type: SchemaType.NUMBER },
+              cues: {
+                type: SchemaType.ARRAY,
+                items: {
+                  type: SchemaType.OBJECT,
+                  properties: {
+                    startSec: { type: SchemaType.NUMBER },
+                    endSec: { type: SchemaType.NUMBER },
+                    text: { type: SchemaType.STRING },
+                  },
+                  required: ['startSec', 'endSec', 'text'],
+                },
+              },
+              chapters: {
+                type: SchemaType.ARRAY,
+                items: {
+                  type: SchemaType.OBJECT,
+                  properties: {
+                    startSec: { type: SchemaType.NUMBER },
+                    endSec: { type: SchemaType.NUMBER },
+                    title: { type: SchemaType.STRING },
+                    summary: { type: SchemaType.STRING },
+                  },
+                  required: ['startSec', 'endSec', 'title', 'summary'],
+                },
+              },
+            },
+            required: ['language', 'durationSec', 'cues', 'chapters'],
+          },
+        },
+      });
+
+      const prompt = [
+        'Bạn là công cụ tạo phụ đề và phân tích nội dung cho video bài giảng.',
+        'Hãy nghe toàn bộ media và trả về JSON đúng schema:',
+        '- "language": mã ngôn ngữ của lời nói (vd "vi", "en"). Tự nhận diện.',
+        '- "durationSec": tổng thời lượng media tính bằng giây.',
+        '- "cues": phụ đề chia thành các câu/đoạn ngắn 3–8 giây, mỗi cue có startSec, endSec (giây, có thể lẻ) và text. GIỮ NGUYÊN ngôn ngữ gốc, không dịch. Sắp xếp theo thời gian, không chồng lấn.',
+        '- "chapters": chia video thành các đoạn nội dung lớn theo chủ đề (mỗi đoạn vài phút). Mỗi chapter có startSec, endSec, title (ngắn gọn) và summary (1–2 câu tóm tắt nội dung đoạn đó), bằng ngôn ngữ gốc.',
+        'Chỉ trả JSON, không thêm chữ nào khác.',
+      ].join('\n');
+
+      const res = await model.generateContent([
+        { fileData: { fileUri: file.uri, mimeType: file.mimeType } },
+        { text: prompt },
+      ]);
+
+      const raw = res.response.text();
+      const parsed = JSON.parse(raw) as Partial<MediaTranscript>;
+      return this.normalizeTranscript(parsed);
+    } finally {
+      await fileManager.deleteFile(file.name).catch(() => undefined);
+    }
+  }
+
+  /** Làm sạch dữ liệu Gemini trả về: ép kiểu số, bỏ cue/chapter thiếu nội dung, sắp theo thời gian. */
+  private normalizeTranscript(p: Partial<MediaTranscript>): MediaTranscript {
+    const num = (v: unknown) => {
+      const n = Number(v);
+      return Number.isFinite(n) && n >= 0 ? n : 0;
+    };
+    const cues = (p.cues ?? [])
+      .map((c) => ({
+        startSec: num(c?.startSec),
+        endSec: num(c?.endSec),
+        text: String(c?.text ?? '').trim(),
+      }))
+      .filter((c) => c.text.length > 0 && c.endSec > c.startSec)
+      .sort((a, b) => a.startSec - b.startSec);
+    const chapters = (p.chapters ?? [])
+      .map((c) => ({
+        startSec: num(c?.startSec),
+        endSec: num(c?.endSec),
+        title: String(c?.title ?? '').trim(),
+        summary: String(c?.summary ?? '').trim(),
+      }))
+      .filter((c) => c.title.length > 0)
+      .sort((a, b) => a.startSec - b.startSec);
+    const durationSec = num(p.durationSec) || cues.at(-1)?.endSec || 0;
+    return {
+      language: String(p.language ?? '').trim() || 'unknown',
+      durationSec: Math.round(durationSec),
+      cues,
+      chapters,
+    };
   }
 
   async embedBatch(texts: string[]): Promise<number[][]> {
@@ -133,7 +300,8 @@ export class GeminiService {
   }
 
   async generate(prompt: string, opts: GenerateOpts = {}): Promise<string> {
-    if (this.chatProvider === 'ollama') return this.generateOllama(prompt, opts);
+    if ((opts.provider ?? this.chatProvider) === 'ollama')
+      return this.generateOllama(prompt, opts);
     const model = this.getChatModel(opts);
     const res = await model.generateContent(prompt);
     return res.response.text();
@@ -143,7 +311,7 @@ export class GeminiService {
     prompt: string,
     opts: GenerateOpts = {},
   ): AsyncGenerator<string> {
-    if (this.chatProvider === 'ollama') {
+    if ((opts.provider ?? this.chatProvider) === 'ollama') {
       yield* this.generateStreamOllama(prompt, opts);
       return;
     }
@@ -157,7 +325,7 @@ export class GeminiService {
 
   private getChatModel(opts: GenerateOpts): GenerativeModel {
     return this.client.getGenerativeModel({
-      model: this.chatModelName,
+      model: opts.model || this.chatModelName,
       generationConfig: {
         temperature: opts.temperature ?? 0.3,
         maxOutputTokens: opts.maxOutputTokens ?? 2048,
@@ -170,7 +338,7 @@ export class GeminiService {
 
   private ollamaBody(prompt: string, opts: GenerateOpts, stream: boolean) {
     return {
-      model: this.ollamaChatModel,
+      model: opts.model || this.ollamaChatModel,
       prompt,
       stream,
       ...(opts.systemInstruction ? { system: opts.systemInstruction } : {}),

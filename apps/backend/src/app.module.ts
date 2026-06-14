@@ -18,6 +18,7 @@ import { LessonModule } from './lesson/lesson.module';
 import { EnrollmentModule } from './enrollment/enrollment.module';
 import { ProgressModule } from './progress/progress.module';
 import { QuizAttemptModule } from './quiz-attempt/quiz-attempt.module';
+import { ReviewQuizModule } from './review-quiz/review-quiz.module';
 import { OrderModule } from './order/order.module';
 import { PaymentModule } from './payment/payment.module';
 import { NoteModule } from './note/note.module';
@@ -60,6 +61,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
         SEPAY_QR_URL: Joi.string().default('https://qr.sepay.vn/img'),
         GEMINI_API_KEY: Joi.string().allow('').default(''),
         GEMINI_CHAT_MODEL: Joi.string().default('gemini-1.5-flash'),
+        GEMINI_TRANSCRIBE_MODEL: Joi.string().default('gemini-1.5-flash'),
         GEMINI_EMBED_MODEL: Joi.string().default('text-embedding-004'),
         COHERE_API_KEY: Joi.string().allow('').default(''),
         COHERE_RERANK_MODEL: Joi.string().default('rerank-multilingual-v3.0'),
@@ -100,6 +102,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
     EnrollmentModule,
     ProgressModule,
     QuizAttemptModule,
+    ReviewQuizModule,
     OrderModule,
     PaymentModule,
     NoteModule,

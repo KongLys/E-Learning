@@ -14,6 +14,7 @@ import { RichTextEditor } from '@/components/common/RichTextEditor';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { QuizBuilder } from './QuizBuilder';
+import { ReviewQuizUI } from '@/components/learn/ReviewQuizUI';
 import { LESSON_TYPE_META, type LessonType } from './lessonTypeMeta';
 
 const PARSE_LABEL: Record<DocumentParseStatus, string> = {
@@ -52,6 +53,9 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
   const [docPct, setDocPct] = useState<number | null>(null);
   const [deleteVideoConfirm, setDeleteVideoConfirm] = useState(false);
   const [deleteDocConfirm, setDeleteDocConfirm] = useState(false);
+  const [reviewPreviewOpen, setReviewPreviewOpen] = useState(false);
+
+  const isMediaLesson = lesson.type === 'video' || lesson.type === 'document';
 
   const { data, isLoading } = useQuery({
     queryKey: ['lesson-edit', lesson.id],
@@ -137,6 +141,20 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
   const appeal = useMutation({
     mutationFn: (reason?: string) => moderationApi.appealLesson(lesson.id, reason),
     onSuccess: () => { setError(''); invalidate(); },
+    onError: onErr,
+  });
+
+  // ----- Quiz ôn tập (AI) cho bài video/tài liệu -----
+  const { data: reviewQuizResp } = useQuery({
+    queryKey: ['review-quiz-edit', lesson.id],
+    queryFn: () => instructorApi.getReviewQuiz(lesson.id),
+    enabled: isMediaLesson,
+  });
+  const reviewQuiz: any = reviewQuizResp?.data ?? null;
+
+  const genReviewQuiz = useMutation({
+    mutationFn: () => instructorApi.generateReviewQuiz(lesson.id),
+    onSuccess: () => { setError(''); qc.invalidateQueries({ queryKey: ['review-quiz-edit', lesson.id] }); },
     onError: onErr,
   });
 
@@ -408,6 +426,38 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
         </section>
       )}
 
+      {/* ===== QUIZ ÔN TẬP (AI) ===== */}
+      {isMediaLesson && (
+        <section className="space-y-3 border-t border-gray-100 pt-5">
+          <h3 className="text-sm font-semibold text-gray-700">Quiz ôn tập (AI)</h3>
+          <p className="text-xs text-gray-500">
+            Sinh câu hỏi trắc nghiệm ôn tập tự động từ nội dung bài học để học viên luyện tập.
+            Không tính vào tiến độ khoá học.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => genReviewQuiz.mutate()}
+              disabled={genReviewQuiz.isPending}
+              className="text-xs bg-purple-600 text-white px-4 py-2 rounded-full hover:bg-purple-700 transition-colors disabled:opacity-50"
+            >
+              {genReviewQuiz.isPending
+                ? 'Đang tạo...'
+                : reviewQuiz
+                  ? 'Tạo lại quiz ôn tập'
+                  : 'Tạo quiz ôn tập'}
+            </button>
+            {reviewQuiz && (
+              <button
+                onClick={() => setReviewPreviewOpen(true)}
+                className="text-xs border px-4 py-2 rounded-full hover:bg-gray-50"
+              >
+                Làm thử ({reviewQuiz.questions?.length ?? 0} câu)
+              </button>
+            )}
+          </div>
+        </section>
+      )}
+
       {/* ConfirmDialog xóa video */}
       {deleteVideoConfirm && (
         <ConfirmDialog
@@ -430,6 +480,37 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
           onConfirm={() => deleteDocMut.mutate()}
           onCancel={() => setDeleteDocConfirm(false)}
         />
+      )}
+
+      {/* Modal làm thử quiz ôn tập */}
+      {reviewPreviewOpen && reviewQuiz && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4"
+          onClick={() => setReviewPreviewOpen(false)}
+        >
+          <div
+            className="my-8 w-full max-w-lg rounded-2xl bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+              <h2 className="text-lg font-bold">Quiz ôn tập — làm thử</h2>
+              <button
+                onClick={() => setReviewPreviewOpen(false)}
+                className="text-xl text-gray-400 hover:text-gray-700"
+                aria-label="Đóng"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="px-6 py-5">
+              <ReviewQuizUI
+                lessonId={lesson.id}
+                quiz={reviewQuiz}
+                onClose={() => setReviewPreviewOpen(false)}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

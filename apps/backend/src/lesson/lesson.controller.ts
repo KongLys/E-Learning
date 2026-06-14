@@ -116,6 +116,11 @@ export class LessonController {
     return this.videoService.getSignedVideoUrl(id, u.userId, u.role);
   }
 
+  @Get('lessons/:id/transcript')
+  getTranscript(@CurrentUser() u: { userId: string; role: string }, @Param('id') id: string) {
+    return this.videoService.getTranscript(id, u.userId, u.role);
+  }
+
   @Post('lessons/:id/video/config')
   configVideo(
     @CurrentUser() u: { userId: string; role: string },

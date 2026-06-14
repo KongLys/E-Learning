@@ -91,18 +91,18 @@ enum MaterialStatus {
 }
 
 enum ModerationStatus {
-  pending   // chờ/đang phân lớp
-  approved  // hợp lệ (it) hoặc admin duyệt lại OK
-  rejected  // model từ chối — còn được kiến nghị
+  pending // chờ/đang phân lớp
+  approved // hợp lệ (it) hoặc admin duyệt lại OK
+  rejected // model từ chối — còn được kiến nghị
   appealing // user đã kiến nghị — chờ admin
-  locked    // admin xác nhận từ chối — không kiến nghị lại được
+  locked // admin xác nhận từ chối — không kiến nghị lại được
 }
 
 enum MindmapStatus {
-  pending    // chưa tạo
+  pending // chưa tạo
   generating // đang sinh sơ đồ (background job)
-  ready      // đã có sơ đồ
-  failed     // sinh lỗi
+  ready // đã có sơ đồ
+  failed // sinh lỗi
 }
 
 // ─── Models ──────────────────────────────────────────────────────────────────
@@ -120,25 +120,25 @@ model User {
   createdAt    DateTime   @default(now()) @map("created_at")
   updatedAt    DateTime   @updatedAt @map("updated_at")
 
-  courses             Course[]
-  enrollments         Enrollment[]
-  orders              Order[]
-  notes               Note[]
-  quickQuestions      QuickQuestion[]
-  questionReplies     QuestionReply[]
-  reviews             Review[]
-  reviewReports       ReviewReport[]
-  communityPosts      CommunityPost[]
-  postComments        PostComment[]
-  postVotes           PostVote[]
-  notifications       Notification[]
-  conversationsAsUser1 Conversation[]    @relation("ConvUser1")
-  conversationsAsUser2 Conversation[]    @relation("ConvUser2")
-  sentMessages         Message[]         @relation("SentMessages")
+  courses              Course[]
+  enrollments          Enrollment[]
+  orders               Order[]
+  notes                Note[]
+  quickQuestions       QuickQuestion[]
+  questionReplies      QuestionReply[]
+  reviews              Review[]
+  reviewReports        ReviewReport[]
+  communityPosts       CommunityPost[]
+  postComments         PostComment[]
+  postVotes            PostVote[]
+  notifications        Notification[]
+  conversationsAsUser1 Conversation[]     @relation("ConvUser1")
+  conversationsAsUser2 Conversation[]     @relation("ConvUser2")
+  sentMessages         Message[]          @relation("SentMessages")
   conversationReads    ConversationRead[]
   messageReactions     MessageReaction[]
-  aiConversations     AiConversation[]
-  coupons             Coupon[]
+  aiConversations      AiConversation[]
+  coupons              Coupon[]
 
   @@map("users")
 }
@@ -178,9 +178,9 @@ model Course {
   createdAt        DateTime     @default(now()) @map("created_at")
   publishedAt      DateTime?    @map("published_at")
 
-  objectives     String[]         @default([])
-  targetAudience String[]         @default([]) @map("target_audience")
-  requirements   String[]         @default([])
+  objectives     String[] @default([])
+  targetAudience String[] @default([]) @map("target_audience")
+  requirements   String[] @default([])
 
   welcomeMessage         String? @map("welcome_message") @db.Text
   congratulationsMessage String? @map("congratulations_message") @db.Text
@@ -249,6 +249,7 @@ model Lesson {
   videoAsset     VideoAsset?
   documentAsset  DocumentAsset?
   quizLesson     QuizLesson?
+  reviewQuiz     ReviewQuiz?
   lessonProgress LessonProgress[]
   notes          Note[]
   quickQuestions QuickQuestion[]
@@ -269,6 +270,14 @@ model VideoAsset {
   durationSec      Int     @default(0) @map("duration_sec")
   processingStatus String  @default("pending") @map("processing_status")
   completionMode   String  @default("percent_90") @map("completion_mode")
+
+  // Tự động sinh phụ đề (cues) + phân tích nội dung theo khung thời gian (segments)
+  // bằng Gemini, chạy nền sau khi upload. Không chặn playback.
+  transcriptStatus String  @default("none") @map("transcript_status") // none|pending|processing|ready|failed
+  transcriptLang   String? @map("transcript_lang")
+  transcriptError  String? @map("transcript_error")
+  cuesJson         Json    @default("[]") @map("cues_json") // [{ startSec, endSec, text }]
+  segmentsJson     Json    @default("[]") @map("segments_json") // [{ startSec, endSec, title, summary }]
   // "percent_90" = xem đủ 90% thời lượng là hoàn thành
   // "ended_autonext" = phải xem hết video, tự động qua bài kế
 
@@ -278,14 +287,14 @@ model VideoAsset {
 }
 
 model DocumentAsset {
-  id        String  @id @default(uuid())
-  lessonId  String  @unique @map("lesson_id")
+  id             String  @id @default(uuid())
+  lessonId       String  @unique @map("lesson_id")
   fileUrl        String? @map("file_url")
   fileName       String? @map("file_name")
   fileType       String  @default("pdf") @map("file_type")
   pageCount      Int     @default(0) @map("page_count")
   fileSize       BigInt  @default(0) @map("file_size")
-  contentHtml    String? @db.Text @map("content_html")
+  contentHtml    String? @map("content_html") @db.Text
   minReadTimeSec Int     @default(0) @map("min_read_time_sec")
 
   // Trạng thái chuyển đổi file PDF/DOCX → markdown (LlamaParse) + index cho AI
@@ -372,6 +381,51 @@ model QuizAttemptAnswer {
   option   QuizOption   @relation(fields: [optionId], references: [id])
 
   @@map("quiz_attempt_answers")
+}
+
+// ─── Quiz ôn tập (AI) ─────────────────────────────────────────────────────────
+// Bộ câu hỏi luyện tập sinh tự động từ nội dung bài học (video/tài liệu). Tách
+// riêng khỏi QuizLesson "chính khoá": dùng chung mỗi bài, KHÔNG tính vào tiến độ,
+// chấm điểm stateless (không lưu lịch sử làm bài).
+model ReviewQuiz {
+  id        String   @id @default(uuid())
+  lessonId  String   @unique @map("lesson_id")
+  model     String? // model AI đã dùng để sinh (hiển thị/debug)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  lesson    Lesson               @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  questions ReviewQuizQuestion[]
+
+  @@map("review_quizzes")
+}
+
+model ReviewQuizQuestion {
+  id           String         @id @default(uuid())
+  reviewQuizId String         @map("review_quiz_id")
+  content      String         @db.Text
+  questionType QuizOptionType @default(single) @map("question_type")
+  orderIndex   Int            @map("order_index")
+  explanation  String?        @db.Text
+
+  reviewQuiz ReviewQuiz         @relation(fields: [reviewQuizId], references: [id], onDelete: Cascade)
+  options    ReviewQuizOption[]
+
+  @@index([reviewQuizId])
+  @@map("review_quiz_questions")
+}
+
+model ReviewQuizOption {
+  id         String  @id @default(uuid())
+  questionId String  @map("question_id")
+  content    String  @db.Text
+  isCorrect  Boolean @default(false) @map("is_correct")
+  orderIndex Int     @map("order_index")
+
+  question ReviewQuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
+  @@map("review_quiz_options")
 }
 
 model Enrollment {
@@ -532,12 +586,12 @@ model Review {
 
 enum ReviewReportReason {
   inappropriate_harmful // Nội dung không phù hợp - Có hại, bạo lực, thù hận, tội phạm
-  inappropriate_other   // Nội dung không phù hợp - Khác
-  misconduct            // Hành vi không phù hợp
-  policy_violation      // Vi phạm chính sách
-  spam                  // Nội dung rác
-  inappropriate_ad      // Quảng cáo không phù hợp
-  other                 // Ý khác
+  inappropriate_other // Nội dung không phù hợp - Khác
+  misconduct // Hành vi không phù hợp
+  policy_violation // Vi phạm chính sách
+  spam // Nội dung rác
+  inappropriate_ad // Quảng cáo không phù hợp
+  other // Ý khác
 }
 
 enum ReportStatus {
@@ -750,7 +804,7 @@ model CourseMindmap {
   id         String        @id @default(uuid())
   courseId   String        @unique @map("course_id")
   title      String
-  structure  Json          // cây JSON chuẩn {title, summary?, keywords?, children:[]}
+  structure  Json // cây JSON chuẩn {title, summary?, keywords?, children:[]}
   markmap    String        @db.Text // markdown markmap đã derive (cache render)
   status     MindmapStatus @default(pending)
   errorMsg   String?       @map("error_msg")
@@ -765,20 +819,20 @@ model CourseMindmap {
 }
 
 model CourseChunk {
-  id           String                       @id @default(uuid())
-  courseId     String                       @map("course_id")
-  sectionId    String?                      @map("section_id")
-  lessonId     String?                      @map("lesson_id")
-  sourceType   String                       @map("source_type") // 'lesson_content' | 'lesson_file'
-  sectionTitle String?                      @map("section_title") // đường dẫn TOC đầy đủ "Phần > Bài > Đề mục"
-  pageNumber   Int?                         @map("page_number")
-  chunkIndex   Int                          @map("chunk_index")
-  content      String                       @db.Text
-  tokenCount   Int                          @default(0) @map("token_count")
-  metadata     Json                         @default("{}")
+  id           String                      @id @default(uuid())
+  courseId     String                      @map("course_id")
+  sectionId    String?                     @map("section_id")
+  lessonId     String?                     @map("lesson_id")
+  sourceType   String                      @map("source_type") // 'lesson_content' | 'lesson_file'
+  sectionTitle String?                     @map("section_title") // đường dẫn TOC đầy đủ "Phần > Bài > Đề mục"
+  pageNumber   Int?                        @map("page_number")
+  chunkIndex   Int                         @map("chunk_index")
+  content      String                      @db.Text
+  tokenCount   Int                         @default(0) @map("token_count")
+  metadata     Json                        @default("{}")
   embedding    Unsupported("vector(768)")?
-  contentTsv   Unsupported("tsvector")?     @default(dbgenerated("to_tsvector('simple'::regconfig, COALESCE(content, ''::text))")) @map("content_tsv")
-  createdAt    DateTime                     @default(now()) @map("created_at")
+  contentTsv   Unsupported("tsvector")?    @default(dbgenerated("to_tsvector('simple'::regconfig, COALESCE(content, ''::text))")) @map("content_tsv")
+  createdAt    DateTime                    @default(now()) @map("created_at")
 
   course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 

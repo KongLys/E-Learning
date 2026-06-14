@@ -4,21 +4,41 @@ import { useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
 import { useProgress } from '@/lib/hooks/useProgress';
 
+export interface Cue {
+  startSec: number;
+  endSec: number;
+  text: string;
+}
+
+export interface Chapter {
+  startSec: number;
+  endSec: number;
+  title: string;
+  summary: string;
+}
+
 interface VideoPlayerProps {
   lessonId: string;
   videoUrl: string;
   initialPositionSec?: number;
+  cues?: Cue[];
+  chapters?: Chapter[];
   onTimeUpdate?: (sec: number) => void;
   onProgress?: (currentSec: number, durationSec: number) => void;
   onEnded?: () => void;
 }
 
-export function VideoPlayer({ lessonId, videoUrl, initialPositionSec = 0, onTimeUpdate, onProgress, onEnded }: VideoPlayerProps) {
+export function VideoPlayer({ lessonId, videoUrl, initialPositionSec = 0, cues = [], chapters = [], onTimeUpdate, onProgress, onEnded }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(1);
+  const [captionsOn, setCaptionsOn] = useState(true);
+
+  const activeCue = captionsOn
+    ? cues.find((c) => currentTime >= c.startSec && currentTime < c.endSec)
+    : undefined;
 
   useProgress(lessonId, () => videoRef.current?.currentTime ?? 0);
 
@@ -120,22 +140,52 @@ export function VideoPlayer({ lessonId, videoUrl, initialPositionSec = 0, onTime
 
   return (
     <div className="bg-black rounded-2xl overflow-hidden shadow-sm ring-1 ring-black/5">
-      <video ref={videoRef} className="w-full aspect-video" />
+      <div className="relative">
+        <video ref={videoRef} className="w-full aspect-video" />
+        {/* Phụ đề overlay chạy theo thời gian */}
+        {activeCue && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center px-4">
+            <span className="max-w-3xl rounded bg-black/70 px-3 py-1.5 text-center text-sm leading-snug text-white sm:text-base">
+              {activeCue.text}
+            </span>
+          </div>
+        )}
+      </div>
       <div className="bg-gray-900 text-white px-4 py-3 space-y-2">
-        <input
-          type="range"
-          min={0}
-          max={duration || 100}
-          value={currentTime}
-          onChange={handleSeek}
-          className="w-full accent-blue-500 h-1"
-        />
+        {/* Thanh tiến trình + mốc chương */}
+        <div className="relative">
+          <input
+            type="range"
+            min={0}
+            max={duration || 100}
+            value={currentTime}
+            onChange={handleSeek}
+            className="w-full accent-blue-500 h-1"
+          />
+          {duration > 0 && chapters.map((c, i) => (
+            <span
+              key={i}
+              title={c.title}
+              className="pointer-events-none absolute top-1/2 h-2.5 w-0.5 -translate-y-1/2 rounded bg-amber-400"
+              style={{ left: `${Math.min(100, (c.startSec / duration) * 100)}%` }}
+            />
+          ))}
+        </div>
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-3">
             <button onClick={togglePlay} className="text-lg">{isPlaying ? '⏸' : '▶'}</button>
             <span className="text-gray-300 text-xs">{formatTime(currentTime)} / {formatTime(duration)}</span>
           </div>
           <div className="flex items-center gap-2">
+            {cues.length > 0 && (
+              <button
+                onClick={() => setCaptionsOn((v) => !v)}
+                title="Bật/tắt phụ đề"
+                className={`text-xs px-1.5 py-0.5 rounded font-semibold ${captionsOn ? 'bg-blue-500' : 'bg-gray-700'}`}
+              >
+                CC
+              </button>
+            )}
             {[0.75, 1, 1.25, 1.5, 2].map((r) => (
               <button
                 key={r}

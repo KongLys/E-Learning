@@ -3,6 +3,7 @@ import { apiClient } from './axios';
 export const learnApi = {
   getLessonDetail: (lessonId: string) => apiClient.get(`/lessons/${lessonId}`),
   getVideoUrl: (lessonId: string) => apiClient.get(`/lessons/${lessonId}/video-url`),
+  getTranscript: (lessonId: string) => apiClient.get(`/lessons/${lessonId}/transcript`),
   getDocumentUrl: (lessonId: string) => apiClient.get(`/lessons/${lessonId}/document-url`),
   getQuiz: (lessonId: string) => apiClient.get(`/lessons/${lessonId}/quiz`),
   getCourseProgress: (courseId: string) => apiClient.get(`/enrollments/${courseId}/progress`),
@@ -12,6 +13,11 @@ export const learnApi = {
   markComplete: (lessonId: string) => apiClient.post('/progress/complete', { lessonId }),
   submitQuiz: (quizLessonId: string, answers: { questionId: string; optionIds: string[] }[]) =>
     apiClient.post(`/quiz/${quizLessonId}/attempts`, { answers }),
+  // Quiz ôn tập (AI) — tạo theo yêu cầu, không tính vào tiến độ khoá học
+  getReviewQuiz: (lessonId: string) => apiClient.get(`/lessons/${lessonId}/review-quiz`),
+  generateReviewQuiz: (lessonId: string) => apiClient.post(`/lessons/${lessonId}/review-quiz`),
+  submitReviewQuiz: (lessonId: string, answers: { questionId: string; optionIds: string[] }[]) =>
+    apiClient.post(`/lessons/${lessonId}/review-quiz/attempts`, { answers }),
   getNotes: (lessonId: string) => apiClient.get(`/lessons/${lessonId}/notes`),
   createNote: (lessonId: string, content: string, positionType: string, positionValue: number) =>
     apiClient.post('/notes', { lessonId, content, positionType, positionValue }),

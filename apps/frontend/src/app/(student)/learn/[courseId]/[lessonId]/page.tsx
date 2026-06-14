@@ -8,6 +8,7 @@ import { VideoPlayer } from '@/components/learn/VideoPlayer';
 import { NotesPanel } from '@/components/learn/NotesPanel';
 import { QuestionsPanel } from '@/components/learn/QuestionsPanel';
 import { QuizUI } from '@/components/learn/QuizUI';
+import { ReviewQuizUI } from '@/components/learn/ReviewQuizUI';
 import { LearnSidebar } from '@/components/learn/LearnSidebar';
 import { SafeHtml } from '@/components/common/SafeHtml';
 import { useState, useRef, useEffect } from 'react';
@@ -21,6 +22,7 @@ export default function LearnPage() {
   const [outlineCollapsed, setOutlineCollapsed] = useState(false);
   const [tab, setTab] = useState<'notes' | 'questions'>('notes');
   const [qaOpen, setQaOpen] = useState(false);
+  const [reviewQuizOpen, setReviewQuizOpen] = useState(false);
   const [noteAddSignal, setNoteAddSignal] = useState(0);
   const videoTimeRef = useRef(0);
   const completedRef = useRef(false);
@@ -59,6 +61,21 @@ export default function LearnPage() {
     queryKey: ['quiz', lessonId],
     queryFn: () => learnApi.getQuiz(lessonId),
     enabled: lessonData?.data?.type === 'quiz',
+  });
+
+  // Quiz ôn tập (AI) — chỉ cho bài video/tài liệu
+  const reviewQuizEnabled =
+    lessonData?.data?.type === 'video' || lessonData?.data?.type === 'document';
+  const { data: reviewQuizData } = useQuery({
+    queryKey: ['review-quiz', lessonId],
+    queryFn: () => learnApi.getReviewQuiz(lessonId),
+    enabled: reviewQuizEnabled,
+  });
+  const reviewQuiz = reviewQuizData?.data ?? null;
+
+  const generateReviewQuiz = useMutation({
+    mutationFn: () => learnApi.generateReviewQuiz(lessonId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['review-quiz', lessonId] }),
   });
 
   const lesson = lessonData?.data;
@@ -250,15 +267,49 @@ export default function LearnPage() {
             <>
               <div className="flex items-start justify-between gap-4 pt-1">
                 <h2 className="text-xl lg:text-2xl font-bold text-gray-900 leading-snug">{lesson.title}</h2>
-                {lesson.type === 'video' && (
-                  <button
-                    onClick={saveNote}
-                    className="shrink-0 inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700"
-                  >
-                    🗒 Lưu ghi chú
-                  </button>
-                )}
+                <div className="shrink-0 flex items-center gap-3">
+                  {lesson.type === 'video' && (
+                    <button
+                      onClick={saveNote}
+                      className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700"
+                    >
+                      🗒 Lưu ghi chú
+                    </button>
+                  )}
+                  {reviewQuiz ? (
+                    <>
+                      <button
+                        onClick={() => setReviewQuizOpen(true)}
+                        className="inline-flex items-center gap-1.5 text-sm font-medium bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700"
+                      >
+                        📝 Làm bài ôn tập
+                      </button>
+                      <button
+                        onClick={() => generateReviewQuiz.mutate()}
+                        disabled={generateReviewQuiz.isPending}
+                        title="Tạo lại bộ câu hỏi ôn tập mới"
+                        className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                      >
+                        {generateReviewQuiz.isPending ? 'Đang tạo...' : 'Tạo lại'}
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => generateReviewQuiz.mutate()}
+                      disabled={generateReviewQuiz.isPending}
+                      className="inline-flex items-center gap-1.5 text-sm font-medium bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 disabled:opacity-60"
+                    >
+                      {generateReviewQuiz.isPending ? '⏳ Đang tạo quiz...' : '✦ Tạo quiz ôn tập'}
+                    </button>
+                  )}
+                </div>
               </div>
+              {generateReviewQuiz.isError && (
+                <p className="text-sm text-red-600 -mt-2">
+                  {(generateReviewQuiz.error as any)?.response?.data?.message ??
+                    'Không tạo được quiz ôn tập, vui lòng thử lại.'}
+                </p>
+              )}
               {lesson.description && <p className="text-sm text-gray-600 -mt-3">{lesson.description}</p>}
             </>
           )}
@@ -324,6 +375,37 @@ export default function LearnPage() {
           </div>
         </main>
       </div>
+
+      {/* Modal làm bài ôn tập */}
+      {reviewQuizOpen && reviewQuiz && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4"
+          onClick={() => setReviewQuizOpen(false)}
+        >
+          <div
+            className="my-8 w-full max-w-lg rounded-2xl bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+              <h2 className="text-lg font-bold">Quiz ôn tập</h2>
+              <button
+                onClick={() => setReviewQuizOpen(false)}
+                className="text-xl text-gray-400 hover:text-gray-700"
+                aria-label="Đóng"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="px-6 py-5">
+              <ReviewQuizUI
+                lessonId={lessonId}
+                quiz={reviewQuiz}
+                onClose={() => setReviewQuizOpen(false)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

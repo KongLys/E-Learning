@@ -79,13 +79,26 @@ export class VideoService {
 
     const asset = await this.prisma.videoAsset.upsert({
       where: { lessonId },
-      update: { videoUrl: url, hlsUrl: url, processingStatus: 'ready', fileName: file.originalname },
+      update: {
+        videoUrl: url,
+        hlsUrl: url,
+        processingStatus: 'ready',
+        fileName: file.originalname,
+        // Reset trạng thái phụ đề — sẽ tạo lại cho video mới.
+        transcriptStatus: 'pending',
+        transcriptError: null,
+        transcript: null,
+        transcriptLang: null,
+        cuesJson: [],
+        segmentsJson: [],
+      },
       create: {
         lessonId,
         videoUrl: url,
         hlsUrl: url,
         processingStatus: 'ready',
         fileName: file.originalname,
+        transcriptStatus: 'pending',
       },
     });
 
@@ -94,6 +107,9 @@ export class VideoService {
       data: { durationSec: asset.durationSec },
     });
     await this.lessonService.updateCourseStats(lesson.sectionId);
+
+    // Chạy nền: tạo phụ đề + phân tích nội dung theo khung thời gian.
+    await this.lessonService.enqueueVideoTranscribe(lessonId);
 
     return asset;
   }
@@ -131,6 +147,12 @@ export class VideoService {
         fileName: null,
         durationSec: 0,
         processingStatus: 'pending',
+        transcriptStatus: 'none',
+        transcriptError: null,
+        transcript: null,
+        transcriptLang: null,
+        cuesJson: [],
+        segmentsJson: [],
       },
     });
 
@@ -196,5 +218,32 @@ export class VideoService {
     const key = this.storage.extractKeyFromUrl(lesson.videoAsset.videoUrl);
     const signedUrl = await this.storage.getSignedUrl(key, VIDEO_URL_TTL);
     return { url: signedUrl };
+  }
+
+  /** Phụ đề + phân tích nội dung theo khung thời gian (cùng quyền xem như video). */
+  async getTranscript(lessonId: string, userId: string, userRole?: string) {
+    const lesson = await this.prisma.lesson.findUnique({
+      where: { id: lessonId },
+      include: { videoAsset: true, section: { include: { course: true } } },
+    });
+    if (!lesson) throw new NotFoundException('Lesson not found');
+
+    if (userRole !== 'admin' && !lesson.isPreview) {
+      const enrolled = await this.lessonService.isEnrolled(
+        userId,
+        lesson.section.courseId,
+      );
+      const isInstructor = lesson.section.course.instructorId === userId;
+      if (!enrolled && !isInstructor)
+        throw new ForbiddenException('Not enrolled in this course');
+    }
+
+    const asset = lesson.videoAsset;
+    return {
+      status: asset?.transcriptStatus ?? 'none',
+      lang: asset?.transcriptLang ?? null,
+      cues: (asset?.cuesJson as unknown) ?? [],
+      segments: (asset?.segmentsJson as unknown) ?? [],
+    };
   }
 }
