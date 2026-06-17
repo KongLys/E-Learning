@@ -138,6 +138,7 @@ model User {
   conversationReads    ConversationRead[]
   messageReactions     MessageReaction[]
   aiConversations      AiConversation[]
+  aiQuizzes            AiQuiz[]
   coupons              Coupon[]
 
   @@map("users")
@@ -201,6 +202,7 @@ model Course {
   communityPosts  CommunityPost[]
   chunks          CourseChunk[]
   aiConversations AiConversation[]
+  aiQuizzes       AiQuiz[]
   mindmap         CourseMindmap?
   coupons         Coupon[]
 
@@ -446,6 +448,55 @@ model ReviewQuizOption {
 
   @@index([questionId])
   @@map("review_quiz_options")
+}
+
+// ─── Quiz cá nhân tạo qua chat AI ──────────────────────────────────────────────
+// Bộ câu hỏi do học viên yêu cầu chatbot AI tạo từ nội dung khoá học. CÁ NHÂN
+// (chỉ người tạo dùng), phạm vi khoá học, nhiều quiz / người. KHÔNG tính tiến độ,
+// chấm điểm stateless. Tách riêng khỏi ReviewQuiz (theo bài, dùng chung).
+model AiQuiz {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  courseId  String   @map("course_id")
+  title     String?
+  model     String? // model AI đã dùng để sinh
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course    Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  questions AiQuizQuestion[]
+
+  @@index([userId, courseId])
+  @@map("ai_quizzes")
+}
+
+model AiQuizQuestion {
+  id           String         @id @default(uuid())
+  quizId       String         @map("quiz_id")
+  content      String         @db.Text
+  questionType QuizOptionType @default(single) @map("question_type")
+  orderIndex   Int            @map("order_index")
+  explanation  String?        @db.Text
+
+  quiz    AiQuiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  options AiQuizOption[]
+
+  @@index([quizId])
+  @@map("ai_quiz_questions")
+}
+
+model AiQuizOption {
+  id         String  @id @default(uuid())
+  questionId String  @map("question_id")
+  content    String  @db.Text
+  isCorrect  Boolean @default(false) @map("is_correct")
+  orderIndex Int     @map("order_index")
+
+  question AiQuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
+  @@map("ai_quiz_options")
 }
 
 model Enrollment {

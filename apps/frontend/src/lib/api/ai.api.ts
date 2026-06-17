@@ -71,6 +71,32 @@ export const aiChatApi = {
     apiClient.get<AiMessage[]>(`/ai/conversations/${conversationId}/messages`),
 };
 
+// ─── Quiz cá nhân tạo qua chat AI ──────────────────────────────────────────────
+
+export interface AiQuizSummary {
+  id: string;
+  title: string | null;
+  createdAt: string;
+  questionCount: number;
+}
+
+/** Thông tin quiz vừa tạo, đến qua sự kiện SSE `quiz`. */
+export interface CreatedQuizInfo {
+  id: string;
+  title: string;
+  questionCount: number;
+}
+
+export const aiQuizApi = {
+  list: (courseId: string) =>
+    apiClient.get<AiQuizSummary[]>(`/courses/${courseId}/ai-quizzes`),
+  get: (id: string) => apiClient.get(`/ai-quizzes/${id}`),
+  submit: (
+    id: string,
+    answers: { questionId: string; optionIds: string[] }[],
+  ) => apiClient.post(`/ai-quizzes/${id}/attempts`, { answers }),
+};
+
 // ─── Mind map ────────────────────────────────────────────────────────────────
 
 export interface MindmapNode {
@@ -101,6 +127,7 @@ export const mindmapApi = {
 export interface AskStreamHandlers {
   onCitations?: (citations: AiMessage['citations']) => void;
   onToken?: (text: string) => void;
+  onQuiz?: (quiz: CreatedQuizInfo) => void;
   onDone?: (info: { length: number }) => void;
   onError?: (msg: string) => void;
 }
@@ -157,6 +184,7 @@ export async function streamAsk(
         const payload = JSON.parse(data);
         if (event === 'citations') handlers.onCitations?.(payload);
         else if (event === 'token') handlers.onToken?.(payload as string);
+        else if (event === 'quiz') handlers.onQuiz?.(payload as CreatedQuizInfo);
         else if (event === 'done') handlers.onDone?.(payload);
         else if (event === 'error') handlers.onError?.(payload.message);
       } catch {

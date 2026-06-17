@@ -2,17 +2,19 @@
 
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { learnApi } from '@/lib/api/learn.api';
 
 interface ReviewQuizUIProps {
-  lessonId: string;
   quiz: any; // { id, questions: [{ id, content, questionType, options: [{ id, content }] }] }
+  /** Nộp đáp án, trả về axios response chứa kết quả chấm điểm. */
+  submit: (
+    answers: { questionId: string; optionIds: string[] }[],
+  ) => Promise<{ data: any }>;
   onClose: () => void;
 }
 
 type State = 'ready' | 'in_progress' | 'submitted';
 
-export function ReviewQuizUI({ lessonId, quiz, onClose }: ReviewQuizUIProps) {
+export function ReviewQuizUI({ quiz, submit, onClose }: ReviewQuizUIProps) {
   const [state, setState] = useState<State>('ready');
   const [currentQ, setCurrentQ] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
@@ -22,7 +24,7 @@ export function ReviewQuizUI({ lessonId, quiz, onClose }: ReviewQuizUIProps) {
 
   const submitMutation = useMutation({
     mutationFn: (ans: { questionId: string; optionIds: string[] }[]) =>
-      learnApi.submitReviewQuiz(lessonId, ans),
+      submit(ans),
     onSuccess: (data) => {
       setResult(data.data);
       setState('submitted');

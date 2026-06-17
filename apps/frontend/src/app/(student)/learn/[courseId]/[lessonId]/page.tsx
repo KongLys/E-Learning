@@ -3,6 +3,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { learnApi } from '@/lib/api/learn.api';
+import { aiQuizApi } from '@/lib/api/ai.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { VideoPlayer, formatSeconds } from '@/components/learn/VideoPlayer';
 import { NotesPanel } from '@/components/learn/NotesPanel';
@@ -88,6 +89,13 @@ export default function LearnPage() {
   const generateReviewQuiz = useMutation({
     mutationFn: () => learnApi.generateReviewQuiz(lessonId),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['review-quiz', lessonId] }),
+  });
+
+  // Quiz cá nhân (AI) mở từ mục "Quiz của tôi" trong sidebar
+  const [aiQuizModal, setAiQuizModal] = useState<any>(null);
+  const openAiQuiz = useMutation({
+    mutationFn: (id: string) => aiQuizApi.get(id),
+    onSuccess: (res) => setAiQuizModal(res.data),
   });
 
   // Podcast (AI) — chỉ cho bài đọc (tài liệu). Poll lại khi đang xử lý.
@@ -210,6 +218,7 @@ export default function LearnPage() {
           isOpen={sidebarOpen}
           collapsed={outlineCollapsed}
           onClose={() => { setSidebarOpen(false); setOutlineCollapsed(true); }}
+          onOpenAiQuiz={(id) => openAiQuiz.mutate(id)}
         />
 
         {/* Main content */}
@@ -504,9 +513,40 @@ export default function LearnPage() {
             </div>
             <div className="px-6 py-5">
               <ReviewQuizUI
-                lessonId={lessonId}
                 quiz={reviewQuiz}
+                submit={(ans) => learnApi.submitReviewQuiz(lessonId, ans)}
                 onClose={() => setReviewQuizOpen(false)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal làm quiz cá nhân (AI) từ "Quiz của tôi" */}
+      {aiQuizModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4"
+          onClick={() => setAiQuizModal(null)}
+        >
+          <div
+            className="my-8 w-full max-w-lg rounded-2xl bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+              <h2 className="text-lg font-bold truncate">{aiQuizModal.title || 'Quiz ôn tập'}</h2>
+              <button
+                onClick={() => setAiQuizModal(null)}
+                className="text-xl text-gray-400 hover:text-gray-700 shrink-0"
+                aria-label="Đóng"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="px-6 py-5">
+              <ReviewQuizUI
+                quiz={aiQuizModal}
+                submit={(ans) => aiQuizApi.submit(aiQuizModal.id, ans)}
+                onClose={() => setAiQuizModal(null)}
               />
             </div>
           </div>

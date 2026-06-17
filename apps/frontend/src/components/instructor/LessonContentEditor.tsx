@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { instructorApi } from '@/lib/api/instructor.api';
+import { learnApi } from '@/lib/api/learn.api';
 import {
   moderationApi,
   MODERATION_COLORS,
@@ -504,8 +505,8 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
             </div>
             <div className="px-6 py-5">
               <ReviewQuizUI
-                lessonId={lesson.id}
                 quiz={reviewQuiz}
+                submit={(ans) => learnApi.submitReviewQuiz(lesson.id, ans)}
                 onClose={() => setReviewPreviewOpen(false)}
               />
             </div>

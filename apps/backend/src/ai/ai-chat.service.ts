@@ -8,12 +8,14 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RagService, Citation } from './rag/rag.service';
 import { ChunkScope } from './vector/vector-store.service';
+import { AiQuizService, CreatedQuizInfo } from './ai-quiz.service';
 
 @Injectable()
 export class AiChatService {
   constructor(
     private prisma: PrismaService,
     private rag: RagService,
+    private aiQuiz: AiQuizService,
   ) {}
 
   async assertAccess(courseId: string, userId: string): Promise<void> {
@@ -93,6 +95,56 @@ export class AiChatService {
       data: { conversationId: conv.id, role: 'user', content: query },
     });
 
+    const persistAssistant =
+      (fullText: string, citations?: Citation[]) => async () => {
+        await this.prisma.aiMessage.create({
+          data: {
+            conversationId: conv.id,
+            role: 'assistant',
+            content: fullText,
+            citations: citations
+              ? (citations as unknown as Prisma.InputJsonValue)
+              : undefined,
+          },
+        });
+        await this.prisma.aiConversation.update({
+          where: { id: conv.id },
+          data: {
+            updatedAt: new Date(),
+            // Set title from first question if not yet set
+            ...(conv.title ? {} : { title: query.slice(0, 80) }),
+          },
+        });
+      };
+
+    // Nhánh tạo quiz: nếu người dùng yêu cầu tạo quiz trong chat thì sinh quiz
+    // cá nhân thay vì trả lời RAG.
+    const intent = detectQuizIntent(query);
+    if (intent.isQuiz) {
+      const aiQuiz = this.aiQuiz;
+      const courseId = conv.courseId;
+      let createdQuiz: CreatedQuizInfo | null = null;
+      async function* quizStream(): AsyncGenerator<string> {
+        yield 'Đang tạo quiz ôn tập từ nội dung khoá học…\n\n';
+        const info = await aiQuiz.generateFromChat(
+          courseId,
+          userId,
+          query,
+          scope,
+          intent.count,
+        );
+        createdQuiz = info;
+        yield `✅ Đã tạo quiz “${info.title}” gồm ${info.questionCount} câu hỏi. Mở ở mục “Quiz của tôi” trong thanh nội dung khoá học để làm bài.`;
+      }
+      return {
+        stream: quizStream(),
+        citations: [] as Citation[],
+        conversationId: conv.id,
+        persist: (fullText: string) => persistAssistant(fullText)(),
+        getQuiz: () => createdQuiz,
+      };
+    }
+
     // Run RAG pipeline (có thể giới hạn phạm vi theo Phần/Bài)
     const result = await this.rag.ask(
       conv.courseId,
@@ -105,24 +157,9 @@ export class AiChatService {
       stream: result.stream,
       citations: result.citations,
       conversationId: conv.id,
-      persist: async (fullText: string) => {
-        await this.prisma.aiMessage.create({
-          data: {
-            conversationId: conv.id,
-            role: 'assistant',
-            content: fullText,
-            citations: result.citations as unknown as Prisma.InputJsonValue,
-          },
-        });
-        await this.prisma.aiConversation.update({
-          where: { id: conv.id },
-          data: {
-            updatedAt: new Date(),
-            // Set title from first question if not yet set
-            ...(conv.title ? {} : { title: query.slice(0, 80) }),
-          },
-        });
-      },
+      persist: (fullText: string) =>
+        persistAssistant(fullText, result.citations)(),
+      getQuiz: (): CreatedQuizInfo | null => null,
     };
   }
 
@@ -136,4 +173,23 @@ export class AiChatService {
       lessonId: c.lessonId,
     }));
   }
+}
+
+/**
+ * Nhận diện ý định "tạo quiz" trong tin nhắn chat (anchor động từ tạo + danh từ
+ * quiz để tránh dương tính giả như "quiz là gì"). Trả số câu nếu người dùng nêu.
+ */
+export function detectQuizIntent(query: string): {
+  isQuiz: boolean;
+  count?: number;
+} {
+  const q = query.toLowerCase();
+  const isQuiz =
+    /(tạo|tao|soạn|soan|sinh|generate|create|make)\b[^]*?(quiz|trắc nghiệm|trac nghiem|câu hỏi|cau hoi|bài kiểm tra|bai kiem tra|đề kiểm tra|de kiem tra|bộ câu hỏi|bo cau hoi)/.test(
+      q,
+    );
+  if (!isQuiz) return { isQuiz: false };
+  const m = q.match(/(\d{1,3})\s*(câu|cau|question)/);
+  const count = m ? parseInt(m[1], 10) : undefined;
+  return { isQuiz: true, count };
 }

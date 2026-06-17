@@ -1,44 +1,23 @@
 import {
   ForbiddenException,
   Injectable,
-  Logger,
   NotFoundException,
-  ServiceUnavailableException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
-import { GeminiService } from '../ai/gemini.service';
+import { QuizGenerationService } from '../ai/quiz-generation.service';
 import { SubmitReviewAttemptDto } from './dto/submit-review-attempt.dto';
 
 const QUESTION_COUNT = 5;
 const MIN_SOURCE_CHARS = 200;
 const MAX_SOURCE_CHARS = 12000;
 
-interface GeneratedQuestion {
-  content: string;
-  options: { content: string; isCorrect: boolean }[];
-  explanation?: string;
-}
-
 @Injectable()
 export class ReviewQuizService {
-  private readonly logger = new Logger(ReviewQuizService.name);
-  private readonly provider: 'gemini' | 'ollama';
-  private readonly model: string | undefined;
-
   constructor(
     private prisma: PrismaService,
-    private gemini: GeminiService,
-    config: ConfigService,
-  ) {
-    // Mặc định Ollama (local, không tốn quota), độc lập với CHAT_PROVIDER của RAG.
-    this.provider =
-      config.get<string>('REVIEW_QUIZ_PROVIDER', 'ollama') === 'gemini'
-        ? 'gemini'
-        : 'ollama';
-    this.model = config.get<string>('REVIEW_QUIZ_MODEL', '') || undefined;
-  }
+    private quizGen: QuizGenerationService,
+  ) {}
 
   // ─── Public API ──────────────────────────────────────────────────────────────
 
@@ -74,7 +53,9 @@ export class ReviewQuizService {
       );
     }
 
-    const questions = await this.generateQuestions(lesson.title, source);
+    const questions = await this.quizGen.generate(source, {
+      count: QUESTION_COUNT,
+    });
 
     // Thay thế bộ câu hỏi cũ (nếu có) — dùng chung mỗi bài học.
     await this.prisma.$transaction(async (tx) => {
@@ -82,7 +63,7 @@ export class ReviewQuizService {
       await tx.reviewQuiz.create({
         data: {
           lessonId,
-          model: this.model ?? this.provider,
+          model: this.quizGen.usedModel,
           questions: {
             create: questions.map((q, qi) => ({
               content: q.content,
@@ -224,109 +205,5 @@ export class ReviewQuizService {
       .replace(/&nbsp;/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
-  }
-
-  private async generateQuestions(
-    lessonTitle: string,
-    source: string,
-  ): Promise<GeneratedQuestion[]> {
-    const systemInstruction =
-      'Bạn là trợ giảng tạo câu hỏi trắc nghiệm ôn tập bằng tiếng Việt. ' +
-      'Chỉ dựa vào nội dung bài học được cung cấp. ' +
-      'Luôn trả về JSON hợp lệ đúng định dạng yêu cầu, không kèm bất kỳ chữ nào ngoài JSON.';
-
-    const prompt = `Dựa vào nội dung bài học dưới đây, hãy tạo ${QUESTION_COUNT} câu hỏi trắc nghiệm ôn tập (mỗi câu có đúng 1 đáp án đúng và 4 lựa chọn).
-
-Trả về DUY NHẤT một mảng JSON, mỗi phần tử có dạng:
-{
-  "content": "nội dung câu hỏi",
-  "options": [
-    { "content": "lựa chọn A", "isCorrect": true },
-    { "content": "lựa chọn B", "isCorrect": false },
-    { "content": "lựa chọn C", "isCorrect": false },
-    { "content": "lựa chọn D", "isCorrect": false }
-  ],
-  "explanation": "giải thích ngắn gọn vì sao đáp án đúng"
-}
-
-Quy tắc: mỗi câu đúng 4 lựa chọn và đúng 1 lựa chọn isCorrect=true; câu hỏi không trùng nhau; chỉ hỏi nội dung có trong bài.
-
-Tiêu đề bài học: ${lessonTitle}
-
-Nội dung bài học:
-"""
-${source}
-"""`;
-
-    let raw: string;
-    try {
-      raw = await this.gemini.generate(prompt, {
-        provider: this.provider,
-        model: this.model,
-        temperature: 0.4,
-        maxOutputTokens: 2048,
-        systemInstruction,
-      });
-    } catch (err) {
-      this.logger.error(
-        `Review quiz generation failed: ${(err as Error).message}`,
-      );
-      throw new ServiceUnavailableException(
-        'Không tạo được quiz ôn tập, vui lòng thử lại',
-      );
-    }
-
-    const questions = this.parseQuestions(raw);
-    if (questions.length === 0) {
-      this.logger.warn(
-        `Review quiz: could not parse any valid question from model output`,
-      );
-      throw new ServiceUnavailableException(
-        'Không tạo được quiz ôn tập, vui lòng thử lại',
-      );
-    }
-    return questions;
-  }
-
-  /** Bóc JSON từ output model (bỏ rào ```json, chữ thừa) và validate từng câu. */
-  private parseQuestions(raw: string): GeneratedQuestion[] {
-    let text = raw.trim();
-    const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
-    if (fence) text = fence[1].trim();
-    const start = text.indexOf('[');
-    const end = text.lastIndexOf(']');
-    if (start !== -1 && end > start) text = text.slice(start, end + 1);
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      return [];
-    }
-    if (!Array.isArray(parsed)) return [];
-
-    const valid: GeneratedQuestion[] = [];
-    for (const item of parsed) {
-      const q = item as Partial<GeneratedQuestion>;
-      if (!q || typeof q.content !== 'string' || !Array.isArray(q.options)) {
-        continue;
-      }
-      const options = q.options
-        .filter(
-          (o): o is { content: string; isCorrect: boolean } =>
-            !!o && typeof o.content === 'string',
-        )
-        .map((o) => ({ content: o.content, isCorrect: o.isCorrect === true }));
-      const correctCount = options.filter((o) => o.isCorrect).length;
-      // Chỉ nhận câu 1-đáp-án hợp lệ (>=2 lựa chọn, đúng 1 đáp án đúng).
-      if (options.length < 2 || correctCount !== 1) continue;
-      valid.push({
-        content: q.content,
-        options,
-        explanation:
-          typeof q.explanation === 'string' ? q.explanation : undefined,
-      });
-    }
-    return valid;
   }
 }

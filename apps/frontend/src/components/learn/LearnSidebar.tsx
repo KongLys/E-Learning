@@ -1,7 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
 import { ProgressBar } from '@/components/ui/ProgressBar';
+import { aiQuizApi } from '@/lib/api/ai.api';
 
 const TYPE_LABELS: Record<string, string> = { video: 'Video', document: 'Tài liệu', quiz: 'Trắc nghiệm' };
 
@@ -20,10 +22,19 @@ interface LearnSidebarProps {
   isOpen: boolean;
   collapsed?: boolean;
   onClose: () => void;
+  /** Mở 1 quiz cá nhân (AI) đã tạo. Nếu không truyền thì ẩn mục "Quiz của tôi". */
+  onOpenAiQuiz?: (quizId: string) => void;
 }
 
-export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections, lessonProgress, progressPercent, isOpen, collapsed, onClose }: LearnSidebarProps) {
+export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections, lessonProgress, progressPercent, isOpen, collapsed, onClose, onOpenAiQuiz }: LearnSidebarProps) {
   const completedIds = new Set(lessonProgress.filter((lp: any) => lp.completed).map((lp: any) => lp.lessonId));
+
+  const aiQuizzesQuery = useQuery({
+    queryKey: ['ai-quizzes', courseId],
+    queryFn: async () => (await aiQuizApi.list(courseId)).data,
+    enabled: !!onOpenAiQuiz,
+  });
+  const aiQuizzes = aiQuizzesQuery.data ?? [];
 
   return (
     <>
@@ -41,6 +52,31 @@ export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections,
 
         {/* Sections */}
         <div className="flex-1 overflow-y-auto">
+          {/* Quiz cá nhân do AI tạo qua chat */}
+          {onOpenAiQuiz && aiQuizzes.length > 0 && (
+            <details className="group border-b border-gray-100" open>
+              <summary className="px-5 py-3.5 cursor-pointer hover:bg-gray-50 list-none flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-gray-900">📝 Quiz của tôi ({aiQuizzes.length})</p>
+                <span className="text-gray-400 text-xs transition-transform group-open:rotate-180">⌄</span>
+              </summary>
+              <ul className="pb-1">
+                {aiQuizzes.map((quiz) => (
+                  <li key={quiz.id}>
+                    <button
+                      onClick={() => onOpenAiQuiz(quiz.id)}
+                      className="w-full text-left flex items-start gap-3 px-5 py-3 hover:bg-gray-50 transition-colors"
+                    >
+                      <span className="mt-0.5 shrink-0">📝</span>
+                      <span className="min-w-0">
+                        <span className="block text-sm leading-snug text-gray-800 truncate">{quiz.title || 'Quiz ôn tập'}</span>
+                        <span className="block text-xs text-gray-400 mt-0.5">{quiz.questionCount} câu · {new Date(quiz.createdAt).toLocaleDateString('vi-VN')}</span>
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
           {sections.map((section: any, idx: number) => (
             <details key={section.id} open className="group border-b border-gray-100">
               <summary className="px-5 py-3.5 cursor-pointer hover:bg-gray-50 list-none flex items-start justify-between gap-2">

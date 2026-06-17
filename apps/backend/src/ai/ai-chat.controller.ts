@@ -54,7 +54,7 @@ export class AiChatController {
       body.sectionId || body.lessonId
         ? { sectionId: body.sectionId, lessonId: body.lessonId }
         : undefined;
-    const { stream, citations, persist } = await this.chat.ask(
+    const { stream, citations, persist, getQuiz } = await this.chat.ask(
       id,
       user.userId,
       body.query,
@@ -78,6 +78,10 @@ export class AiChatController {
         res.write(`event: token\ndata: ${JSON.stringify(piece)}\n\n`);
       }
       await persist(full);
+      const quiz = getQuiz?.();
+      if (quiz) {
+        res.write(`event: quiz\ndata: ${JSON.stringify(quiz)}\n\n`);
+      }
       res.write(
         `event: done\ndata: ${JSON.stringify({ length: full.length })}\n\n`,
       );

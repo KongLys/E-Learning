@@ -6,16 +6,19 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MessageSquare, Network } from 'lucide-react';
 import {
   aiChatApi,
+  aiQuizApi,
   mindmapApi,
   streamAsk,
   type AiConversation,
   type AiMessage,
   type AskScope,
+  type CreatedQuizInfo,
 } from '@/lib/api/ai.api';
 import { learnApi } from '@/lib/api/learn.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorMessage } from '@/components/common/ErrorMessage';
 import { MindMapViewer } from '@/components/learn/MindMapViewer';
+import { ReviewQuizUI } from '@/components/learn/ReviewQuizUI';
 
 type Citation = NonNullable<AiMessage['citations']>[number];
 
@@ -42,7 +45,15 @@ export default function CourseAiChatPage() {
   const [streamError, setStreamError] = useState('');
   // Phạm vi truy vấn: '' = cả khóa, 's:{sectionId}' = theo Phần, 'l:{lessonId}' = theo Bài
   const [scopeKey, setScopeKey] = useState('');
+  // Quiz vừa được tạo qua chat + quiz đang mở trong modal
+  const [createdQuiz, setCreatedQuiz] = useState<CreatedQuizInfo | null>(null);
+  const [openQuiz, setOpenQuiz] = useState<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const openQuizMut = useMutation({
+    mutationFn: (id: string) => aiQuizApi.get(id),
+    onSuccess: (res) => setOpenQuiz(res.data),
+  });
 
   const conversationsQuery = useQuery({
     queryKey: ['ai-conversations', courseId],
@@ -125,6 +136,10 @@ export default function CourseAiChatPage() {
               i === p.length - 1 ? { ...m, content: buffer, citations } : m,
             ),
           );
+        },
+        onQuiz: (quiz) => {
+          setCreatedQuiz(quiz);
+          qc.invalidateQueries({ queryKey: ['ai-quizzes', courseId] });
         },
         onError: (msg) => setStreamError(msg),
       },
@@ -220,6 +235,27 @@ export default function CourseAiChatPage() {
         </div>
 
         <div className="border-t p-4 space-y-2">
+          {createdQuiz && (
+            <div className="flex items-center gap-2 rounded-lg border border-purple-200 bg-purple-50 px-3 py-2 text-sm">
+              <span className="flex-1 truncate text-purple-800">
+                ✅ Đã tạo quiz “{createdQuiz.title}” ({createdQuiz.questionCount} câu)
+              </span>
+              <button
+                onClick={() => openQuizMut.mutate(createdQuiz.id)}
+                disabled={openQuizMut.isPending}
+                className="shrink-0 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-700 disabled:opacity-50"
+              >
+                {openQuizMut.isPending ? 'Đang mở…' : '📝 Làm bài ôn tập'}
+              </button>
+              <button
+                onClick={() => setCreatedQuiz(null)}
+                className="shrink-0 text-purple-400 hover:text-purple-600"
+                aria-label="Đóng"
+              >
+                ✕
+              </button>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <label className="text-xs text-gray-500 shrink-0">Phạm vi:</label>
             <select
@@ -267,6 +303,36 @@ export default function CourseAiChatPage() {
         </div>
       </main>
     </div>
+      )}
+
+      {openQuiz && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4"
+          onClick={() => setOpenQuiz(null)}
+        >
+          <div
+            className="my-8 w-full max-w-lg rounded-2xl bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+              <h2 className="text-lg font-bold">Quiz ôn tập</h2>
+              <button
+                onClick={() => setOpenQuiz(null)}
+                className="text-xl text-gray-400 hover:text-gray-700"
+                aria-label="Đóng"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="px-6 py-5">
+              <ReviewQuizUI
+                quiz={openQuiz}
+                submit={(ans) => aiQuizApi.submit(openQuiz.id, ans)}
+                onClose={() => setOpenQuiz(null)}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
