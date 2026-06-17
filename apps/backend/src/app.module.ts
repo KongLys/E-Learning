@@ -19,6 +19,7 @@ import { EnrollmentModule } from './enrollment/enrollment.module';
 import { ProgressModule } from './progress/progress.module';
 import { QuizAttemptModule } from './quiz-attempt/quiz-attempt.module';
 import { ReviewQuizModule } from './review-quiz/review-quiz.module';
+import { PodcastModule } from './podcast/podcast.module';
 import { OrderModule } from './order/order.module';
 import { PaymentModule } from './payment/payment.module';
 import { NoteModule } from './note/note.module';
@@ -63,6 +64,9 @@ import { RolesGuard } from './auth/guards/roles.guard';
         GEMINI_CHAT_MODEL: Joi.string().default('gemini-1.5-flash'),
         GEMINI_TRANSCRIBE_MODEL: Joi.string().default('gemini-1.5-flash'),
         GEMINI_EMBED_MODEL: Joi.string().default('text-embedding-004'),
+        GOOGLE_TTS_API_KEY: Joi.string().allow('').default(''),
+        GOOGLE_TTS_VOICE: Joi.string().default('vi-VN-Wavenet-A'),
+        GOOGLE_TTS_LANGUAGE: Joi.string().default('vi-VN'),
         COHERE_API_KEY: Joi.string().allow('').default(''),
         COHERE_RERANK_MODEL: Joi.string().default('rerank-multilingual-v3.0'),
         LLAMA_CLOUD_API_KEY: Joi.string().allow('').default(''),
@@ -103,6 +107,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
     ProgressModule,
     QuizAttemptModule,
     ReviewQuizModule,
+    PodcastModule,
     OrderModule,
     PaymentModule,
     NoteModule,

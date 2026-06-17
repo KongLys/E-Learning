@@ -250,6 +250,7 @@ model Lesson {
   documentAsset  DocumentAsset?
   quizLesson     QuizLesson?
   reviewQuiz     ReviewQuiz?
+  podcastAsset   PodcastAsset?
   lessonProgress LessonProgress[]
   notes          Note[]
   quickQuestions QuickQuestion[]
@@ -309,6 +310,25 @@ model DocumentAsset {
   lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
 
   @@map("document_assets")
+}
+
+// Podcast (audio) tự sinh bằng AI từ nội dung bài đọc (document):
+// LLM viết kịch bản lời dẫn → Google Cloud TTS đọc thành MP3 → lưu R2.
+// Chạy nền (BullMQ); không chặn việc đọc bài. Hiển thị khi status='ready'.
+model PodcastAsset {
+  id          String   @id @default(uuid())
+  lessonId    String   @unique @map("lesson_id")
+  status      String   @default("pending") // pending|processing|ready|failed
+  audioUrl    String?  @map("audio_url")
+  durationSec Int      @default(0) @map("duration_sec")
+  voice       String?
+  errorMsg    String?  @map("error_msg")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@map("podcast_assets")
 }
 
 model QuizLesson {

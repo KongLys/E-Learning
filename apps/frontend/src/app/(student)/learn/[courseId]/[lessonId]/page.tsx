@@ -4,7 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { learnApi } from '@/lib/api/learn.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { VideoPlayer } from '@/components/learn/VideoPlayer';
+import { VideoPlayer, formatSeconds } from '@/components/learn/VideoPlayer';
 import { NotesPanel } from '@/components/learn/NotesPanel';
 import { QuestionsPanel } from '@/components/learn/QuestionsPanel';
 import { QuizUI } from '@/components/learn/QuizUI';
@@ -20,7 +20,7 @@ export default function LearnPage() {
   const qc = useQueryClient();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [outlineCollapsed, setOutlineCollapsed] = useState(false);
-  const [tab, setTab] = useState<'notes' | 'questions'>('notes');
+  const [tab, setTab] = useState<'content' | 'notes' | 'questions'>('content');
   const [qaOpen, setQaOpen] = useState(false);
   const [reviewQuizOpen, setReviewQuizOpen] = useState(false);
   const [noteAddSignal, setNoteAddSignal] = useState(0);
@@ -51,6 +51,18 @@ export default function LearnPage() {
     enabled: lessonData?.data?.type === 'video',
   });
 
+  // Phụ đề + phân tích nội dung theo khung thời gian (tự sinh bằng AI).
+  // Poll lại khi đang xử lý để hiển thị ngay khi job hoàn tất.
+  const { data: transcriptData } = useQuery({
+    queryKey: ['transcript', lessonId],
+    queryFn: () => learnApi.getTranscript(lessonId),
+    enabled: lessonData?.data?.type === 'video',
+    refetchInterval: (q) => {
+      const s = (q.state.data as any)?.data?.status;
+      return s === 'pending' || s === 'processing' ? 8000 : false;
+    },
+  });
+
   const { data: docUrlData } = useQuery({
     queryKey: ['doc-url', lessonId],
     queryFn: () => learnApi.getDocumentUrl(lessonId),
@@ -76,6 +88,23 @@ export default function LearnPage() {
   const generateReviewQuiz = useMutation({
     mutationFn: () => learnApi.generateReviewQuiz(lessonId),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['review-quiz', lessonId] }),
+  });
+
+  // Podcast (AI) — chỉ cho bài đọc (tài liệu). Poll lại khi đang xử lý.
+  const podcastEnabled = lessonData?.data?.type === 'document';
+  const { data: podcastData } = useQuery({
+    queryKey: ['podcast', lessonId],
+    queryFn: () => learnApi.getPodcast(lessonId),
+    enabled: podcastEnabled,
+    refetchInterval: (q) => {
+      const s = (q.state.data as any)?.data?.status;
+      return s === 'pending' || s === 'processing' ? 5000 : false;
+    },
+  });
+  const podcast = podcastData?.data ?? null;
+  const generatePodcast = useMutation({
+    mutationFn: () => learnApi.generatePodcast(lessonId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['podcast', lessonId] }),
   });
 
   const lesson = lessonData?.data;
@@ -139,7 +168,11 @@ export default function LearnPage() {
   const notePositionType = lesson.type === 'video' ? 'video_timestamp' : lesson.type === 'document' ? 'document_page' : 'none';
   const courseTitle: string | undefined = lesson?.section?.course?.title;
   const saveNote = () => { setTab('notes'); setNoteAddSignal((n) => n + 1); };
-  const TABS: [typeof tab, string][] = [['notes', 'Ghi chú'], ['questions', 'Hỏi đáp']];
+  const transcript = transcriptData?.data;
+  const cues = transcript?.cues ?? [];
+  const chapters = transcript?.segments ?? [];
+  const transcriptStatus: string = transcript?.status ?? 'none';
+  const TABS: [typeof tab, string][] = [['content', 'Nội dung'], ['notes', 'Ghi chú'], ['questions', 'Hỏi đáp']];
 
   return (
     <div className="flex flex-col h-screen">
@@ -187,6 +220,8 @@ export default function LearnPage() {
               lessonId={lessonId}
               videoUrl={videoUrlData.data.url}
               initialPositionSec={initialPos}
+              cues={cues}
+              chapters={chapters}
               onTimeUpdate={(t) => { videoTimeRef.current = t; }}
               onProgress={(cur, dur) => {
                 if (videoCompletionMode === 'percent_90' && dur > 0 && cur / dur >= 0.9) {
@@ -231,6 +266,51 @@ export default function LearnPage() {
               ) : (
                 !lesson.documentAsset?.contentHtml && <div className="text-center py-10 text-gray-400">Tài liệu chưa được tải lên</div>
               )}
+
+              {/* Podcast (AI) — nghe bản đọc nội dung bài học */}
+              <div className="rounded-2xl bg-slate-50 p-4 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+                    🎙 <span>Podcast bài học</span>
+                  </div>
+                  {podcast?.status === 'ready' ? (
+                    <button
+                      onClick={() => generatePodcast.mutate()}
+                      disabled={generatePodcast.isPending}
+                      title="Tạo lại podcast mới"
+                      className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                    >
+                      {generatePodcast.isPending ? 'Đang tạo...' : 'Tạo lại'}
+                    </button>
+                  ) : podcast?.status === 'pending' || podcast?.status === 'processing' ? (
+                    <span className="text-xs text-gray-500">⏳ Đang tạo podcast…</span>
+                  ) : (
+                    <button
+                      onClick={() => generatePodcast.mutate()}
+                      disabled={generatePodcast.isPending}
+                      className="inline-flex items-center gap-1.5 text-sm font-medium bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 disabled:opacity-60"
+                    >
+                      {generatePodcast.isPending ? '⏳ Đang tạo...' : '✦ Tạo podcast'}
+                    </button>
+                  )}
+                </div>
+                {podcast?.status === 'ready' && podcast.audioUrl && (
+                  <audio controls preload="none" src={podcast.audioUrl} className="w-full">
+                    Trình duyệt của bạn không hỗ trợ phát audio.
+                  </audio>
+                )}
+                {podcast?.status === 'failed' && (
+                  <p className="text-sm text-red-600">
+                    {podcast.errorMsg ?? 'Không tạo được podcast, vui lòng thử lại.'}
+                  </p>
+                )}
+                {generatePodcast.isError && (
+                  <p className="text-sm text-red-600">
+                    {(generatePodcast.error as any)?.response?.data?.message ??
+                      'Không tạo được podcast, vui lòng thử lại.'}
+                  </p>
+                )}
+              </div>
 
               <button
                 onClick={completeDocument}
@@ -314,7 +394,7 @@ export default function LearnPage() {
             </>
           )}
 
-          {/* Video: tabs Phụ đề / Ghi chú / Hỏi đáp */}
+          {/* Video: tabs Nội dung / Ghi chú / Hỏi đáp */}
           {lesson.type === 'video' && (
             <div>
               <div className="flex gap-6 border-b">
@@ -329,6 +409,32 @@ export default function LearnPage() {
                 ))}
               </div>
               <div className="pt-4">
+                {tab === 'content' && (
+                  <div className="space-y-3">
+                    {(transcriptStatus === 'pending' || transcriptStatus === 'processing') && (
+                      <p className="text-sm text-gray-500">⏳ Đang tạo phụ đề & phân tích nội dung video…</p>
+                    )}
+                    {transcriptStatus === 'failed' && (
+                      <p className="text-sm text-gray-500">Không tạo được phụ đề cho video này.</p>
+                    )}
+                    {transcriptStatus === 'ready' && chapters.length === 0 && (
+                      <p className="text-sm text-gray-500">Chưa có phân tích nội dung cho video này.</p>
+                    )}
+                    {chapters.map((c: any, i: number) => (
+                      <button
+                        key={i}
+                        onClick={() => jumpToVideo(c.startSec)}
+                        className="block w-full text-left rounded-xl border border-gray-100 p-3 hover:bg-slate-50 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-mono text-blue-600">⏱ {formatSeconds(c.startSec)}</span>
+                          <span className="text-sm font-semibold text-gray-900">{c.title}</span>
+                        </div>
+                        {c.summary && <p className="mt-1 text-sm text-gray-600">{c.summary}</p>}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {tab === 'notes' && (
                   <NotesPanel
                     lessonId={lessonId}

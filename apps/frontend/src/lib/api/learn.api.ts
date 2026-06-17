@@ -18,6 +18,9 @@ export const learnApi = {
   generateReviewQuiz: (lessonId: string) => apiClient.post(`/lessons/${lessonId}/review-quiz`),
   submitReviewQuiz: (lessonId: string, answers: { questionId: string; optionIds: string[] }[]) =>
     apiClient.post(`/lessons/${lessonId}/review-quiz/attempts`, { answers }),
+  // Podcast (AI) — sinh audio lời dẫn từ nội dung bài đọc, tạo theo yêu cầu (chạy nền)
+  getPodcast: (lessonId: string) => apiClient.get(`/lessons/${lessonId}/podcast`),
+  generatePodcast: (lessonId: string) => apiClient.post(`/lessons/${lessonId}/podcast`),
   getNotes: (lessonId: string) => apiClient.get(`/lessons/${lessonId}/notes`),
   createNote: (lessonId: string, content: string, positionType: string, positionValue: number) =>
     apiClient.post('/notes', { lessonId, content, positionType, positionValue }),
