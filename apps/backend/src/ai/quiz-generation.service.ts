@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GeminiService } from './gemini.service';
+import { wrapUntrusted, UNTRUSTED_DATA_RULE } from './prompt-safety.util';
 
 export interface GeneratedQuestion {
   content: string;
@@ -51,7 +52,8 @@ export class QuizGenerationService {
     const systemInstruction =
       'Bạn là trợ giảng tạo câu hỏi trắc nghiệm ôn tập bằng tiếng Việt. ' +
       'Chỉ dựa vào nội dung được cung cấp. ' +
-      'Luôn trả về JSON hợp lệ đúng định dạng yêu cầu, không kèm bất kỳ chữ nào ngoài JSON.';
+      'Luôn trả về JSON hợp lệ đúng định dạng yêu cầu, không kèm bất kỳ chữ nào ngoài JSON. ' +
+      UNTRUSTED_DATA_RULE;
 
     const prompt = `Dựa vào nội dung dưới đây, hãy tạo ${opts.count} câu hỏi trắc nghiệm ôn tập (mỗi câu có đúng 1 đáp án đúng và 4 lựa chọn).
 
@@ -70,9 +72,7 @@ Trả về DUY NHẤT một mảng JSON, mỗi phần tử có dạng:
 Quy tắc: mỗi câu đúng 4 lựa chọn và đúng 1 lựa chọn isCorrect=true; câu hỏi không trùng nhau; chỉ hỏi nội dung có trong tài liệu.
 
 Nội dung:
-"""
-${source}
-"""`;
+${wrapUntrusted(source, 'tài liệu')}`;
 
     let raw: string;
     try {

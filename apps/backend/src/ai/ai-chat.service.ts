@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
@@ -9,13 +10,19 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RagService, Citation } from './rag/rag.service';
 import { ChunkScope } from './vector/vector-store.service';
 import { AiQuizService, CreatedQuizInfo } from './ai-quiz.service';
+import { neutralizeInline, MAX_USER_QUERY_LEN } from './prompt-safety.util';
+import { GuardrailService } from './guard/guardrail.service';
+import { REFUSAL_MESSAGE, scrubOutput } from './guard/injection-guard.util';
 
 @Injectable()
 export class AiChatService {
+  private readonly logger = new Logger(AiChatService.name);
+
   constructor(
     private prisma: PrismaService,
     private rag: RagService,
     private aiQuiz: AiQuizService,
+    private guardrail: GuardrailService,
   ) {}
 
   async assertAccess(courseId: string, userId: string): Promise<void> {
@@ -78,6 +85,9 @@ export class AiChatService {
     if (!query || query.trim().length < 2) {
       throw new BadRequestException('Query is too short');
     }
+    if (query.length > MAX_USER_QUERY_LEN) {
+      throw new BadRequestException('Query is too long');
+    }
     const conv = await this.loadConversation(conversationId, userId);
 
     // Load history (last 10 messages)
@@ -86,9 +96,14 @@ export class AiChatService {
       orderBy: { createdAt: 'desc' },
       take: 10,
     });
+    // Trung hòa nội dung lịch sử (do người dùng nhập / model sinh) trước khi nối
+    // vào prompt — tránh prompt injection qua các lượt hội thoại trước.
     const formattedHistory = history
       .reverse()
-      .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`);
+      .map(
+        (m) =>
+          `${m.role === 'user' ? 'User' : 'Assistant'}: ${neutralizeInline(m.content, 1000)}`,
+      );
 
     // Save user message
     await this.prisma.aiMessage.create({
@@ -117,9 +132,32 @@ export class AiChatService {
         });
       };
 
+    // Guardrail đầu vào: phát hiện ý đồ prompt injection / jailbreak.
+    const guard = await this.guardrail.inspectQuery(query);
+    if (guard.verdict !== 'clean') {
+      this.logger.warn(
+        `Guardrail ${guard.verdict} (${guard.category ?? 'unknown'}) on conversation ${conv.id}`,
+      );
+    }
+    if (guard.verdict === 'block') {
+      function* refusalStream(): Generator<string> {
+        yield REFUSAL_MESSAGE;
+      }
+      return {
+        stream: refusalStream(),
+        citations: [] as Citation[],
+        conversationId: conv.id,
+        persist: (fullText: string) => persistAssistant(fullText)(),
+        getQuiz: (): CreatedQuizInfo | null => null,
+      };
+    }
+    // 'strip': bỏ mệnh đề injection, chỉ xử lý phần câu hỏi hợp lệ còn lại.
+    const effectiveQuery =
+      guard.verdict === 'strip' ? guard.sanitizedQuery : query;
+
     // Nhánh tạo quiz: nếu người dùng yêu cầu tạo quiz trong chat thì sinh quiz
     // cá nhân thay vì trả lời RAG.
-    const intent = detectQuizIntent(query);
+    const intent = detectQuizIntent(effectiveQuery);
     if (intent.isQuiz) {
       const aiQuiz = this.aiQuiz;
       const courseId = conv.courseId;
@@ -129,7 +167,7 @@ export class AiChatService {
         const info = await aiQuiz.generateFromChat(
           courseId,
           userId,
-          query,
+          effectiveQuery,
           scope,
           intent.count,
         );
@@ -148,13 +186,20 @@ export class AiChatService {
     // Run RAG pipeline (có thể giới hạn phạm vi theo Phần/Bài)
     const result = await this.rag.ask(
       conv.courseId,
-      query,
+      effectiveQuery,
       formattedHistory,
       scope,
     );
 
+    // Guardrail đầu ra: gỡ marker nội bộ / đoạn rò rỉ system prompt nếu model echo.
+    async function* scrubbedStream(
+      src: AsyncIterable<string>,
+    ): AsyncGenerator<string> {
+      for await (const piece of src) yield scrubOutput(piece);
+    }
+
     return {
-      stream: result.stream,
+      stream: scrubbedStream(result.stream),
       citations: result.citations,
       conversationId: conv.id,
       persist: (fullText: string) =>

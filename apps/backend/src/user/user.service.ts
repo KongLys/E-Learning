@@ -121,8 +121,15 @@ export class UserService {
     const skip = (page - 1) * limit;
 
     const where: Record<string, unknown> = {};
-    if (query.role) where.role = query.role;
-    if (query.status) where.status = query.status;
+    // Chỉ nhận giá trị enum hợp lệ (defense-in-depth, không phụ thuộc Prisma reject).
+    const ALLOWED_ROLES = ['student', 'instructor', 'admin'];
+    const ALLOWED_STATUSES = ['active', 'locked', 'deleted'];
+    if (query.role && ALLOWED_ROLES.includes(query.role)) {
+      where.role = query.role;
+    }
+    if (query.status && ALLOWED_STATUSES.includes(query.status)) {
+      where.status = query.status;
+    }
     if (query.search) {
       where.OR = [
         { email: { contains: query.search, mode: 'insensitive' } },

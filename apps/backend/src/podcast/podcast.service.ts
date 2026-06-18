@@ -8,6 +8,11 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 import { GeminiService } from '../ai/gemini.service';
+import {
+  wrapUntrusted,
+  neutralizeInline,
+  UNTRUSTED_DATA_RULE,
+} from '../ai/prompt-safety.util';
 import { StorageService } from '../storage/storage.service';
 import { PODCAST_QUEUE, GeneratePodcastJob } from './podcast.queue';
 
@@ -165,7 +170,8 @@ export class PodcastService {
     const systemInstruction =
       'Bạn là người dẫn một podcast giáo dục bằng tiếng Việt. ' +
       'Viết kịch bản lời dẫn tự nhiên, mạch lạc, dễ nghe, chỉ dựa trên nội dung bài học được cung cấp. ' +
-      'CHỈ trả về văn xuôi thuần để đọc thành tiếng: KHÔNG markdown, KHÔNG tiêu đề, KHÔNG ký hiệu *,#,- hay nhãn người nói.';
+      'CHỈ trả về văn xuôi thuần để đọc thành tiếng: KHÔNG markdown, KHÔNG tiêu đề, KHÔNG ký hiệu *,#,- hay nhãn người nói. ' +
+      UNTRUSTED_DATA_RULE;
 
     const prompt = `Hãy viết kịch bản cho một tập podcast ngắn (khoảng 2–4 phút khi đọc) tóm tắt và giảng lại nội dung bài học dưới đây cho người nghe.
 
@@ -176,12 +182,10 @@ Yêu cầu:
 - Văn nói tự nhiên, một người dẫn duy nhất, KHÔNG dùng markdown hay ký hiệu định dạng.
 - Chỉ dùng thông tin có trong nội dung bài học.
 
-Tiêu đề bài học: ${lessonTitle}
+Tiêu đề bài học: ${neutralizeInline(lessonTitle, 300)}
 
 Nội dung bài học:
-"""
-${source}
-"""`;
+${wrapUntrusted(source, 'bài học')}`;
 
     const raw = await this.gemini.generate(prompt, {
       temperature: 0.6,

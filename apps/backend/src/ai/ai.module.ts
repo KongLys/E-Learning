@@ -9,6 +9,7 @@ import { LlamaParseService } from './chunking/llama-parse.service';
 import { MarkdownChunkerService } from './chunking/markdown-chunker.service';
 import { VectorStoreService } from './vector/vector-store.service';
 import { RagService } from './rag/rag.service';
+import { GuardrailService } from './guard/guardrail.service';
 import { AiChatService } from './ai-chat.service';
 import { AiChatController } from './ai-chat.controller';
 import { QuizGenerationService } from './quiz-generation.service';
@@ -63,6 +64,7 @@ import { ModerationModule } from '../moderation/moderation.module';
     MarkdownChunkerService,
     VectorStoreService,
     RagService,
+    GuardrailService,
     AiChatService,
     QuizGenerationService,
     AiQuizService,

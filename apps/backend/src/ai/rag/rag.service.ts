@@ -9,6 +9,7 @@ import {
 } from '../vector/vector-store.service';
 import {
   SYSTEM_INSTRUCTION,
+  NO_CONTEXT_MESSAGE,
   buildAnswerPrompt,
   buildCompressionPrompt,
   buildQueryRewritePrompt,
@@ -35,6 +36,7 @@ export class RagService {
   private readonly logger = new Logger(RagService.name);
   private readonly retrieveTop: number;
   private readonly rerankTop: number;
+  private readonly rerankMinScore: number;
 
   constructor(
     private gemini: GeminiService,
@@ -44,6 +46,7 @@ export class RagService {
   ) {
     this.retrieveTop = config.get<number>('RAG_RETRIEVE_TOP', 50);
     this.rerankTop = config.get<number>('RAG_RERANK_TOP', 5);
+    this.rerankMinScore = config.get<number>('RAG_RERANK_MIN_SCORE', 0.3);
   }
 
   async ask(
@@ -71,29 +74,49 @@ export class RagService {
     );
     const fused = reciprocalRankFusion(pools, this.retrieveTop);
 
+    const noContextResult = (): AskResult => ({
+      stream: emptyStream(NO_CONTEXT_MESSAGE),
+      citations: [],
+      contextChunks: [],
+    });
+
     if (fused.length === 0) {
-      return {
-        stream: emptyStream(
-          'Nội dung bài học trong khóa chưa đề cập đến vấn đề này.',
-        ),
-        citations: [],
-        contextChunks: [],
-      };
+      return noContextResult();
     }
 
-    // 3. Rerank với Cohere → top K
+    // 3. Rerank với Cohere → top K, LỌC theo ngưỡng relevance.
     const rerankResults = await this.cohere.rerank(
       query,
       fused.map((c) => c.content),
       this.rerankTop,
     );
-    const topK = rerankResults.map((r) => fused[r.index]);
+    // Khi Cohere lỗi/thiếu key, fallback trả relevanceScore=0 cho mọi kết quả ⇒
+    // bỏ qua cổng điểm để không chặn nhầm; lúc đó dựa vào cổng compression + prompt.
+    const hasScores = rerankResults.some((r) => r.relevanceScore > 0);
+    const keptResults = hasScores
+      ? rerankResults.filter((r) => r.relevanceScore >= this.rerankMinScore)
+      : rerankResults;
+    const topK = keptResults.map((r) => fused[r.index]);
+
+    // Cổng A: không còn đoạn nào đủ liên quan ⇒ báo "chưa đề cập", không gọi LLM.
+    if (topK.length === 0) {
+      this.logger.debug(
+        `RAG gate: no chunk above relevance ${this.rerankMinScore} for query`,
+      );
+      return noContextResult();
+    }
 
     // 4. Compression — Gemini trích đoạn liên quan
     const compressed = await this.compress(
       query,
       topK.map((c) => c.content),
     );
+
+    // Cổng B: compression không tìm thấy đoạn liên quan nào ⇒ "chưa đề cập".
+    if (!compressed.trim()) {
+      this.logger.debug('RAG gate: compression returned empty context');
+      return noContextResult();
+    }
 
     // 5. Generate answer
     const citations: Citation[] = topK.map((c) => ({

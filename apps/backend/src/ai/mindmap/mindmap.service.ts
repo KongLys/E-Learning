@@ -11,6 +11,11 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { GeminiService } from '../gemini.service';
 import {
+  wrapUntrusted,
+  neutralizeInline,
+  UNTRUSTED_DATA_RULE,
+} from '../prompt-safety.util';
+import {
   buildTree,
   ChunkInput,
   ContentGroup,
@@ -397,7 +402,8 @@ export class MindmapService {
 const SUMMARY_SYSTEM =
   'Bạn là trợ lý tạo sơ đồ tư duy từ tài liệu học (lĩnh vực CNTT). ' +
   'Tóm tắt mỗi phần thành một node ngắn gọn, giữ nguyên thuật ngữ kỹ thuật, bằng tiếng Việt. ' +
-  'Chỉ trả về DUY NHẤT một mảng JSON hợp lệ, không kèm giải thích hay markdown.';
+  'Chỉ trả về DUY NHẤT một mảng JSON hợp lệ, không kèm giải thích hay markdown. ' +
+  UNTRUSTED_DATA_RULE;
 
 function buildBatchPrompt(batch: { index: number; group: ContentGroup }[]): {
   prompt: string;
@@ -413,8 +419,8 @@ function buildBatchPrompt(batch: { index: number; group: ContentGroup }[]): {
     const heading = group.path.join(' > ') || 'Tài liệu';
     const content = group.content.slice(0, GROUP_CONTENT_CAP);
     chars += content.length;
-    parts.push(`Phần [id=${local}] "${heading}":`);
-    parts.push(`"""${content}"""`);
+    parts.push(`Phần [id=${local}] "${neutralizeInline(heading, 200)}":`);
+    parts.push(wrapUntrusted(content));
     parts.push('');
   });
   return { prompt: parts.join('\n'), chars };

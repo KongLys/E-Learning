@@ -347,7 +347,11 @@ export class CourseService {
     const skip = (page - 1) * limit;
 
     const where: Record<string, unknown> = { status: 'published' };
-    if (query.level) where.level = query.level;
+    // Chỉ nhận giá trị enum hợp lệ (defense-in-depth, không phụ thuộc Prisma reject).
+    const ALLOWED_LEVELS = ['beginner', 'intermediate', 'advanced'];
+    if (query.level && ALLOWED_LEVELS.includes(query.level)) {
+      where.level = query.level;
+    }
     if (query.search) {
       where.OR = [
         { title: { contains: query.search, mode: 'insensitive' } },

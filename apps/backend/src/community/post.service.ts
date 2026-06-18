@@ -66,7 +66,11 @@ export class PostService {
     const page = query.page ?? 1;
     const limit = 20;
     const where: any = { courseId, status: 'active' };
-    if (query.type) where.type = query.type;
+    // Chỉ nhận giá trị enum hợp lệ (defense-in-depth, không phụ thuộc Prisma reject).
+    const ALLOWED_TYPES = ['question', 'discussion', 'announcement'];
+    if (query.type && ALLOWED_TYPES.includes(query.type)) {
+      where.type = query.type;
+    }
 
     const orderBy: any[] = [{ isPinned: 'desc' }];
     if (query.sort === 'upvotes') orderBy.push({ upvotes: 'desc' });

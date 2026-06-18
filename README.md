@@ -51,10 +51,6 @@ Open [http://localhost:3000](http://localhost:3000).
 | Instructor | instructor@elearning.local   | Demo@123   |
 | Student    | student@elearning.local      | Demo@123   |
 
-## VNPay Sandbox
-
-Use sandbox credentials in `.env`. Test card: `9704198526191432198`, expiry `07/15`, OTP `123456`.
-
 ## Running Tests
 
 ```bash
@@ -90,7 +86,7 @@ See [plan/README.md](plan/README.md) for system design overview.
 | Frontend | Next.js 16, React 19, TanStack Query |
 | Auth     | JWT (access + refresh), Redis token storage |
 | Storage  | MinIO (S3-compatible) |
-| Payment  | VNPay integration |
+| Payment  | SePay integration |
 | Styling  | Tailwind CSS v4 |
 
 ### Key Routes
@@ -111,13 +107,3 @@ See [plan/README.md](plan/README.md) for system design overview.
 - `/learn/[courseId]/[lessonId]` — learning page
 - `/instructor/*` — instructor dashboard
 - `/admin/*` — admin portal
-
-## Production Checklist
-
-- [ ] `JWT_SECRET`: random string 32+ chars
-- [ ] `POSTGRES_PASSWORD`: strong password
-- [ ] `REDIS_PASSWORD`: set password
-- [ ] `MINIO_SECRET_KEY`: change from default
-- [ ] `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET`: live credentials
-- [ ] `VNPAY_URL`: production URL (remove sandbox)
-- [ ] `NEXT_PUBLIC_API_URL`: production domain
