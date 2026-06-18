@@ -193,18 +193,19 @@ model Course {
   appealReason     String?          @map("appeal_reason")
   moderatedAt      DateTime?        @map("moderated_at")
 
-  instructor      User             @relation(fields: [instructorId], references: [id])
-  category        Category?        @relation(fields: [categoryId], references: [id])
-  sections        Section[]
-  enrollments     Enrollment[]
-  orderItems      OrderItem[]
-  reviews         Review[]
-  communityPosts  CommunityPost[]
-  chunks          CourseChunk[]
-  aiConversations AiConversation[]
-  aiQuizzes       AiQuiz[]
-  mindmap         CourseMindmap?
-  coupons         Coupon[]
+  instructor         User                @relation(fields: [instructorId], references: [id])
+  category           Category?           @relation(fields: [categoryId], references: [id])
+  sections           Section[]
+  enrollments        Enrollment[]
+  orderItems         OrderItem[]
+  reviews            Review[]
+  communityPosts     CommunityPost[]
+  chunks             CourseChunk[]
+  aiConversations    AiConversation[]
+  aiQuizzes          AiQuiz[]
+  referenceMaterials ReferenceMaterial[]
+  mindmap            CourseMindmap?
+  coupons            Coupon[]
 
   @@index([instructorId])
   @@index([categoryId])
@@ -497,6 +498,36 @@ model AiQuizOption {
 
   @@index([questionId])
   @@map("ai_quiz_options")
+}
+
+// ─── Tài liệu tham khảo (cấp khóa học) ─────────────────────────────────────────
+// Giảng viên thêm tài liệu bổ sung cho học viên: video upload, link YouTube, hoặc
+// file PDF/DOCX. Tách khỏi nội dung bài học; không vector hóa, không kiểm duyệt.
+enum ReferenceMaterialType {
+  video
+  youtube
+  file
+}
+
+model ReferenceMaterial {
+  id          String                @id @default(uuid())
+  courseId    String                @map("course_id")
+  title       String
+  description String?               @db.Text
+  type        ReferenceMaterialType
+  fileUrl     String?               @map("file_url") // type video|file (R2)
+  fileName    String?               @map("file_name")
+  fileType    String?               @map("file_type") // pdf|docx|mp4|webm
+  fileSize    BigInt?               @map("file_size")
+  externalUrl String?               @map("external_url") // type youtube
+  orderIndex  Int                   @default(0) @map("order_index")
+  createdAt   DateTime              @default(now()) @map("created_at")
+  updatedAt   DateTime              @default(now()) @updatedAt @map("updated_at")
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([courseId])
+  @@map("reference_materials")
 }
 
 model Enrollment {

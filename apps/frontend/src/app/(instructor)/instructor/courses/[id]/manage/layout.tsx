@@ -16,7 +16,10 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     heading: 'Tạo nội dung của bạn',
-    items: [{ segment: 'curriculum', label: 'Khung chương trình' }],
+    items: [
+      { segment: 'curriculum', label: 'Khung chương trình' },
+      { segment: 'references', label: 'Tài liệu tham khảo' },
+    ],
   },
   {
     heading: 'Xuất bản khóa học của bạn',

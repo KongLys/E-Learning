@@ -57,6 +57,28 @@ export const instructorApi = {
   // Quiz ôn tập (AI) cho bài video/tài liệu
   getReviewQuiz: (lessonId: string) => apiClient.get(`/lessons/${lessonId}/review-quiz`),
   generateReviewQuiz: (lessonId: string) => apiClient.post(`/lessons/${lessonId}/review-quiz`),
+
+  // Tài liệu tham khảo (cấp khóa học)
+  listReferenceMaterials: (courseId: string) =>
+    apiClient.get(`/courses/${courseId}/reference-materials`),
+  createReferenceMaterial: (
+    courseId: string,
+    data: { type: 'video' | 'youtube' | 'file'; title: string; description?: string; externalUrl?: string },
+    file?: File,
+    onProgress?: (pct: number) => void,
+  ) => {
+    const fd = new FormData();
+    fd.append('type', data.type);
+    fd.append('title', data.title);
+    if (data.description) fd.append('description', data.description);
+    if (data.externalUrl) fd.append('externalUrl', data.externalUrl);
+    if (file) fd.append('file', file);
+    return apiClient.post(`/courses/${courseId}/reference-materials`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: (e) => { if (e.total) onProgress?.(Math.round((e.loaded / e.total) * 100)); },
+    });
+  },
+  deleteReferenceMaterial: (id: string) => apiClient.delete(`/reference-materials/${id}`),
   addQuizQuestion: (lessonId: string, dto: any) => apiClient.post(`/lessons/${lessonId}/quiz/questions`, dto),
   updateQuizQuestion: (qId: string, dto: any) => apiClient.patch(`/quiz/questions/${qId}`, dto),
   deleteQuizQuestion: (qId: string) => apiClient.delete(`/quiz/questions/${qId}`),

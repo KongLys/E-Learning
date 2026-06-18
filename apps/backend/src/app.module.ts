@@ -19,6 +19,7 @@ import { EnrollmentModule } from './enrollment/enrollment.module';
 import { ProgressModule } from './progress/progress.module';
 import { QuizAttemptModule } from './quiz-attempt/quiz-attempt.module';
 import { ReviewQuizModule } from './review-quiz/review-quiz.module';
+import { ReferenceMaterialModule } from './reference-material/reference-material.module';
 import { PodcastModule } from './podcast/podcast.module';
 import { OrderModule } from './order/order.module';
 import { PaymentModule } from './payment/payment.module';
@@ -107,6 +108,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
     ProgressModule,
     QuizAttemptModule,
     ReviewQuizModule,
+    ReferenceMaterialModule,
     PodcastModule,
     OrderModule,
     PaymentModule,

@@ -26,7 +26,6 @@ export default function LearnPage() {
   const [qaOpen, setQaOpen] = useState(false);
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const [aiPanelWidth, setAiPanelWidth] = useState(400);
-  const [reviewQuizOpen, setReviewQuizOpen] = useState(false);
   const [noteAddSignal, setNoteAddSignal] = useState(0);
   const videoTimeRef = useRef(0);
   const completedRef = useRef(false);
@@ -80,43 +79,11 @@ export default function LearnPage() {
     enabled: lessonData?.data?.type === 'quiz',
   });
 
-  // Quiz ôn tập (AI) — chỉ cho bài video/tài liệu
-  const reviewQuizEnabled =
-    lessonData?.data?.type === 'video' || lessonData?.data?.type === 'document';
-  const { data: reviewQuizData } = useQuery({
-    queryKey: ['review-quiz', lessonId],
-    queryFn: () => learnApi.getReviewQuiz(lessonId),
-    enabled: reviewQuizEnabled,
-  });
-  const reviewQuiz = reviewQuizData?.data ?? null;
-
-  const generateReviewQuiz = useMutation({
-    mutationFn: () => learnApi.generateReviewQuiz(lessonId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['review-quiz', lessonId] }),
-  });
-
   // Quiz cá nhân (AI) mở từ mục "Quiz của tôi" trong sidebar
   const [aiQuizModal, setAiQuizModal] = useState<any>(null);
   const openAiQuiz = useMutation({
     mutationFn: (id: string) => aiQuizApi.get(id),
     onSuccess: (res) => setAiQuizModal(res.data),
-  });
-
-  // Podcast (AI) — chỉ cho bài đọc (tài liệu). Poll lại khi đang xử lý.
-  const podcastEnabled = lessonData?.data?.type === 'document';
-  const { data: podcastData } = useQuery({
-    queryKey: ['podcast', lessonId],
-    queryFn: () => learnApi.getPodcast(lessonId),
-    enabled: podcastEnabled,
-    refetchInterval: (q) => {
-      const s = (q.state.data as any)?.data?.status;
-      return s === 'pending' || s === 'processing' ? 5000 : false;
-    },
-  });
-  const podcast = podcastData?.data ?? null;
-  const generatePodcast = useMutation({
-    mutationFn: () => learnApi.generatePodcast(lessonId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['podcast', lessonId] }),
   });
 
   const lesson = lessonData?.data;
@@ -316,51 +283,6 @@ export default function LearnPage() {
                 !lesson.documentAsset?.contentHtml && <div className="text-center py-10 text-gray-400">Tài liệu chưa được tải lên</div>
               )}
 
-              {/* Podcast (AI) — nghe bản đọc nội dung bài học */}
-              <div className="rounded-2xl bg-slate-50 p-4 space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-gray-800">
-                    🎙 <span>Podcast bài học</span>
-                  </div>
-                  {podcast?.status === 'ready' ? (
-                    <button
-                      onClick={() => generatePodcast.mutate()}
-                      disabled={generatePodcast.isPending}
-                      title="Tạo lại podcast mới"
-                      className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-50"
-                    >
-                      {generatePodcast.isPending ? 'Đang tạo...' : 'Tạo lại'}
-                    </button>
-                  ) : podcast?.status === 'pending' || podcast?.status === 'processing' ? (
-                    <span className="text-xs text-gray-500">⏳ Đang tạo podcast…</span>
-                  ) : (
-                    <button
-                      onClick={() => generatePodcast.mutate()}
-                      disabled={generatePodcast.isPending}
-                      className="inline-flex items-center gap-1.5 text-sm font-medium bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 disabled:opacity-60"
-                    >
-                      {generatePodcast.isPending ? '⏳ Đang tạo...' : '✦ Tạo podcast'}
-                    </button>
-                  )}
-                </div>
-                {podcast?.status === 'ready' && podcast.audioUrl && (
-                  <audio controls preload="none" src={podcast.audioUrl} className="w-full">
-                    Trình duyệt của bạn không hỗ trợ phát audio.
-                  </audio>
-                )}
-                {podcast?.status === 'failed' && (
-                  <p className="text-sm text-red-600">
-                    {podcast.errorMsg ?? 'Không tạo được podcast, vui lòng thử lại.'}
-                  </p>
-                )}
-                {generatePodcast.isError && (
-                  <p className="text-sm text-red-600">
-                    {(generatePodcast.error as any)?.response?.data?.message ??
-                      'Không tạo được podcast, vui lòng thử lại.'}
-                  </p>
-                )}
-              </div>
-
               <button
                 onClick={completeDocument}
                 disabled={!docReadEnough || completeMutation.isPending}
@@ -396,49 +318,15 @@ export default function LearnPage() {
             <>
               <div className="flex items-start justify-between gap-4 pt-1">
                 <h2 className="text-xl lg:text-2xl font-bold text-gray-900 leading-snug">{lesson.title}</h2>
-                <div className="shrink-0 flex items-center gap-3">
-                  {lesson.type === 'video' && (
-                    <button
-                      onClick={saveNote}
-                      className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700"
-                    >
-                      🗒 Lưu ghi chú
-                    </button>
-                  )}
-                  {reviewQuiz ? (
-                    <>
-                      <button
-                        onClick={() => setReviewQuizOpen(true)}
-                        className="inline-flex items-center gap-1.5 text-sm font-medium bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700"
-                      >
-                        📝 Làm bài ôn tập
-                      </button>
-                      <button
-                        onClick={() => generateReviewQuiz.mutate()}
-                        disabled={generateReviewQuiz.isPending}
-                        title="Tạo lại bộ câu hỏi ôn tập mới"
-                        className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-50"
-                      >
-                        {generateReviewQuiz.isPending ? 'Đang tạo...' : 'Tạo lại'}
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      onClick={() => generateReviewQuiz.mutate()}
-                      disabled={generateReviewQuiz.isPending}
-                      className="inline-flex items-center gap-1.5 text-sm font-medium bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 disabled:opacity-60"
-                    >
-                      {generateReviewQuiz.isPending ? '⏳ Đang tạo quiz...' : '✦ Tạo quiz ôn tập'}
-                    </button>
-                  )}
-                </div>
+                {lesson.type === 'video' && (
+                  <button
+                    onClick={saveNote}
+                    className="shrink-0 inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700"
+                  >
+                    🗒 Lưu ghi chú
+                  </button>
+                )}
               </div>
-              {generateReviewQuiz.isError && (
-                <p className="text-sm text-red-600 -mt-2">
-                  {(generateReviewQuiz.error as any)?.response?.data?.message ??
-                    'Không tạo được quiz ôn tập, vui lòng thử lại.'}
-                </p>
-              )}
               {lesson.description && <p className="text-sm text-gray-600 -mt-3">{lesson.description}</p>}
             </>
           )}
@@ -558,37 +446,6 @@ export default function LearnPage() {
           </>
         )}
       </div>
-
-      {/* Modal làm bài ôn tập */}
-      {reviewQuizOpen && reviewQuiz && (
-        <div
-          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4"
-          onClick={() => setReviewQuizOpen(false)}
-        >
-          <div
-            className="my-8 w-full max-w-lg rounded-2xl bg-white shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-              <h2 className="text-lg font-bold">Quiz ôn tập</h2>
-              <button
-                onClick={() => setReviewQuizOpen(false)}
-                className="text-xl text-gray-400 hover:text-gray-700"
-                aria-label="Đóng"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="px-6 py-5">
-              <ReviewQuizUI
-                quiz={reviewQuiz}
-                submit={(ans) => learnApi.submitReviewQuiz(lessonId, ans)}
-                onClose={() => setReviewQuizOpen(false)}
-              />
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Modal làm quiz cá nhân (AI) từ "Quiz của tôi" */}
       {aiQuizModal && (

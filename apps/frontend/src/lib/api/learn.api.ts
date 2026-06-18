@@ -21,6 +21,13 @@ export const learnApi = {
   // Podcast (AI) — sinh audio lời dẫn từ nội dung bài đọc, tạo theo yêu cầu (chạy nền)
   getPodcast: (lessonId: string) => apiClient.get(`/lessons/${lessonId}/podcast`),
   generatePodcast: (lessonId: string) => apiClient.post(`/lessons/${lessonId}/podcast`),
+  // Tài liệu tham khảo + tài liệu toàn khóa (sidebar khung chương trình)
+  getReferenceMaterials: (courseId: string) =>
+    apiClient.get(`/courses/${courseId}/reference-materials`),
+  getReferenceMaterialUrl: (id: string) =>
+    apiClient.get(`/reference-materials/${id}/url`),
+  getCourseLessonFiles: (courseId: string) =>
+    apiClient.get(`/courses/${courseId}/lesson-files`),
   getNotes: (lessonId: string) => apiClient.get(`/lessons/${lessonId}/notes`),
   createNote: (lessonId: string, content: string, positionType: string, positionValue: number) =>
     apiClient.post('/notes', { lessonId, content, positionType, positionValue }),

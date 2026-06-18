@@ -1,11 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { aiQuizApi } from '@/lib/api/ai.api';
+import { learnApi } from '@/lib/api/learn.api';
+import { youtubeEmbedUrl } from '@/lib/youtube';
+import { MaterialViewerModal, type MaterialKind } from './MaterialViewerModal';
 
 const TYPE_LABELS: Record<string, string> = { video: 'Video', document: 'Tài liệu', quiz: 'Trắc nghiệm' };
+const REF_ICON: Record<string, string> = { video: '🎬', youtube: '▶️', file: '📄' };
 
 function durationLabel(type: string, durationSec: number): string {
   const min = Math.max(1, Math.round((durationSec || 0) / 60));
@@ -26,8 +31,11 @@ interface LearnSidebarProps {
   onOpenAiQuiz?: (quizId: string) => void;
 }
 
+type Viewer = { title: string; kind: MaterialKind; url: string };
+
 export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections, lessonProgress, progressPercent, isOpen, collapsed, onClose, onOpenAiQuiz }: LearnSidebarProps) {
   const completedIds = new Set(lessonProgress.filter((lp: any) => lp.completed).map((lp: any) => lp.lessonId));
+  const [viewer, setViewer] = useState<Viewer | null>(null);
 
   const aiQuizzesQuery = useQuery({
     queryKey: ['ai-quizzes', courseId],
@@ -35,6 +43,45 @@ export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections,
     enabled: !!onOpenAiQuiz,
   });
   const aiQuizzes = aiQuizzesQuery.data ?? [];
+
+  const refQuery = useQuery({
+    queryKey: ['reference-materials', courseId],
+    queryFn: async () => (await learnApi.getReferenceMaterials(courseId)).data as any[],
+  });
+  const refMaterials = refQuery.data ?? [];
+
+  const filesQuery = useQuery({
+    queryKey: ['lesson-files', courseId],
+    queryFn: async () => (await learnApi.getCourseLessonFiles(courseId)).data as any[],
+  });
+  const fileSections = filesQuery.data ?? [];
+  const fileCount = fileSections.reduce((n, s) => n + (s.files?.length ?? 0), 0);
+
+  // Mở tài liệu tham khảo: youtube → embed; video/file → signed URL.
+  const openRef = useMutation({
+    mutationFn: async (m: any): Promise<Viewer> => {
+      if (m.type === 'youtube') {
+        const url = youtubeEmbedUrl(m.externalUrl);
+        if (!url) throw new Error('Link YouTube không hợp lệ');
+        return { title: m.title, kind: 'youtube', url };
+      }
+      const res = await learnApi.getReferenceMaterialUrl(m.id);
+      const kind: MaterialKind =
+        m.type === 'video' ? 'video' : m.fileType === 'pdf' ? 'pdf' : 'docx';
+      return { title: m.title, kind, url: res.data.url };
+    },
+    onSuccess: (v) => setViewer(v),
+  });
+
+  // Mở file đính kèm của bài (dùng lại endpoint document-url đã ký).
+  const openDoc = useMutation({
+    mutationFn: async (f: any): Promise<Viewer> => {
+      const res = await learnApi.getDocumentUrl(f.lessonId);
+      const kind: MaterialKind = f.fileType === 'pdf' ? 'pdf' : 'docx';
+      return { title: f.fileName || f.lessonTitle, kind, url: res.data.url };
+    },
+    onSuccess: (v) => setViewer(v),
+  });
 
   return (
     <>
@@ -52,31 +99,6 @@ export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections,
 
         {/* Sections */}
         <div className="flex-1 overflow-y-auto">
-          {/* Quiz cá nhân do AI tạo qua chat */}
-          {onOpenAiQuiz && aiQuizzes.length > 0 && (
-            <details className="group border-b border-gray-100" open>
-              <summary className="px-5 py-3.5 cursor-pointer hover:bg-gray-50 list-none flex items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-gray-900">📝 Quiz của tôi ({aiQuizzes.length})</p>
-                <span className="text-gray-400 text-xs transition-transform group-open:rotate-180">⌄</span>
-              </summary>
-              <ul className="pb-1">
-                {aiQuizzes.map((quiz) => (
-                  <li key={quiz.id}>
-                    <button
-                      onClick={() => onOpenAiQuiz(quiz.id)}
-                      className="w-full text-left flex items-start gap-3 px-5 py-3 hover:bg-gray-50 transition-colors"
-                    >
-                      <span className="mt-0.5 shrink-0">📝</span>
-                      <span className="min-w-0">
-                        <span className="block text-sm leading-snug text-gray-800 truncate">{quiz.title || 'Quiz ôn tập'}</span>
-                        <span className="block text-xs text-gray-400 mt-0.5">{quiz.questionCount} câu · {new Date(quiz.createdAt).toLocaleDateString('vi-VN')}</span>
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </details>
-          )}
           {sections.map((section: any, idx: number) => (
             <details key={section.id} open className="group border-b border-gray-100">
               <summary className="px-5 py-3.5 cursor-pointer hover:bg-gray-50 list-none flex items-start justify-between gap-2">
@@ -114,8 +136,104 @@ export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections,
               </ul>
             </details>
           ))}
+
+          {/* ── Quiz của tôi (AI tạo qua chat) ── */}
+          {onOpenAiQuiz && aiQuizzes.length > 0 && (
+            <details className="group border-b border-gray-100">
+              <summary className="px-5 py-3.5 cursor-pointer hover:bg-gray-50 list-none flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-gray-900">📝 Quiz của tôi ({aiQuizzes.length})</p>
+                <span className="text-gray-400 text-xs transition-transform group-open:rotate-180">⌄</span>
+              </summary>
+              <ul className="pb-1">
+                {aiQuizzes.map((quiz) => (
+                  <li key={quiz.id}>
+                    <button
+                      onClick={() => onOpenAiQuiz(quiz.id)}
+                      className="w-full text-left flex items-start gap-3 px-5 py-3 hover:bg-gray-50 transition-colors"
+                    >
+                      <span className="mt-0.5 shrink-0">📝</span>
+                      <span className="min-w-0">
+                        <span className="block text-sm leading-snug text-gray-800 truncate">{quiz.title || 'Quiz ôn tập'}</span>
+                        <span className="block text-xs text-gray-400 mt-0.5">{quiz.questionCount} câu · {new Date(quiz.createdAt).toLocaleDateString('vi-VN')}</span>
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+
+          {/* ── Tài liệu tham khảo ── */}
+          {refMaterials.length > 0 && (
+            <details className="group border-b border-gray-100">
+              <summary className="px-5 py-3.5 cursor-pointer hover:bg-gray-50 list-none flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-gray-900">📎 Tài liệu tham khảo ({refMaterials.length})</p>
+                <span className="text-gray-400 text-xs transition-transform group-open:rotate-180">⌄</span>
+              </summary>
+              <ul className="pb-1">
+                {refMaterials.map((m: any) => (
+                  <li key={m.id}>
+                    <button
+                      onClick={() => openRef.mutate(m)}
+                      disabled={openRef.isPending}
+                      className="w-full text-left flex items-start gap-3 px-5 py-3 hover:bg-gray-50 transition-colors disabled:opacity-60"
+                    >
+                      <span className="mt-0.5 shrink-0">{REF_ICON[m.type] ?? '📎'}</span>
+                      <span className="min-w-0">
+                        <span className="block text-sm leading-snug text-gray-800 truncate">{m.title}</span>
+                        {m.description && <span className="block text-xs text-gray-400 mt-0.5 truncate">{m.description}</span>}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+
+          {/* ── Tài liệu toàn khóa học (file đính kèm trong các bài) ── */}
+          {fileCount > 0 && (
+            <details className="group border-b border-gray-100">
+              <summary className="px-5 py-3.5 cursor-pointer hover:bg-gray-50 list-none flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-gray-900">📚 Tài liệu toàn khóa học ({fileCount})</p>
+                <span className="text-gray-400 text-xs transition-transform group-open:rotate-180">⌄</span>
+              </summary>
+              <div className="pb-1">
+                {fileSections.map((s: any) => (
+                  <div key={s.id}>
+                    <p className="px-5 pt-2 pb-1 text-[11px] font-medium uppercase tracking-wide text-gray-400">{s.title}</p>
+                    <ul>
+                      {s.files.map((f: any) => (
+                        <li key={f.lessonId + f.fileName}>
+                          <button
+                            onClick={() => openDoc.mutate(f)}
+                            disabled={openDoc.isPending}
+                            className="w-full text-left flex items-start gap-3 px-5 py-2.5 hover:bg-gray-50 transition-colors disabled:opacity-60"
+                          >
+                            <span className="mt-0.5 shrink-0">📄</span>
+                            <span className="min-w-0">
+                              <span className="block text-sm leading-snug text-gray-800 truncate">{f.fileName || f.lessonTitle}</span>
+                              <span className="block text-xs text-gray-400 mt-0.5">{(f.fileType ?? '').toUpperCase()}{f.fileType === 'pdf' && f.pageCount ? ` · ${f.pageCount} trang` : ''}</span>
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
         </div>
       </aside>
+
+      {viewer && (
+        <MaterialViewerModal
+          title={viewer.title}
+          kind={viewer.kind}
+          url={viewer.url}
+          onClose={() => setViewer(null)}
+        />
+      )}
     </>
   );
 }
