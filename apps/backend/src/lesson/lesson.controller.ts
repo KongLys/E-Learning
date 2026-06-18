@@ -25,6 +25,7 @@ import { DocumentConfigDto } from './dto/document-config.dto';
 import { VideoConfigDto } from './dto/video-config.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 // Disk-backed multer storage: large uploads stream to a temp file instead of
 // being buffered whole in RAM (the service then streams the temp file to R2).
@@ -45,6 +46,13 @@ export class LessonController {
     private documentService: DocumentService,
     private quizService: QuizService,
   ) {}
+
+  // Admin: re-index toàn bộ bài học (áp chunker mới cho dữ liệu cũ)
+  @Post('admin/lessons/reindex')
+  @Roles('admin')
+  reindexAllLessons() {
+    return this.lessonService.reindexAllLessons();
+  }
 
   // Lesson CRUD
   @Post('sections/:sectionId/lessons')

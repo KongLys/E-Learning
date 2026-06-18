@@ -20,3 +20,5 @@ plan/
 *.h5
 *.msgpack
 *.venv
+
+DESIGN.md

@@ -20,6 +20,8 @@ export interface Citation {
   pageNumber: number | null;
   sectionId: string | null;
   lessonId: string | null;
+  /** Đoạn trích nguồn để hiển thị khi người dùng rê chuột vào tham chiếu. */
+  excerpt: string;
 }
 
 export interface AskResult {
@@ -100,6 +102,7 @@ export class RagService {
       pageNumber: c.pageNumber,
       sectionId: c.sectionId,
       lessonId: c.lessonId,
+      excerpt: truncateExcerpt(c.content),
     }));
     const prompt = buildAnswerPrompt(
       query,
@@ -181,6 +184,19 @@ function reciprocalRankFusion(
 
 function unique(arr: string[]): string[] {
   return [...new Set(arr.map((s) => s.trim()).filter(Boolean))];
+}
+
+/**
+ * Đoạn trích nguồn để hiển thị trong card tham chiếu: lấy GẦN TRỌN nội dung chunk
+ * (chunk vốn đã bị giới hạn kích thước), giữ ngắt đoạn để dễ đọc, chỉ chặn trên
+ * một ngưỡng rất cao để tránh payload bất thường. Card ở frontend cuộn được.
+ */
+function truncateExcerpt(content: string, max = 4000): string {
+  const text = content
+    .replace(/[ \t]+/g, ' ') // gộp space/tab, GIỮ xuống dòng
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  return text.length > max ? `${text.slice(0, max).trimEnd()}…` : text;
 }
 
 async function* emptyStream(msg: string): AsyncGenerator<string> {

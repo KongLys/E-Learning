@@ -171,6 +171,7 @@ export class AiChatService {
       pageNumber: c.pageNumber,
       sectionId: c.sectionId,
       lessonId: c.lessonId,
+      excerpt: c.excerpt,
     }));
   }
 }

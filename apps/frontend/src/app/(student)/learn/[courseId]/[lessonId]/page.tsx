@@ -11,6 +11,7 @@ import { QuestionsPanel } from '@/components/learn/QuestionsPanel';
 import { QuizUI } from '@/components/learn/QuizUI';
 import { ReviewQuizUI } from '@/components/learn/ReviewQuizUI';
 import { LearnSidebar } from '@/components/learn/LearnSidebar';
+import { AiChatPanel } from '@/components/learn/AiChatPanel';
 import { SafeHtml } from '@/components/common/SafeHtml';
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
@@ -23,10 +24,13 @@ export default function LearnPage() {
   const [outlineCollapsed, setOutlineCollapsed] = useState(false);
   const [tab, setTab] = useState<'content' | 'notes' | 'questions'>('content');
   const [qaOpen, setQaOpen] = useState(false);
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const [aiPanelWidth, setAiPanelWidth] = useState(400);
   const [reviewQuizOpen, setReviewQuizOpen] = useState(false);
   const [noteAddSignal, setNoteAddSignal] = useState(0);
   const videoTimeRef = useRef(0);
   const completedRef = useRef(false);
+  const aiResizingRef = useRef(false);
 
   const { data: lessonData, isLoading: lessonLoading } = useQuery({
     queryKey: ['lesson', lessonId],
@@ -145,7 +149,39 @@ export default function LearnPage() {
   // Reset cờ hoàn thành khi đổi bài
   useEffect(() => { completedRef.current = false; }, [lessonId]);
 
+  // Kéo để mở rộng/thu nhỏ khung chat AI (cột phải)
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!aiResizingRef.current) return;
+      const w = window.innerWidth - e.clientX;
+      const max = Math.round(window.innerWidth * 0.7);
+      setAiPanelWidth(Math.min(Math.max(w, 320), max));
+    };
+    const onUp = () => {
+      if (!aiResizingRef.current) return;
+      aiResizingRef.current = false;
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, []);
+
+  const startAiResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    aiResizingRef.current = true;
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+  };
+
   const goNext = () => { if (nextLessonId) router.push(`/learn/${courseId}/${nextLessonId}`); };
+
+  // Mở khung chat AI bên phải, đồng thời thu gọn mục lục chương trình để lấy chỗ.
+  const openAiPanel = () => { setAiPanelOpen(true); setOutlineCollapsed(true); setSidebarOpen(false); };
 
   const markCompleteOnce = (then?: () => void) => {
     if (completedRef.current) { then?.(); return; }
@@ -183,7 +219,7 @@ export default function LearnPage() {
   const TABS: [typeof tab, string][] = [['content', 'Nội dung'], ['notes', 'Ghi chú'], ['questions', 'Hỏi đáp']];
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col h-[calc(100vh-4rem)]">
       {/* Top bar */}
       <header className="border-b border-gray-100 px-4 py-3 flex items-center gap-3 bg-white shrink-0">
         <button
@@ -197,12 +233,16 @@ export default function LearnPage() {
           {courseTitle ?? '← Khóa học của tôi'}
         </Link>
         {lesson.type !== 'quiz' && (
-          <Link
-            href={`/learn/${courseId}/ai`}
-            className="text-sm bg-purple-600 text-white px-3 py-1.5 rounded hover:bg-purple-700"
+          <button
+            onClick={() => (aiPanelOpen ? setAiPanelOpen(false) : openAiPanel())}
+            className={`text-sm px-3 py-1.5 rounded ${
+              aiPanelOpen
+                ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                : 'bg-purple-600 text-white hover:bg-purple-700'
+            }`}
           >
             ✦ Hỏi AI
-          </Link>
+          </button>
         )}
       </header>
 
@@ -489,6 +529,34 @@ export default function LearnPage() {
           )}
           </div>
         </main>
+
+        {/* Khung chat AI (cột phải) — đẩy nội dung sang trái; overlay trên màn hình hẹp */}
+        {aiPanelOpen && (
+          <>
+            <div
+              className="fixed inset-0 z-30 bg-black/30 lg:hidden"
+              onClick={() => setAiPanelOpen(false)}
+            />
+            <aside
+              style={{ width: aiPanelWidth }}
+              className="fixed inset-y-0 right-0 z-40 max-w-full border-l bg-white shadow-xl lg:relative lg:z-auto lg:shrink-0 lg:shadow-none"
+            >
+              {/* Tay kéo để mở rộng/thu nhỏ (chỉ trên màn hình lớn) */}
+              <div
+                onMouseDown={startAiResize}
+                onDoubleClick={() => setAiPanelWidth(400)}
+                title="Kéo để thay đổi độ rộng · nhấp đúp để đặt lại"
+                className="absolute left-0 top-0 hidden h-full w-1.5 -translate-x-1/2 cursor-col-resize hover:bg-purple-300 lg:block"
+              />
+              <AiChatPanel
+                courseId={courseId}
+                currentLessonId={lessonId}
+                currentLessonType={lesson.type}
+                onClose={() => setAiPanelOpen(false)}
+              />
+            </aside>
+          </>
+        )}
       </div>
 
       {/* Modal làm bài ôn tập */}

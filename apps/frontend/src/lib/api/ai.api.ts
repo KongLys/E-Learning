@@ -32,6 +32,7 @@ export interface AiMessage {
         pageNumber: number | null;
         sectionId?: string | null;
         lessonId: string | null;
+        excerpt?: string;
       }>
     | null;
   createdAt: string;

@@ -83,12 +83,17 @@ export class VectorStoreService {
     scope?: ChunkScope,
   ): Promise<RetrievedChunk[]> {
     const vec = `[${queryEmbedding.join(',')}]`;
-    // Bộ lọc phạm vi (Phần/Bài) áp vào cả 2 nhánh vector + full-text.
+    // Bộ lọc phạm vi (Phần/Bài) + loại trừ bài quiz/kiểm tra: trợ lý AI không
+    // được truy cập nội dung các bài kiểm tra để tránh lộ câu hỏi/đáp án. Áp vào
+    // cả 2 nhánh vector + full-text.
     const scopeSql = Prisma.sql`${
       scope?.lessonId
         ? Prisma.sql` AND lesson_id = ${scope.lessonId}`
         : Prisma.empty
-    }${scope?.sectionId ? Prisma.sql` AND section_id = ${scope.sectionId}` : Prisma.empty}`;
+    }${scope?.sectionId ? Prisma.sql` AND section_id = ${scope.sectionId}` : Prisma.empty} AND NOT EXISTS (
+        SELECT 1 FROM lessons ql
+        WHERE ql.id = course_chunks.lesson_id AND ql.type::text = 'quiz'
+      )`;
     // Reciprocal Rank Fusion: combines vector ANN ranks with full-text ranks.
     // k=60 is a standard RRF constant.
     const rows = await this.prisma.$queryRaw<

@@ -68,6 +68,28 @@ export class LessonService {
   }
 
   /**
+   * Re-index toàn bộ bài học có nội dung vector hóa được (loại bài quiz; chỉ bài
+   * có tài liệu hoặc mô tả). Dùng để áp lại chunker mới cho dữ liệu cũ — mỗi job
+   * tự dọn chunk cũ (deleteByLesson) nên idempotent. Chạy nền qua BullMQ.
+   */
+  async reindexAllLessons(): Promise<{ enqueued: number }> {
+    const lessons = await this.prisma.lesson.findMany({
+      where: {
+        type: { not: 'quiz' },
+        OR: [
+          { documentAsset: { isNot: null } },
+          { description: { not: null } },
+        ],
+      },
+      select: { id: true },
+    });
+    for (const { id } of lessons) {
+      await this.enqueueLessonIndex(id);
+    }
+    return { enqueued: lessons.length };
+  }
+
+  /**
    * Nội dung bài đổi → đưa kết quả kiểm duyệt về 'pending' để bộ phân lớp đánh giá
    * lại ở lần index kế tiếp. Giữ nguyên 'locked' (admin đã chốt) và 'appealing'
    * (đang chờ admin xử lý kiến nghị).
