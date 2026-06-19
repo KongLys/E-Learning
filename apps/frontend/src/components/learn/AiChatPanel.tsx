@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { History, Plus, X } from 'lucide-react';
+import { CheckCircle2, ChevronDown, FileText, Headphones, History, Loader2, Mic, Plus, RotateCw, Sparkles, X } from 'lucide-react';
 import {
   aiChatApi,
   myReviewQuizApi,
@@ -249,7 +249,7 @@ export function AiChatPanel({
       {/* Header */}
       <div className="relative flex shrink-0 items-center gap-2 border-b px-3 py-2.5">
         <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-800">
-          <span className="text-purple-600">✦</span> Hỏi AI
+          <Sparkles size={16} className="text-purple-600" /> Hỏi AI
         </div>
         <div className="ml-auto flex items-center gap-1">
           <button
@@ -333,22 +333,22 @@ export function AiChatPanel({
       <div className="shrink-0 space-y-2 border-t p-3">
         {createdQuiz && (
           <div className="flex items-center gap-2 rounded-lg border border-purple-200 bg-purple-50 px-3 py-2 text-sm">
-            <span className="flex-1 truncate text-purple-800">
-              ✅ Đã tạo quiz “{createdQuiz.title}” ({createdQuiz.questionCount} câu)
+            <span className="flex flex-1 items-center gap-1 truncate text-purple-800">
+              <CheckCircle2 size={14} className="shrink-0" /> Đã tạo quiz “{createdQuiz.title}” ({createdQuiz.questionCount} câu)
             </span>
             <button
               onClick={() => openQuizMut.mutate(createdQuiz.id)}
               disabled={openQuizMut.isPending}
-              className="shrink-0 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-700 disabled:opacity-50"
+              className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-700 disabled:opacity-50"
             >
-              {openQuizMut.isPending ? 'Đang mở…' : '📝 Làm bài ôn tập'}
+              {openQuizMut.isPending ? 'Đang mở…' : <><FileText size={13} /> Làm bài ôn tập</>}
             </button>
             <button
               onClick={() => setCreatedQuiz(null)}
               className="shrink-0 text-purple-400 hover:text-purple-600"
               aria-label="Đóng"
             >
-              ✕
+              <X size={16} />
             </button>
           </div>
         )}
@@ -361,29 +361,24 @@ export function AiChatPanel({
                 reviewQuizQuery.isLoading ? (
                   <span className="text-xs text-gray-400">Đang kiểm tra quiz ôn tập…</span>
                 ) : hasReviewQuiz ? (
-                  <>
-                    <button
-                      onClick={openExistingReviewQuiz}
-                      className="inline-flex items-center gap-1 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-700"
-                    >
-                      📝 Làm quiz ôn tập
-                    </button>
-                    <button
-                      onClick={() => generateReviewQuiz.mutate()}
-                      disabled={generateReviewQuiz.isPending}
-                      title="Tạo lại quiz, đè lên nội dung cũ (dùng khi bài học đã cập nhật)"
-                      className="inline-flex items-center gap-1 rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs font-medium text-purple-700 hover:bg-purple-100 disabled:opacity-60"
-                    >
-                      {generateReviewQuiz.isPending ? '⏳ Đang tạo lại…' : '↻ Tạo lại'}
-                    </button>
-                  </>
+                  <SplitActionButton
+                    mainIcon={<FileText size={13} />}
+                    mainLabel="Làm quiz ôn tập"
+                    onMain={openExistingReviewQuiz}
+                    regenIcon={<RotateCw size={13} />}
+                    regenLabel="Tạo lại quiz"
+                    regenTitle="Tạo lại quiz, đè lên nội dung cũ (dùng khi bài học đã cập nhật)"
+                    onRegen={() => generateReviewQuiz.mutate()}
+                    pending={generateReviewQuiz.isPending}
+                    pendingLabel="Đang tạo lại quiz…"
+                  />
                 ) : (
                   <button
                     onClick={() => generateReviewQuiz.mutate()}
                     disabled={generateReviewQuiz.isPending}
                     className="inline-flex items-center gap-1 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-700 disabled:opacity-60"
                   >
-                    {generateReviewQuiz.isPending ? '⏳ Đang tạo quiz…' : '✦ Tạo quiz ôn tập'}
+                    {generateReviewQuiz.isPending ? <><Loader2 size={13} className="animate-spin" /> Đang tạo quiz…</> : <><Sparkles size={13} /> Tạo quiz ôn tập</>}
                   </button>
                 )
               )}
@@ -393,31 +388,25 @@ export function AiChatPanel({
                     disabled
                     className="inline-flex items-center gap-1 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
                   >
-                    ⏳ Đang tạo podcast…
+                    <Loader2 size={13} className="animate-spin" /> Đang tạo podcast…
                   </button>
                 ) : podcast?.status === 'ready' ? (
-                  <>
-                    <button
-                      onClick={() => onOpenPodcast?.(currentLessonId!, currentLessonTitle ?? 'Podcast')}
-                      className="inline-flex items-center gap-1 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-700"
-                    >
-                      🎙 Nghe podcast
-                    </button>
-                    <button
-                      onClick={() => setConfirmRegen(true)}
-                      title="Tạo lại podcast, đè lên bản cũ (dùng khi bài học đã cập nhật)"
-                      className="inline-flex items-center gap-1 rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs font-medium text-purple-700 hover:bg-purple-100"
-                    >
-                      ↻ Tạo lại
-                    </button>
-                  </>
+                  <SplitActionButton
+                    mainIcon={<Headphones size={13} />}
+                    mainLabel="Nghe podcast"
+                    onMain={() => onOpenPodcast?.(currentLessonId!, currentLessonTitle ?? 'Podcast')}
+                    regenIcon={<RotateCw size={13} />}
+                    regenLabel="Tạo lại podcast"
+                    regenTitle="Tạo lại podcast, đè lên bản cũ (dùng khi bài học đã cập nhật)"
+                    onRegen={() => setConfirmRegen(true)}
+                  />
                 ) : (
                   <button
                     onClick={() => generatePodcast.mutate()}
                     disabled={generatePodcast.isPending}
                     className="inline-flex items-center gap-1 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-700 disabled:opacity-60"
                   >
-                    🎙 Tạo podcast
+                    <Mic size={13} /> Tạo podcast
                   </button>
                 )
               )}
@@ -520,6 +509,83 @@ export function AiChatPanel({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Nút hành động dạng "split": nút chính + mũi tên đổ xuống mở menu "Tạo lại".
+ * Khi đang tạo lại, nút thu gọn thành trạng thái chờ (spinner + nhãn).
+ */
+function SplitActionButton({
+  mainIcon,
+  mainLabel,
+  onMain,
+  regenIcon,
+  regenLabel,
+  regenTitle,
+  onRegen,
+  pending = false,
+  pendingLabel,
+}: {
+  mainIcon: ReactNode;
+  mainLabel: string;
+  onMain: () => void;
+  regenIcon: ReactNode;
+  regenLabel: string;
+  regenTitle?: string;
+  onRegen: () => void;
+  pending?: boolean;
+  pendingLabel?: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  if (pending) {
+    return (
+      <button
+        disabled
+        className="inline-flex items-center gap-1 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+      >
+        <Loader2 size={13} className="animate-spin" /> {pendingLabel ?? 'Đang xử lý…'}
+      </button>
+    );
+  }
+
+  return (
+    <div className="relative inline-flex">
+      <button
+        onClick={onMain}
+        className="inline-flex items-center gap-1 rounded-l-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-700"
+      >
+        {mainIcon} {mainLabel}
+      </button>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        title="Tùy chọn khác"
+        aria-label="Tùy chọn khác"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="inline-flex items-center rounded-r-lg border-l border-purple-500 bg-purple-600 px-1.5 py-1.5 text-white hover:bg-purple-700"
+      >
+        <ChevronDown size={14} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full z-20 mt-1 w-48 rounded-xl border bg-white p-1 shadow-lg">
+            <button
+              onClick={() => {
+                setOpen(false);
+                onRegen();
+              }}
+              title={regenTitle}
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-medium text-gray-700 hover:bg-gray-100"
+            >
+              {regenIcon} {regenLabel}
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

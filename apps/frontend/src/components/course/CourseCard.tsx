@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
+import { Star } from 'lucide-react';
 import { formatVND } from '@/lib/utils';
 
 export interface CourseCardData {
@@ -55,7 +56,7 @@ export function CourseCard({ course }: { course: CourseCardData }) {
           </span>
           {course.averageRating !== undefined && (
             <span className="flex items-center gap-1 text-sm">
-              <span className="text-amber-400">★</span>
+              <Star size={14} className="fill-amber-400 text-amber-400" />
               <span className="font-medium text-ink">{course.averageRating.toFixed(1)}</span>
             </span>
           )}

@@ -5,6 +5,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePostDto } from './dto/create-post.dto';
 
@@ -56,6 +57,9 @@ export class PostService {
         title: dto.title,
         body: dto.body,
         type: dto.type,
+        media: dto.media
+          ? (dto.media as unknown as Prisma.InputJsonValue)
+          : undefined,
       },
       include: {
         author: { select: { id: true, fullName: true, avatarUrl: true } },

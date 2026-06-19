@@ -19,77 +19,13 @@ import { PaymentQrModal } from '@/components/payment/PaymentQrModal';
 import { ReviewSection } from '@/components/review/ReviewSection';
 import { formatDuration, formatVND } from '@/lib/utils';
 import { useState } from 'react';
+import { BookOpen, Check, ChevronDown, Clock, Lock, Play, Users } from 'lucide-react';
 
 const LEVEL_LABELS: Record<string, string> = {
   beginner: 'Cơ bản',
   intermediate: 'Trung cấp',
   advanced: 'Nâng cao',
 };
-
-function CheckIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0 text-semantic-success">
-      <polyline points="20 6 9 17 4 12" />
-    </svg>
-  );
-}
-
-function LockIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-    </svg>
-  );
-}
-
-function PlayIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polygon points="5 3 19 12 5 21 5 3" />
-    </svg>
-  );
-}
-
-function ChevronIcon({ open }: { open: boolean }) {
-  return (
-    <svg
-      width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-      className={`transition-transform ${open ? 'rotate-180' : ''}`}
-    >
-      <path d="M6 9l6 6 6-6" />
-    </svg>
-  );
-}
-
-function UsersIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-    </svg>
-  );
-}
-
-function BookIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-    </svg>
-  );
-}
-
-function ClockIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" />
-      <polyline points="12 6 12 12 16 14" />
-    </svg>
-  );
-}
 
 export default function CourseDetailPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -195,19 +131,19 @@ export default function CourseDetailPage() {
           <div className="flex flex-wrap gap-4 text-sm text-white/60">
             {course.totalLessons > 0 && (
               <span className="flex items-center gap-1.5">
-                <BookIcon />
+                <BookOpen size={14} strokeWidth={1.75} />
                 {course.totalLessons} bài học
               </span>
             )}
             {course.totalDurationSec > 0 && (
               <span className="flex items-center gap-1.5">
-                <ClockIcon />
+                <Clock size={14} strokeWidth={1.75} />
                 {formatDuration(course.totalDurationSec)}
               </span>
             )}
             {course.totalStudents > 0 && (
               <span className="flex items-center gap-1.5">
-                <UsersIcon />
+                <Users size={14} strokeWidth={1.75} />
                 {course.totalStudents.toLocaleString()} học viên
               </span>
             )}
@@ -227,7 +163,7 @@ export default function CourseDetailPage() {
                 <ul className="grid grid-cols-1 gap-x-6 gap-y-2.5 sm:grid-cols-2">
                   {course.objectives.map((obj: string, i: number) => (
                     <li key={i} className="flex gap-2 text-sm text-body-copy">
-                      <CheckIcon />
+                      <Check size={16} strokeWidth={2.5} className="mt-0.5 shrink-0 text-semantic-success" />
                       <span>{obj}</span>
                     </li>
                   ))}
@@ -286,7 +222,7 @@ export default function CourseDetailPage() {
                               {section.lessons?.length ?? 0} bài
                             </span>
                           </span>
-                          <ChevronIcon open={isOpen} />
+                          <ChevronDown size={16} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                         </button>
                         {isOpen && section.lessons?.length > 0 && (
                           <ul className="border-t border-hairline divide-y divide-hairline-soft">
@@ -299,12 +235,12 @@ export default function CourseDetailPage() {
                                 <span className={`flex items-center gap-1 text-xs ${lesson.isPreview ? 'text-semantic-success' : 'text-muted-soft'}`}>
                                   {lesson.isPreview ? (
                                     <>
-                                      <PlayIcon />
+                                      <Play size={13} />
                                       Xem thử
                                     </>
                                   ) : (
                                     <>
-                                      <LockIcon />
+                                      <Lock size={13} />
                                       Đã khoá
                                     </>
                                   )}
@@ -458,19 +394,19 @@ export default function CourseDetailPage() {
               <div className="pt-2 border-t border-hairline space-y-2 text-sm text-muted">
                 {course.totalLessons > 0 && (
                   <div className="flex items-center gap-2">
-                    <BookIcon />
+                    <BookOpen size={14} strokeWidth={1.75} />
                     {course.totalLessons} bài học
                   </div>
                 )}
                 {course.totalDurationSec > 0 && (
                   <div className="flex items-center gap-2">
-                    <ClockIcon />
+                    <Clock size={14} strokeWidth={1.75} />
                     {formatDuration(course.totalDurationSec ?? 0)}
                   </div>
                 )}
                 {course.totalStudents > 0 && (
                   <div className="flex items-center gap-2">
-                    <UsersIcon />
+                    <Users size={14} strokeWidth={1.75} />
                     {course.totalStudents.toLocaleString()} học viên
                   </div>
                 )}

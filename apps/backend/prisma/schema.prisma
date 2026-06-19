@@ -722,6 +722,7 @@ model CommunityPost {
   status    CommunityPostStatus @default(active)
   title     String
   body      String              @db.Text
+  media     Json?
   isPinned  Boolean             @default(false) @map("is_pinned")
   upvotes   Int                 @default(0)
   createdAt DateTime            @default(now()) @map("created_at")

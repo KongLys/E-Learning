@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { instructorApi } from '@/lib/api/instructor.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer } from 'recharts';
+import { Star } from 'lucide-react';
 
 const RATING_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6'];
 
@@ -46,8 +47,8 @@ export default function ReviewsPage() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <p className="text-3xl font-bold text-gray-900">
-            {overview?.avgRating ? `${overview.avgRating} ★` : '—'}
+          <p className="flex items-center gap-1 text-3xl font-bold text-gray-900">
+            {overview?.avgRating ? <>{overview.avgRating} <Star size={22} className="fill-amber-400 text-amber-400" /></> : '—'}
           </p>
           <p className="text-xs text-gray-500 mt-1">Đánh giá trung bình</p>
         </div>

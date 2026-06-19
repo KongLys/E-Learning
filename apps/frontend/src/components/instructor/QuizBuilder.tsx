@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Check, Circle, X } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { instructorApi } from '@/lib/api/instructor.api';
 
@@ -111,8 +112,8 @@ export function QuizBuilder({ lessonId, onError }: { lessonId: string; onError: 
             </div>
             <ul className="mt-1 ml-4 space-y-0.5">
               {q.options?.map((o: any) => (
-                <li key={o.id} className={`text-xs ${o.isCorrect ? 'text-green-600' : 'text-gray-500'}`}>
-                  {o.isCorrect ? '✓' : '○'} {o.content}
+                <li key={o.id} className={`flex items-center gap-1 text-xs ${o.isCorrect ? 'text-green-600' : 'text-gray-500'}`}>
+                  {o.isCorrect ? <Check size={12} className="shrink-0" /> : <Circle size={12} className="shrink-0" />} {o.content}
                 </li>
               ))}
             </ul>
@@ -201,7 +202,7 @@ function QuestionForm({
               disabled={isTF} placeholder={`Đáp án ${i + 1}`}
               className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm disabled:bg-gray-100" />
             {!isTF && draft.options.length > 2 && (
-              <button onClick={() => removeOption(i)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+              <button onClick={() => removeOption(i)} className="text-red-400 hover:text-red-600" aria-label="Xóa đáp án"><X size={14} /></button>
             )}
           </div>
         ))}

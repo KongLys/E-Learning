@@ -1,18 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Film, FileText, Paperclip, Play } from 'lucide-react';
 import { instructorApi } from '@/lib/api/instructor.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 
 type RefType = 'file' | 'youtube' | 'video';
 
-const TYPE_META: Record<RefType, { label: string; icon: string }> = {
-  file: { label: 'Tệp PDF/DOCX', icon: '📄' },
-  youtube: { label: 'Link YouTube', icon: '▶️' },
-  video: { label: 'Video tải lên', icon: '🎬' },
+const TYPE_META: Record<RefType, { label: string; icon: ReactNode }> = {
+  file: { label: 'Tệp PDF/DOCX', icon: <FileText size={16} /> },
+  youtube: { label: 'Link YouTube', icon: <Play size={16} /> },
+  video: { label: 'Video tải lên', icon: <Film size={16} /> },
 };
 
 export default function ReferencesPage() {
@@ -106,7 +107,7 @@ export default function ReferencesPage() {
             <button
               key={t}
               onClick={() => setType(t)}
-              className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition-colors ${
                 type === t
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -182,7 +183,7 @@ export default function ReferencesPage() {
           {materials.map((m) => (
             <li key={m.id} className="flex items-center gap-3 px-4 py-3">
               <span className="shrink-0">
-                {TYPE_META[m.type as RefType]?.icon ?? '📎'}
+                {TYPE_META[m.type as RefType]?.icon ?? <Paperclip size={16} />}
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-gray-900">{m.title}</p>

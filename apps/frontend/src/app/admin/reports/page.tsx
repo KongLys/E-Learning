@@ -7,6 +7,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { REPORT_REASON_LABELS } from '@/components/review/reportReasons';
 import type { ReviewReportReason } from '@/lib/api/review.api';
+import { Star } from 'lucide-react';
 
 interface ReportRow {
   id: string;
@@ -80,9 +81,10 @@ export default function AdminReportsPage() {
                   <span className="text-xs uppercase bg-red-100 text-red-700 px-2 py-0.5 rounded">
                     {REPORT_REASON_LABELS[r.reason]}
                   </span>
-                  <span className="text-xs text-amber-500 leading-none">
-                    {'★'.repeat(r.review.rating)}
-                    <span className="text-gray-300">{'★'.repeat(5 - r.review.rating)}</span>
+                  <span className="inline-flex items-center gap-0.5">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <Star key={i} size={12} className={i < r.review.rating ? 'fill-amber-400 text-amber-400' : 'text-gray-300'} />
+                    ))}
                   </span>
                 </div>
 

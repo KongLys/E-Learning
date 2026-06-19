@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Clock, FileText, Pencil, Trash2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { learnApi } from '@/lib/api/learn.api';
 import { formatSeconds } from './VideoPlayer';
@@ -55,9 +56,9 @@ export function NotesPanel({ lessonId, lessonTitle, positionType, getCurrentPosi
   }, [addSignal]);
 
   const positionBadge = (value: number) => {
-    if (positionType === 'video_timestamp') return `⏱ ${formatSeconds(value)}`;
-    if (positionType === 'document_page') return `📄 Trang ${value}`;
-    return '';
+    if (positionType === 'video_timestamp') return <><Clock size={12} /> {formatSeconds(value)}</>;
+    if (positionType === 'document_page') return <><FileText size={12} /> Trang {value}</>;
+    return null;
   };
 
   return (
@@ -121,15 +122,15 @@ export function NotesPanel({ lessonId, lessonTitle, positionType, getCurrentPosi
                 <div className="flex gap-1 shrink-0 opacity-60 group-hover:opacity-100 transition-opacity">
                   <button
                     onClick={() => { setEditId(note.id); setEditContent(note.content); }}
-                    className="text-xs text-gray-600 hover:text-blue-600 hover:bg-white px-3 py-1.5 rounded-full"
+                    className="inline-flex items-center gap-1 text-xs text-gray-600 hover:text-blue-600 hover:bg-white px-3 py-1.5 rounded-full"
                   >
-                    ✏ Sửa
+                    <Pencil size={12} /> Sửa
                   </button>
                   <button
                     onClick={() => deleteMutation.mutate(note.id)}
-                    className="text-xs text-gray-600 hover:text-red-600 hover:bg-white px-3 py-1.5 rounded-full"
+                    className="inline-flex items-center gap-1 text-xs text-gray-600 hover:text-red-600 hover:bg-white px-3 py-1.5 rounded-full"
                   >
-                    🗑 Xóa
+                    <Trash2 size={12} /> Xóa
                   </button>
                 </div>
               )}

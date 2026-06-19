@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { FileText, Video, X } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { instructorApi } from '@/lib/api/instructor.api';
 import { learnApi } from '@/lib/api/learn.api';
@@ -221,8 +222,8 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
           {/* File đã upload */}
           {videoAsset?.videoUrl ? (
             <div className="flex items-center justify-between gap-2 rounded-xl bg-green-50 px-3 py-2">
-              <span className="text-xs text-green-700 truncate">
-                📹 {videoAsset.fileName ?? 'video'}
+              <span className="inline-flex items-center gap-1 text-xs text-green-700 truncate">
+                <Video size={14} className="shrink-0" /> {videoAsset.fileName ?? 'video'}
               </span>
               {!readOnly && (
                 <button
@@ -345,8 +346,8 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
           {/* File đã upload */}
           {docAsset?.fileUrl ? (
             <div className="flex items-center justify-between gap-2 rounded-xl bg-green-50 px-3 py-2">
-              <span className="text-xs text-green-700 truncate">
-                📄 {docAsset.fileName ?? 'tài liệu'}
+              <span className="inline-flex items-center gap-1 text-xs text-green-700 truncate">
+                <FileText size={14} className="shrink-0" /> {docAsset.fileName ?? 'tài liệu'}
                 {' · '}{docAsset.fileType?.toUpperCase()}
                 {docAsset.fileSize ? ` · ${formatFileSize(Number(docAsset.fileSize))}` : ''}
               </span>
@@ -497,10 +498,10 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
               <h2 className="text-lg font-bold">Quiz ôn tập — làm thử</h2>
               <button
                 onClick={() => setReviewPreviewOpen(false)}
-                className="text-xl text-gray-400 hover:text-gray-700"
+                className="text-gray-400 hover:text-gray-700"
                 aria-label="Đóng"
               >
-                ✕
+                <X size={20} />
               </button>
             </div>
             <div className="px-6 py-5">

@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { communityApi } from '@/lib/api/community.api';
 import { useAuthStore } from '@/store/auth.store';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import Link from 'next/link';
+import { Check, CheckCircle2, ChevronLeft, ChevronUp, Pin, X } from 'lucide-react';
 
 /** Một comment hoặc reply — hỗ trợ sửa, upvote, xóa, đánh dấu giải pháp (chỉ top-level). */
 function CommentItem({
@@ -38,7 +39,7 @@ function CommentItem({
 
   return (
     <div className={`border rounded-[20px] p-4 space-y-2 ${comment.isSolution ? 'border-leaf bg-leaf-soft' : 'border-outline bg-white'}`}>
-      {comment.isSolution && <span className="text-xs text-leaf-deep font-semibold">✓ Giải pháp</span>}
+      {comment.isSolution && <span className="inline-flex items-center gap-1 text-xs text-leaf-deep font-semibold"><CheckCircle2 size={13} /> Giải pháp</span>}
       <div className="flex items-start gap-3">
         <div className="flex-1">
           {editMode ? (
@@ -56,7 +57,7 @@ function CommentItem({
             <span>{comment.author?.fullName}</span>
             <span>{new Date(comment.createdAt).toLocaleDateString('vi-VN')}</span>
             <button onClick={() => voteMutation.mutate()} className="flex items-center gap-1 hover:text-sky font-medium transition-colors">
-              ▲ {comment.upvotes ?? 0}
+              <ChevronUp size={14} /> {comment.upvotes ?? 0}
             </button>
             {user && !isReply && onReply && (
               <button onClick={() => onReply(comment.id)} className="hover:text-sky transition-colors">Trả lời</button>
@@ -68,8 +69,8 @@ function CommentItem({
               <button onClick={() => onDelete(comment.id)} className="hover:text-coral transition-colors">Xóa</button>
             )}
             {user && user.id === postAuthorId && !isReply && onSolution && (
-              <button onClick={() => onSolution(comment.id)} className={`font-semibold transition-colors ${comment.isSolution ? 'text-leaf-deep' : 'hover:text-leaf-deep'}`}>
-                {comment.isSolution ? '✓ Bỏ giải pháp' : 'Đánh dấu giải pháp'}
+              <button onClick={() => onSolution(comment.id)} className={`inline-flex items-center gap-1 font-semibold transition-colors ${comment.isSolution ? 'text-leaf-deep' : 'hover:text-leaf-deep'}`}>
+                {comment.isSolution ? <><Check size={13} /> Bỏ giải pháp</> : 'Đánh dấu giải pháp'}
               </button>
             )}
           </div>
@@ -89,6 +90,74 @@ function CommentItem({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/** Hiển thị đầy đủ nội dung; nếu quá dài thì thu gọn kèm nút "Xem thêm". */
+function ExpandableText({ text }: { text: string }) {
+  const ref = useRef<HTMLParagraphElement>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [overflowing, setOverflowing] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (el) setOverflowing(el.scrollHeight > el.clientHeight + 4);
+  }, [text]);
+
+  return (
+    <div>
+      <p
+        ref={ref}
+        className={`text-base text-ink-deep whitespace-pre-wrap leading-relaxed ${expanded ? '' : 'max-h-75 overflow-hidden'}`}
+      >
+        {text}
+      </p>
+      {overflowing && (
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-1 text-sm font-semibold text-sky hover:text-sky-deep transition-colors"
+        >
+          {expanded ? 'Thu gọn' : 'Xem thêm'}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Lưới ảnh/video kiểu Facebook trong chiều rộng card cố định. */
+function MediaGallery({ media }: { media: { url: string; type: string }[] }) {
+  if (!media?.length) return null;
+
+  if (media.length === 1) {
+    const m = media[0];
+    return (
+      <div className="rounded-xl overflow-hidden border border-outline bg-black/5">
+        {m.type === 'video' ? (
+          <video src={m.url} controls className="w-full max-h-130 bg-black" />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={m.url} alt="" className="w-full max-h-130 object-contain bg-black/5" />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-2 gap-1.5 rounded-xl overflow-hidden">
+      {media.map((m, i) => (
+        <div
+          key={i}
+          className={`relative bg-skylearn-sunken overflow-hidden ${media.length === 3 && i === 0 ? 'col-span-2' : ''}`}
+        >
+          {m.type === 'video' ? (
+            <video src={m.url} controls className="w-full h-full max-h-80 object-cover bg-black" />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={m.url} alt="" className="w-full h-full aspect-square object-cover" />
+          )}
+        </div>
+      ))}
     </div>
   );
 }
@@ -164,14 +233,14 @@ export default function CommunityPostPage() {
   const canModerate = isAdmin || isCourseInstructor;
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-8 space-y-6">
-      <Link href={`/courses/${post.course?.slug}/community`} className="text-sm text-ink-subtle hover:text-ink-mute transition-colors">← Quay lại cộng đồng</Link>
+    <div className="w-full max-w-150 mx-auto px-4 sm:px-6 py-8 space-y-5">
+      <Link href={`/courses/${post.course?.slug}/community`} className="inline-flex items-center gap-1 text-sm text-ink-subtle hover:text-ink-mute transition-colors"><ChevronLeft size={14} /> Quay lại cộng đồng</Link>
 
       {/* Post */}
       <div className={`bg-white border rounded-[20px] p-6 space-y-4 ${post.isPinned ? 'border-sun' : 'border-outline'}`}>
         <div className="flex items-start gap-4">
           <div className="flex-1">
-            {post.isPinned && <span className="text-xs text-sun-deep font-semibold">📌 Đã ghim</span>}
+            {post.isPinned && <span className="inline-flex items-center gap-1 text-xs text-sun-deep font-semibold"><Pin size={12} /> Đã ghim</span>}
             <h1 className="text-2xl font-bold text-ink-deep">{post.title}</h1>
             <div className="flex items-center gap-3 mt-1 text-sm text-ink-subtle">
               <span>{post.author?.fullName}</span>
@@ -179,7 +248,7 @@ export default function CommunityPostPage() {
             </div>
           </div>
           <button onClick={() => voteMutation.mutate()} className="flex flex-col items-center gap-0.5 text-ink-subtle hover:text-sky p-2 rounded-xl hover:bg-sky-soft transition-colors">
-            <span className="text-lg leading-none">▲</span>
+            <ChevronUp size={20} />
             <span className="text-xs font-semibold">{post.upvotes}</span>
           </button>
         </div>
@@ -193,7 +262,11 @@ export default function CommunityPostPage() {
             </div>
           </div>
         ) : (
-          <p className="text-base text-ink-deep whitespace-pre-wrap">{post.body}</p>
+          <ExpandableText text={post.body} />
+        )}
+
+        {Array.isArray(post.media) && post.media.length > 0 && !editPost && (
+          <MediaGallery media={post.media} />
         )}
 
         {/* Quản lý bài đăng */}
@@ -245,7 +318,7 @@ export default function CommunityPostPage() {
           {replyTarget && (
             <div className="flex items-center gap-2 text-sm text-sky-deep bg-sky-soft rounded-xl px-3 py-2">
               <span>Trả lời: <strong>{replyTarget.author?.fullName}</strong></span>
-              <button onClick={() => setReplyTo(null)} className="ml-auto text-ink-subtle hover:text-ink-mute">✕</button>
+              <button onClick={() => setReplyTo(null)} className="ml-auto text-ink-subtle hover:text-ink-mute"><X size={14} /></button>
             </div>
           )}
           <textarea

@@ -1,5 +1,6 @@
 'use client';
 
+import { Star } from 'lucide-react';
 import type { ReviewSummary } from '@/lib/api/review.api';
 
 /** Hiển thị điểm trung bình + thanh phân bố sao 1–5. */
@@ -10,9 +11,10 @@ export function RatingSummary({ summary }: { summary: ReviewSummary }) {
     <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
       <div className="flex flex-col items-center justify-center px-4">
         <span className="font-display text-5xl text-ink">{avg.toFixed(1)}</span>
-        <span className="mt-1 text-amber-400 text-lg leading-none">
-          {'★'.repeat(Math.round(avg))}
-          <span className="text-gray-300">{'★'.repeat(5 - Math.round(avg))}</span>
+        <span className="mt-1 flex items-center gap-0.5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Star key={i} size={16} className={i < Math.round(avg) ? 'fill-amber-400 text-amber-400' : 'text-gray-300'} />
+          ))}
         </span>
         <span className="mt-1 text-xs text-muted">{total.toLocaleString()} đánh giá</span>
       </div>

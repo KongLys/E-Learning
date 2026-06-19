@@ -10,7 +10,7 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { AddLessonModal } from '@/components/instructor/AddLessonModal';
 import { LessonTypeIcon, type LessonType } from '@/components/instructor/lessonTypeMeta';
 import Link from 'next/link';
-import { Check, ChevronDown, GripVertical, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Check, ChevronDown, FileText, GripVertical, Pencil, Plus, Trash2, Video, X } from 'lucide-react';
 import {
   DndContext,
   KeyboardSensor,
@@ -671,17 +671,15 @@ export default function CourseCurriculumPage() {
                                           {lesson.title}
                                         </span>
                                         {lesson.type === 'video' && (
-                                          <span className={`block truncate text-xs ${lesson.videoAsset?.videoUrl ? 'text-green-600' : 'text-gray-400'}`}>
-                                            {lesson.videoAsset?.videoUrl
-                                              ? `📹 ${lesson.videoAsset.fileName ?? 'video đã tải lên'}`
-                                              : '📹 Chưa có video'}
+                                          <span className={`flex items-center gap-1 truncate text-xs ${lesson.videoAsset?.videoUrl ? 'text-green-600' : 'text-gray-400'}`}>
+                                            <Video size={12} className="shrink-0" />
+                                            <span className="truncate">{lesson.videoAsset?.videoUrl ? (lesson.videoAsset.fileName ?? 'video đã tải lên') : 'Chưa có video'}</span>
                                           </span>
                                         )}
                                         {lesson.type === 'document' && (
-                                          <span className={`block truncate text-xs ${lesson.documentAsset?.fileUrl ? 'text-green-600' : 'text-gray-400'}`}>
-                                            {lesson.documentAsset?.fileUrl
-                                              ? `📄 ${lesson.documentAsset.fileName ?? `${lesson.documentAsset.fileType?.toUpperCase() ?? 'tài liệu'} đã tải lên`}`
-                                              : '📄 Chưa có file'}
+                                          <span className={`flex items-center gap-1 truncate text-xs ${lesson.documentAsset?.fileUrl ? 'text-green-600' : 'text-gray-400'}`}>
+                                            <FileText size={12} className="shrink-0" />
+                                            <span className="truncate">{lesson.documentAsset?.fileUrl ? (lesson.documentAsset.fileName ?? `${lesson.documentAsset.fileType?.toUpperCase() ?? 'tài liệu'} đã tải lên`) : 'Chưa có file'}</span>
                                           </span>
                                         )}
                                       </Link>

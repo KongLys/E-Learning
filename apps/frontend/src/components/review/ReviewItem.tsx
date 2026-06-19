@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Flag } from 'lucide-react';
+import { Flag, Star } from 'lucide-react';
 import type { Review } from '@/lib/api/review.api';
 import { ReportReviewModal } from './ReportReviewModal';
 
@@ -36,9 +36,10 @@ export function ReviewItem({ review, canReport }: ReviewItemProps) {
           <span className="text-sm font-medium text-ink">{name}</span>
           <span className="text-xs text-muted-soft">{formatDate(review.createdAt)}</span>
         </div>
-        <div className="mt-0.5 text-sm leading-none text-amber-400">
-          {'★'.repeat(review.rating)}
-          <span className="text-gray-300">{'★'.repeat(5 - review.rating)}</span>
+        <div className="mt-0.5 flex items-center gap-0.5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Star key={i} size={13} className={i < review.rating ? 'fill-amber-400 text-amber-400' : 'text-gray-300'} />
+          ))}
         </div>
         {review.content && <p className="mt-1.5 text-sm leading-relaxed text-body-copy">{review.content}</p>}
 

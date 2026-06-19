@@ -1,10 +1,11 @@
 import Link from 'next/link';
+import { CheckCircle2 } from 'lucide-react';
 
 export default function CheckoutSuccessPage() {
   return (
     <div className="min-h-screen flex items-center justify-center px-6">
       <div className="text-center">
-        <div className="text-5xl mb-4">🎉</div>
+        <CheckCircle2 size={56} className="mx-auto mb-4 text-green-600" />
         <h1 className="text-2xl font-bold text-green-600 mb-2">Thanh toán thành công!</h1>
         <p className="text-gray-500 mb-6">Bạn đã đăng ký khóa học thành công. Bắt đầu học ngay!</p>
         <Link

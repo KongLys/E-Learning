@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Star } from 'lucide-react';
 
 interface StarInputProps {
   value: number;
@@ -24,12 +25,10 @@ export function StarInput({ value, onChange, size = 28 }: StarInputProps) {
           className="leading-none transition-transform hover:scale-110"
           aria-label={`${star} sao`}
         >
-          <span
-            style={{ fontSize: size }}
-            className={star <= active ? 'text-amber-400' : 'text-gray-300'}
-          >
-            &#9733;
-          </span>
+          <Star
+            size={size}
+            className={star <= active ? 'fill-amber-400 text-amber-400' : 'text-gray-300'}
+          />
         </button>
       ))}
     </div>

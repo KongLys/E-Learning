@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
+import { Pause, Play } from 'lucide-react';
 import { useProgress } from '@/lib/hooks/useProgress';
 
 export interface Cue {
@@ -173,7 +174,7 @@ export function VideoPlayer({ lessonId, videoUrl, initialPositionSec = 0, cues =
         </div>
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-3">
-            <button onClick={togglePlay} className="text-lg">{isPlaying ? '⏸' : '▶'}</button>
+            <button onClick={togglePlay} aria-label={isPlaying ? 'Tạm dừng' : 'Phát'}>{isPlaying ? <Pause size={18} /> : <Play size={18} />}</button>
             <span className="text-gray-300 text-xs">{formatTime(currentTime)} / {formatTime(duration)}</span>
           </div>
           <div className="flex items-center gap-2">

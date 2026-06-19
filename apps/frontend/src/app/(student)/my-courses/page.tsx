@@ -8,40 +8,7 @@ import { ProgressBar } from '@/components/ui/ProgressBar';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-
-function CheckIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="20 6 9 17 4 12" />
-    </svg>
-  );
-}
-
-function ArrowRightIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M5 12h14M12 5l7 7-7 7" />
-    </svg>
-  );
-}
-
-function ChatBubbleIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-    </svg>
-  );
-}
-
-function CommunityIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-    </svg>
-  );
-}
+import { ArrowRight, BookOpen, Check, MessageSquare, Users } from 'lucide-react';
 
 export default function MyCoursesPage() {
   const router = useRouter();
@@ -70,10 +37,7 @@ export default function MyCoursesPage() {
         {enrollments.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <div className="w-16 h-16 rounded-full bg-surface-strong flex items-center justify-center mb-5 text-muted">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-              </svg>
+              <BookOpen size={24} strokeWidth={1.5} />
             </div>
             <p className="text-muted mb-5 text-base">Bạn chưa đăng ký khóa học nào.</p>
             <Link
@@ -81,7 +45,7 @@ export default function MyCoursesPage() {
               className="inline-flex h-10 items-center gap-2 px-5 rounded-pill bg-emphasis text-white text-sm font-medium hover:bg-ink transition-colors"
             >
               Khám phá khóa học
-              <ArrowRightIcon />
+              <ArrowRight size={14} />
             </Link>
           </div>
         ) : (
@@ -112,7 +76,7 @@ export default function MyCoursesPage() {
                     )}
                     {isCompleted && (
                       <span className="absolute top-3 right-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-pill bg-semantic-success text-white text-xs font-semibold">
-                        <CheckIcon />
+                        <Check size={12} strokeWidth={2.5} />
                         Hoàn thành
                       </span>
                     )}
@@ -144,7 +108,7 @@ export default function MyCoursesPage() {
                         disabled={startChatMutation.isPending}
                         className="w-full inline-flex h-9 items-center justify-center gap-1.5 mt-2 rounded-pill border border-hairline-strong text-ink text-sm font-medium hover:bg-surface-strong transition-colors disabled:opacity-50"
                       >
-                        <ChatBubbleIcon />
+                        <MessageSquare size={14} />
                         Chat với giảng viên
                       </button>
                     )}
@@ -153,7 +117,7 @@ export default function MyCoursesPage() {
                         href={`/courses/${course.slug}/community`}
                         className="w-full inline-flex h-9 items-center justify-center gap-1.5 mt-2 rounded-pill border border-hairline-strong text-ink text-sm font-medium hover:bg-surface-strong transition-colors"
                       >
-                        <CommunityIcon />
+                        <Users size={14} />
                         Cộng đồng
                       </Link>
                     )}

@@ -7,7 +7,7 @@ import { adminApi } from '@/lib/api/admin.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import {
-  FileText, PenLine, X, ChevronDown, ChevronRight,
+  FileText, PenLine, X, ChevronDown, ChevronLeft, ChevronRight,
   Video, File as FileIcon, CheckCircle, Clock, AlertCircle, XCircle,
 } from 'lucide-react';
 
@@ -507,9 +507,9 @@ function AdminCoursesContent() {
 
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2">
-          <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="px-3 py-1.5 text-sm border rounded-lg disabled:opacity-40 hover:bg-gray-50">← Trước</button>
+          <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="inline-flex items-center gap-1 px-3 py-1.5 text-sm border rounded-lg disabled:opacity-40 hover:bg-gray-50"><ChevronLeft size={14} /> Trước</button>
           <span className="text-sm text-gray-500">{page} / {totalPages}</span>
-          <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)} className="px-3 py-1.5 text-sm border rounded-lg disabled:opacity-40 hover:bg-gray-50">Sau →</button>
+          <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)} className="inline-flex items-center gap-1 px-3 py-1.5 text-sm border rounded-lg disabled:opacity-40 hover:bg-gray-50">Sau <ChevronRight size={14} /></button>
         </div>
       )}
     </div>

@@ -3,7 +3,7 @@
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ChevronDown } from 'lucide-react';
 import { instructorApi } from '@/lib/api/instructor.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { LessonContentEditor } from '@/components/instructor/LessonContentEditor';
@@ -56,7 +56,7 @@ export default function CurriculumDetailPage() {
                     <p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">Phần {idx + 1}</p>
                     <p className="text-sm font-semibold text-gray-900 leading-snug">{section.title}</p>
                   </div>
-                  <span className="text-gray-400 text-xs mt-0.5 shrink-0 transition-transform group-open:rotate-180">⌄</span>
+                  <ChevronDown size={16} className="text-gray-400 mt-0.5 shrink-0 transition-transform group-open:rotate-180" />
                 </summary>
                 <ul className="pb-1">
                   {section.lessons?.map((lesson: any) => {

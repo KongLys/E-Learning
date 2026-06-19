@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Clock } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { learnApi } from '@/lib/api/learn.api';
 import { formatSeconds } from './VideoPlayer';
@@ -87,7 +88,7 @@ export function QuestionsPanel({ lessonId, positionType, getCurrentPosition, onJ
                 className="accent-blue-600 w-4 h-4"
               />
               Đính kèm thời điểm video
-              {attachTime && <span className="text-blue-700 font-semibold bg-white/70 px-2 py-0.5 rounded-full">⏱ {formatSeconds(capturedPos)}</span>}
+              {attachTime && <span className="inline-flex items-center gap-1 text-blue-700 font-semibold bg-white/70 px-2 py-0.5 rounded-full"><Clock size={12} /> {formatSeconds(capturedPos)}</span>}
             </label>
           )}
           <div className="flex gap-2">
@@ -127,7 +128,7 @@ export function QuestionsPanel({ lessonId, positionType, getCurrentPosition, onJ
                     onClick={() => onJumpTo?.(q.positionValue)}
                     className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 bg-blue-100 hover:bg-blue-200 px-2.5 py-1 rounded-full"
                   >
-                    ⏱ {formatSeconds(q.positionValue)}
+                    <Clock size={12} /> {formatSeconds(q.positionValue)}
                   </button>
                 )}
               </div>

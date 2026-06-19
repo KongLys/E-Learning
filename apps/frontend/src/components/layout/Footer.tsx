@@ -1,34 +1,5 @@
 import Link from 'next/link';
-
-function GlobeIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" />
-      <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-    </svg>
-  );
-}
-
-function MailIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-      <polyline points="22,6 12,13 2,6" />
-    </svg>
-  );
-}
-
-function ShareIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="18" cy="5" r="3" />
-      <circle cx="6" cy="12" r="3" />
-      <circle cx="18" cy="19" r="3" />
-      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
-      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
-    </svg>
-  );
-}
+import { Globe, Mail, Share2 } from 'lucide-react';
 
 const COL_LINK = 'text-sm text-muted hover:text-ink transition-colors';
 
@@ -44,9 +15,9 @@ export function Footer() {
               Nâng tầm kiến thức Việt thông qua nền tảng học tập tinh gọn, thẩm mỹ và hiệu quả.
             </p>
             <div className="flex items-center gap-4 mt-5 text-muted-soft">
-              <button className="hover:text-muted transition-colors"><GlobeIcon /></button>
-              <button className="hover:text-muted transition-colors"><MailIcon /></button>
-              <button className="hover:text-muted transition-colors"><ShareIcon /></button>
+              <button className="hover:text-muted transition-colors"><Globe size={16} strokeWidth={1.75} /></button>
+              <button className="hover:text-muted transition-colors"><Mail size={16} strokeWidth={1.75} /></button>
+              <button className="hover:text-muted transition-colors"><Share2 size={16} strokeWidth={1.75} /></button>
             </div>
           </div>
 

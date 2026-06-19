@@ -5,14 +5,7 @@ import Image from 'next/image';
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth.store';
-
-function ChevronDownIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M6 9l6 6 6-6" />
-    </svg>
-  );
-}
+import { ChevronDown } from 'lucide-react';
 
 export function UserMenu() {
   const { user, logout } = useAuthStore();
@@ -70,7 +63,7 @@ export function UserMenu() {
             <span className="text-xs font-semibold text-muted">{initials}</span>
           )}
         </div>
-        <ChevronDownIcon />
+        <ChevronDown size={14} />
       </button>
 
       {open && (

@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api/admin.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import Link from 'next/link';
-import { Users, BookOpen, DollarSign, GraduationCap, Clock, Lock, CheckCircle } from 'lucide-react';
+import { Users, BookOpen, DollarSign, GraduationCap, Clock, Lock, CheckCircle, ArrowRight } from 'lucide-react';
 
 function StatCard({
   icon: Icon,
@@ -69,8 +69,8 @@ export default function AdminDashboardPage() {
                 <p className="text-xs text-amber-600 mt-0.5">Cần xem xét và phê duyệt</p>
               </div>
             </div>
-            <Link href="/admin/courses?tab=pending" className="text-xs font-medium text-amber-700 hover:underline">
-              Xem ngay →
+            <Link href="/admin/courses?tab=pending" className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 hover:underline">
+              Xem ngay <ArrowRight size={12} />
             </Link>
           </div>
         )}
@@ -81,8 +81,8 @@ export default function AdminDashboardPage() {
               <Lock size={16} className="text-red-500" strokeWidth={1.75} />
               <p className="text-sm font-medium text-red-800">{stats.lockedUsers} người dùng đang bị khóa</p>
             </div>
-            <Link href="/admin/users?status=locked" className="text-xs font-medium text-red-700 hover:underline">
-              Xem →
+            <Link href="/admin/users?status=locked" className="inline-flex items-center gap-1 text-xs font-medium text-red-700 hover:underline">
+              Xem <ArrowRight size={12} />
             </Link>
           </div>
         )}

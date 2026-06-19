@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { CheckCircle2, X } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { orderApi, type SepayPaymentInfo } from '@/lib/api/course.api';
 import { formatVND } from '@/lib/utils';
@@ -100,14 +101,14 @@ export function PaymentQrModal({ payment, courseId, onClose, onPaid }: PaymentQr
       >
         <div className="flex items-center justify-between px-6 py-4 border-b">
           <h2 className="text-lg font-bold">Quét mã QR để thanh toán</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl leading-none">
-            ✕
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 leading-none" aria-label="Đóng">
+            <X size={20} />
           </button>
         </div>
 
         {isPaid ? (
           <div className="px-6 py-10 text-center">
-            <div className="text-5xl mb-3">🎉</div>
+            <CheckCircle2 size={48} className="mx-auto mb-3 text-semantic-success" />
             <p className="text-lg font-bold text-semantic-success mb-1">Thanh toán thành công!</p>
             <p className="text-sm text-gray-500">Đang chuyển tới trang học...</p>
           </div>

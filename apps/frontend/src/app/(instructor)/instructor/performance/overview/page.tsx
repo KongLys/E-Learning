@@ -15,6 +15,8 @@ import {
   Legend,
   Cell,
 } from 'recharts';
+import { AlertTriangle, Star } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { instructorApi } from '@/lib/api/instructor.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 
@@ -24,7 +26,7 @@ function formatVND(amount: number) {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
 }
 
-function StatCard({ label, value }: { label: string; value: string | number }) {
+function StatCard({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-5">
       <p className="text-3xl font-bold text-gray-900 mb-1">{value}</p>
@@ -71,7 +73,7 @@ export default function PerformanceOverviewPage() {
 
       {overview?.pendingQuestions > 0 && (
         <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-5 py-4">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-600 shrink-0"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <AlertTriangle size={18} className="text-amber-600 shrink-0" />
           <p className="text-sm text-amber-800">
             Bạn có <span className="font-semibold">{overview.pendingQuestions}</span> câu hỏi chưa được trả lời.
           </p>
@@ -81,7 +83,7 @@ export default function PerformanceOverviewPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Tổng khóa học" value={overview?.totalCourses ?? 0} />
         <StatCard label="Tổng học viên" value={overview?.totalStudents ?? 0} />
-        <StatCard label="Đánh giá trung bình" value={overview?.avgRating ? `${overview.avgRating} ★` : '—'} />
+        <StatCard label="Đánh giá trung bình" value={overview?.avgRating ? <span className="inline-flex items-center gap-1">{overview.avgRating} <Star size={20} className="fill-amber-400 text-amber-400" /></span> : '—'} />
         <StatCard label="Tổng doanh thu" value={formatVND(overview?.totalRevenue ?? 0)} />
       </div>
 

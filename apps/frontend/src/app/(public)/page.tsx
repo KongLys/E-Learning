@@ -5,23 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { courseApi } from '@/lib/api/course.api';
 import { CourseGrid } from '@/components/course/CourseGrid';
 import { formatVND } from '@/lib/utils';
-
-function ArrowRightIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M5 12h14M12 5l7 7-7 7" />
-    </svg>
-  );
-}
-
-function CourseListIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-    </svg>
-  );
-}
+import { ArrowRight, BookOpen } from 'lucide-react';
 
 function CourseListItem({ course }: { course: any }) {
   return (
@@ -30,7 +14,7 @@ function CourseListItem({ course }: { course: any }) {
       className="flex items-center gap-4 py-4 group hover:bg-canvas-soft -mx-4 px-4 rounded-xl transition-colors"
     >
       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-surface-strong text-muted group-hover:bg-hairline transition-colors">
-        <CourseListIcon />
+        <BookOpen size={16} strokeWidth={1.75} />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-[15px] font-medium text-ink truncate group-hover:text-emphasis transition-colors">
@@ -90,7 +74,7 @@ export default function HomePage() {
               className="inline-flex h-11 items-center gap-2 px-7 rounded-pill bg-surface-dark text-white text-[15px] font-medium hover:bg-ink transition-colors"
             >
               Bắt đầu học ngay
-              <ArrowRightIcon />
+              <ArrowRight size={14} strokeWidth={2.5} />
             </Link>
             <Link
               href="/register"

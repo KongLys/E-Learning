@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
+import { AlertTriangle, Check, ChevronDown, Film, FileText, Loader2, Mic, Paperclip, Play, X } from 'lucide-react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { myReviewQuizApi } from '@/lib/api/ai.api';
@@ -10,7 +11,11 @@ import { youtubeEmbedUrl } from '@/lib/youtube';
 import { MaterialViewerModal, type MaterialKind } from './MaterialViewerModal';
 
 const TYPE_LABELS: Record<string, string> = { video: 'Video', document: 'Tài liệu', quiz: 'Trắc nghiệm' };
-const REF_ICON: Record<string, string> = { video: '🎬', youtube: '▶️', file: '📄' };
+const REF_ICON: Record<string, ReactNode> = {
+  video: <Film size={16} />,
+  youtube: <Play size={16} />,
+  file: <FileText size={16} />,
+};
 
 function durationLabel(type: string, durationSec: number): string {
   const min = Math.max(1, Math.round((durationSec || 0) / 60));
@@ -129,7 +134,7 @@ export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections,
         <div className="p-5 border-b border-gray-100 shrink-0">
           <div className="flex items-start justify-between gap-2 mb-3">
             <h2 className="text-base font-bold text-gray-900 leading-snug">{courseTitle || 'Nội dung khóa học'}</h2>
-            <button className="text-gray-400 hover:text-gray-600 shrink-0 -mt-0.5" onClick={onClose} aria-label="Đóng">✕</button>
+            <button className="text-gray-400 hover:text-gray-600 shrink-0 -mt-0.5" onClick={onClose} aria-label="Đóng"><X size={18} /></button>
           </div>
           <ProgressBar value={progressPercent} />
           <p className="text-xs text-gray-500 mt-1.5">{Math.round(progressPercent)}% hoàn thành</p>
@@ -144,7 +149,7 @@ export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections,
                   <p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">Phần {idx + 1}</p>
                   <p className="text-sm font-semibold text-gray-900 leading-snug">{section.title}</p>
                 </div>
-                <span className="text-gray-400 text-xs mt-0.5 shrink-0 transition-transform group-open:rotate-180">⌄</span>
+                <ChevronDown size={16} className="text-gray-400 mt-0.5 shrink-0 transition-transform group-open:rotate-180" />
               </summary>
               <ul className="pb-1">
                 {section.lessons?.map((lesson: any) => {
@@ -161,7 +166,7 @@ export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections,
                       >
                         {/* Status circle */}
                         {isCompleted ? (
-                          <span className="mt-0.5 w-5 h-5 shrink-0 rounded-full bg-green-500 text-white text-[11px] flex items-center justify-center">✓</span>
+                          <span className="mt-0.5 w-5 h-5 shrink-0 rounded-full bg-green-500 text-white flex items-center justify-center"><Check size={12} /></span>
                         ) : (
                           <span className={`mt-0.5 w-5 h-5 shrink-0 rounded-full border-2 ${isCurrent ? 'border-blue-500' : 'border-gray-300'}`} />
                         )}
@@ -182,13 +187,13 @@ export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections,
             <details className="group border-b border-gray-100" open={quizCount > 0}>
               <summary className="px-5 py-3.5 cursor-pointer hover:bg-gray-50 list-none flex items-center justify-between gap-2">
                 <p className="text-sm font-semibold text-gray-900">Quiz ôn tập của tôi{quizCount > 0 ? ` (${quizCount})` : ''}</p>
-                <span className="text-gray-400 text-xs transition-transform group-open:rotate-180">⌄</span>
+                <ChevronDown size={16} className="text-gray-400 transition-transform group-open:rotate-180" />
               </summary>
               {quizzesLoading ? (
                 <p className="px-5 py-3 text-xs text-gray-400">Đang tải…</p>
               ) : quizCount === 0 ? (
                 <p className="px-5 py-3 text-xs text-gray-500 leading-relaxed">
-                  Chưa có quiz ôn tập. Nhờ AI tạo quiz trong khung chat (✦ Hỏi AI) hoặc bấm “✦ Tạo quiz ôn tập” ở bài học để luyện tập.
+                  Chưa có quiz ôn tập. Nhờ AI tạo quiz trong khung chat (Hỏi AI) hoặc bấm “Tạo quiz ôn tập” ở bài học để luyện tập.
                 </p>
               ) : (
                 <ul className="pb-1">
@@ -200,7 +205,7 @@ export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections,
                         onClick={() => onOpenReviewQuiz(quiz.lessonId)}
                         className={`w-full text-left flex items-start gap-3 px-5 py-3 border-l-[3px] transition-colors ${active ? 'bg-blue-50 border-blue-500' : 'border-transparent hover:bg-gray-50'}`}
                       >
-                        <span className="mt-0.5 shrink-0">📝</span>
+                        <FileText size={16} className="mt-0.5 shrink-0 text-gray-500" />
                         <span className="min-w-0">
                           <span className={`block text-sm leading-snug truncate ${active ? 'text-blue-700 font-semibold' : 'text-gray-800'}`}>{quiz.lessonTitle}</span>
                           <span className="block text-xs text-gray-400 mt-0.5">Theo bài · {quiz.questionCount} câu · {new Date(quiz.updatedAt).toLocaleDateString('vi-VN')}</span>
@@ -217,7 +222,7 @@ export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections,
                         onClick={() => onOpenMyQuiz(quiz.id)}
                         className={`w-full text-left flex items-start gap-3 px-5 py-3 border-l-[3px] transition-colors ${active ? 'bg-blue-50 border-blue-500' : 'border-transparent hover:bg-gray-50'}`}
                       >
-                        <span className="mt-0.5 shrink-0">📝</span>
+                        <FileText size={16} className="mt-0.5 shrink-0 text-gray-500" />
                         <span className="min-w-0">
                           <span className={`block text-sm leading-snug truncate ${active ? 'text-blue-700 font-semibold' : 'text-gray-800'}`}>{quiz.title || 'Quiz ôn tập'}</span>
                           <span className="block text-xs text-gray-400 mt-0.5">Qua chat · {quiz.questionCount} câu · {new Date(quiz.createdAt).toLocaleDateString('vi-VN')}</span>
@@ -236,13 +241,13 @@ export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections,
             <details className="group border-b border-gray-100" open={podcasts.length > 0}>
               <summary className="px-5 py-3.5 cursor-pointer hover:bg-gray-50 list-none flex items-center justify-between gap-2">
                 <p className="text-sm font-semibold text-gray-900">Podcast{podcasts.length > 0 ? ` (${podcasts.length})` : ''}</p>
-                <span className="text-gray-400 text-xs transition-transform group-open:rotate-180">⌄</span>
+                <ChevronDown size={16} className="text-gray-400 transition-transform group-open:rotate-180" />
               </summary>
               {podcastsQuery.isLoading ? (
                 <p className="px-5 py-3 text-xs text-gray-400">Đang tải…</p>
               ) : podcasts.length === 0 ? (
                 <p className="px-5 py-3 text-xs text-gray-500 leading-relaxed">
-                  Chưa có podcast. Mở một bài tài liệu rồi bấm “🎙 Tạo podcast” trong khung chat (✦ Hỏi AI) để tạo.
+                  Chưa có podcast. Mở một bài tài liệu rồi bấm “Tạo podcast” trong khung chat (Hỏi AI) để tạo.
                 </p>
               ) : (
                 <ul className="pb-1">
@@ -255,7 +260,7 @@ export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections,
                             onClick={() => onOpenPodcast(p.lessonId, p.lessonTitle)}
                             className={`w-full text-left flex items-start gap-3 px-5 py-3 border-l-[3px] transition-colors ${active ? 'bg-blue-50 border-blue-500' : 'border-transparent hover:bg-gray-50'}`}
                           >
-                            <span className="mt-0.5 shrink-0">🎙</span>
+                            <Mic size={16} className="mt-0.5 shrink-0" />
                             <span className="min-w-0">
                               <span className={`block text-sm leading-snug truncate ${active ? 'text-blue-700 font-semibold' : 'text-gray-800'}`}>{p.lessonTitle}</span>
                               <span className="block text-xs text-gray-400 mt-0.5">Theo bài · {podcastDuration(p.durationSec)} · {new Date(p.updatedAt).toLocaleDateString('vi-VN')}</span>
@@ -268,7 +273,7 @@ export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections,
                     return (
                       <li key={`pc-${p.lessonId}`}>
                         <div className="flex items-start gap-3 px-5 py-3 border-l-[3px] border-transparent">
-                          <span className="mt-0.5 shrink-0">{isBusy ? '⏳' : '⚠'}</span>
+                          <span className="mt-0.5 shrink-0">{isBusy ? <Loader2 size={16} className="animate-spin" /> : <AlertTriangle size={16} />}</span>
                           <span className="min-w-0">
                             <span className="block text-sm leading-snug truncate text-gray-800">{p.lessonTitle}</span>
                             <span className={`block text-xs mt-0.5 ${isBusy ? 'text-gray-400' : 'text-red-500'}`}>
@@ -289,7 +294,7 @@ export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections,
             <details className="group border-b border-gray-100">
               <summary className="px-5 py-3.5 cursor-pointer hover:bg-gray-50 list-none flex items-center justify-between gap-2">
                 <p className="text-sm font-semibold text-gray-900">Tài liệu tham khảo ({refMaterials.length})</p>
-                <span className="text-gray-400 text-xs transition-transform group-open:rotate-180">⌄</span>
+                <ChevronDown size={16} className="text-gray-400 transition-transform group-open:rotate-180" />
               </summary>
               <ul className="pb-1">
                 {refMaterials.map((m: any) => (
@@ -299,7 +304,7 @@ export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections,
                       disabled={openRef.isPending}
                       className="w-full text-left flex items-start gap-3 px-5 py-3 hover:bg-gray-50 transition-colors disabled:opacity-60"
                     >
-                      <span className="mt-0.5 shrink-0">{REF_ICON[m.type] ?? '📎'}</span>
+                      <span className="mt-0.5 shrink-0">{REF_ICON[m.type] ?? <Paperclip size={16} />}</span>
                       <span className="min-w-0">
                         <span className="block text-sm leading-snug text-gray-800 truncate">{m.title}</span>
                         {m.description && <span className="block text-xs text-gray-400 mt-0.5 truncate">{m.description}</span>}
@@ -316,7 +321,7 @@ export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections,
             <details className="group border-b border-gray-100">
               <summary className="px-5 py-3.5 cursor-pointer hover:bg-gray-50 list-none flex items-center justify-between gap-2">
                 <p className="text-sm font-semibold text-gray-900">Tài liệu toàn khóa học ({fileCount})</p>
-                <span className="text-gray-400 text-xs transition-transform group-open:rotate-180">⌄</span>
+                <ChevronDown size={16} className="text-gray-400 transition-transform group-open:rotate-180" />
               </summary>
               <div className="pb-1">
                 {fileSections.map((s: any) => (
@@ -330,7 +335,7 @@ export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections,
                             disabled={openDoc.isPending}
                             className="w-full text-left flex items-start gap-3 px-5 py-2.5 hover:bg-gray-50 transition-colors disabled:opacity-60"
                           >
-                            <span className="mt-0.5 shrink-0">📄</span>
+                            <FileText size={16} className="mt-0.5 shrink-0" />
                             <span className="min-w-0">
                               <span className="block text-sm leading-snug text-gray-800 truncate">{f.fileName || f.lessonTitle}</span>
                               <span className="block text-xs text-gray-400 mt-0.5">{(f.fileType ?? '').toUpperCase()}{f.fileType === 'pdf' && f.pageCount ? ` · ${f.pageCount} trang` : ''}</span>

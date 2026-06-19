@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Check, ChevronLeft, ChevronRight, Lightbulb, Sparkles, X } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import { useAiChatBridge } from '@/store/ai-chat-bridge.store';
 import type { AskScope } from '@/lib/api/ai.api';
@@ -142,22 +143,22 @@ export function ReviewQuizUI({ quiz, submit, onClose, askScope }: ReviewQuizUIPr
                     return (
                       <div
                         key={opt.id}
-                        className={`rounded-md px-2 py-1 text-sm ${isCorrectOpt ? 'bg-surface-strong text-semantic-success' : youPicked ? 'text-semantic-error' : 'text-muted'}`}
+                        className={`flex items-center gap-1 rounded-md px-2 py-1 text-sm ${isCorrectOpt ? 'bg-surface-strong text-semantic-success' : youPicked ? 'text-semantic-error' : 'text-muted'}`}
                       >
-                        {isCorrectOpt ? '✓ ' : youPicked ? '✗ ' : ''}
+                        {isCorrectOpt ? <Check size={14} className="shrink-0" /> : youPicked ? <X size={14} className="shrink-0" /> : null}
                         {opt.content}
                       </div>
                     );
                   })}
                 </div>
                 {r?.explanation && (
-                  <p className="mt-2 text-sm text-muted">💡 {r.explanation}</p>
+                  <p className="mt-2 flex items-start gap-1 text-sm text-muted"><Lightbulb size={14} className="mt-0.5 shrink-0" /> {r.explanation}</p>
                 )}
                 <button
                   onClick={() => explainQuestion(q, r)}
                   className="mt-3 inline-flex items-center gap-1 rounded-pill border border-hairline px-3 py-1 text-xs font-medium text-muted transition-colors hover:bg-canvas"
                 >
-                  ✦ Vì sao {correct ? 'đúng' : 'sai'}?
+                  <Sparkles size={13} /> Vì sao {correct ? 'đúng' : 'sai'}?
                 </button>
               </div>
             );
@@ -231,16 +232,16 @@ export function ReviewQuizUI({ quiz, submit, onClose, askScope }: ReviewQuizUIPr
         <button
           disabled={currentQ === 0}
           onClick={() => setCurrentQ((c) => c - 1)}
-          className="rounded-pill border border-hairline px-5 py-2 text-sm font-medium text-muted transition-colors hover:bg-canvas disabled:opacity-40"
+          className="inline-flex items-center gap-1 rounded-pill border border-hairline px-5 py-2 text-sm font-medium text-muted transition-colors hover:bg-canvas disabled:opacity-40"
         >
-          ← Câu trước
+          <ChevronLeft size={16} /> Câu trước
         </button>
         {currentQ < questions.length - 1 ? (
           <button
             onClick={() => setCurrentQ((c) => c + 1)}
-            className="rounded-pill bg-emphasis px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-ink"
+            className="inline-flex items-center gap-1 rounded-pill bg-emphasis px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-ink"
           >
-            Câu tiếp →
+            Câu tiếp <ChevronRight size={16} />
           </button>
         ) : (
           <button

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { learnApi } from '@/lib/api/learn.api';
 
@@ -234,16 +235,16 @@ export function QuizUI({ lessonId, quiz, onPassed }: QuizUIProps) {
         <button
           disabled={currentQ === 0}
           onClick={() => setCurrentQ((q) => q - 1)}
-          className="rounded-pill border border-hairline px-5 py-2 text-sm font-medium text-muted transition-colors hover:bg-canvas disabled:opacity-40"
+          className="inline-flex items-center gap-1 rounded-pill border border-hairline px-5 py-2 text-sm font-medium text-muted transition-colors hover:bg-canvas disabled:opacity-40"
         >
-          ← Câu trước
+          <ChevronLeft size={16} /> Câu trước
         </button>
         {currentQ < questions.length - 1 ? (
           <button
             onClick={() => setCurrentQ((q) => q + 1)}
-            className="rounded-pill bg-emphasis px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-ink"
+            className="inline-flex items-center gap-1 rounded-pill bg-emphasis px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-ink"
           >
-            Câu tiếp →
+            Câu tiếp <ChevronRight size={16} />
           </button>
         ) : (
           <button

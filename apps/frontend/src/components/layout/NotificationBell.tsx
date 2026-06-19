@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { notificationApi } from '@/lib/api/notification.api';
 import { moderationApi } from '@/lib/api/ai.api';
+import { Bell } from 'lucide-react';
 
 type NotificationActionData = {
   action: 'appeal';
@@ -20,15 +21,6 @@ type NotificationItem = {
   createdAt: string;
   data?: NotificationActionData;
 };
-
-function BellIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-    </svg>
-  );
-}
 
 export function NotificationBell() {
   const qc = useQueryClient();
@@ -93,7 +85,7 @@ export function NotificationBell() {
         className="relative flex h-9 w-9 items-center justify-center rounded-full text-muted hover:text-ink hover:bg-surface-strong transition-colors"
         aria-label="Thông báo"
       >
-        <BellIcon />
+        <Bell size={18} strokeWidth={1.75} aria-hidden="true" />
         {unreadCount > 0 && (
           <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-semantic-error text-white text-[10px] font-semibold leading-none">
             {unreadCount > 9 ? '9+' : unreadCount}

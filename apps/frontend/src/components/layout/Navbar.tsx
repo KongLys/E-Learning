@@ -8,14 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { chatApi } from '@/lib/api/chat.api';
 import { NotificationBell } from '@/components/layout/NotificationBell';
 import { UserMenu } from '@/components/layout/UserMenu';
-
-function ChatIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-    </svg>
-  );
-}
+import { MessageSquare, Search } from 'lucide-react';
 
 function ChatLink() {
   const { data: convData } = useQuery({
@@ -34,22 +27,13 @@ function ChatLink() {
       aria-label="Chat"
       title="Chat"
     >
-      <ChatIcon />
+      <MessageSquare size={18} strokeWidth={1.75} aria-hidden="true" />
       {unreadCount > 0 && (
         <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-semantic-error text-white text-[10px] font-semibold leading-none">
           {unreadCount > 9 ? '9+' : unreadCount}
         </span>
       )}
     </Link>
-  );
-}
-
-function SearchIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="11" cy="11" r="8" />
-      <path d="m21 21-4.35-4.35" />
-    </svg>
   );
 }
 
@@ -67,7 +51,7 @@ function NavSearch() {
       className="relative w-full max-w-md"
     >
       <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-soft pointer-events-none">
-        <SearchIcon />
+        <Search size={16} aria-hidden="true" />
       </span>
       <input
         value={value}

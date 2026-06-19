@@ -1,5 +1,7 @@
 'use client';
 
+import { FileText, X } from 'lucide-react';
+
 export type MaterialKind = 'video' | 'youtube' | 'pdf' | 'docx';
 
 interface MaterialViewerModalProps {
@@ -24,10 +26,10 @@ export function MaterialViewerModal({ title, kind, url, onClose }: MaterialViewe
           <h2 className="text-lg font-bold truncate">{title}</h2>
           <button
             onClick={onClose}
-            className="shrink-0 text-xl text-gray-400 hover:text-gray-700"
+            className="shrink-0 text-gray-400 hover:text-gray-700"
             aria-label="Đóng"
           >
-            ✕
+            <X size={20} />
           </button>
         </div>
         <div className="px-6 py-5">
@@ -52,7 +54,7 @@ export function MaterialViewerModal({ title, kind, url, onClose }: MaterialViewe
           )}
           {kind === 'docx' && (
             <div className="rounded-2xl bg-slate-50 py-10 text-center">
-              <p className="mb-3 text-sm font-medium text-gray-800">📄 {title}</p>
+              <p className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-gray-800"><FileText size={16} /> {title}</p>
               <a
                 href={url}
                 target="_blank"

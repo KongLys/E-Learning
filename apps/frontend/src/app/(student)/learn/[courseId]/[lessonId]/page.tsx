@@ -15,6 +15,7 @@ import { LearnSidebar } from '@/components/learn/LearnSidebar';
 import { AiChatPanel } from '@/components/learn/AiChatPanel';
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
+import { Check, ChevronDown, ChevronLeft, Clock, FileText, Headphones, Loader2, Menu, MessageSquare, Sparkles } from 'lucide-react';
 
 export default function LearnPage() {
   const { courseId, lessonId } = useParams<{ courseId: string; lessonId: string }>();
@@ -254,13 +255,14 @@ export default function LearnPage() {
       <header className="border-b border-gray-100 px-4 py-3 flex items-center gap-3 bg-white shrink-0">
         <button
           onClick={() => { setOutlineCollapsed((v) => !v); setSidebarOpen(true); }}
-          className="text-gray-600 hover:text-gray-900 text-xl leading-none px-1"
+          className="text-gray-600 hover:text-gray-900 leading-none px-1"
           aria-label="Mở/đóng nội dung khóa học"
         >
-          ☰
+          <Menu size={22} />
         </button>
-        <Link href={`/my-courses`} className="font-medium text-gray-700 hover:text-gray-900 flex-1 truncate" title="Quay lại khóa học của tôi">
-          {courseTitle ?? '← Khóa học của tôi'}
+        <Link href={`/my-courses`} className="flex items-center gap-1 font-medium text-gray-700 hover:text-gray-900 flex-1 min-w-0" title="Quay lại khóa học của tôi">
+          <ChevronLeft size={16} className="shrink-0" />
+          <span className="truncate">{courseTitle ?? 'Khóa học của tôi'}</span>
         </Link>
         {lesson.type !== 'quiz' && (
           <button
@@ -271,7 +273,7 @@ export default function LearnPage() {
                 : 'bg-purple-600 text-white hover:bg-purple-700'
             }`}
           >
-            ✦ Hỏi AI
+            <span className="inline-flex items-center gap-1"><Sparkles size={14} /> Hỏi AI</span>
           </button>
         )}
       </header>
@@ -313,9 +315,9 @@ export default function LearnPage() {
                 </h2>
                 <button
                   onClick={() => setActiveQuiz(null)}
-                  className="shrink-0 text-sm font-medium text-gray-500 hover:text-gray-800"
+                  className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-800"
                 >
-                  ← Quay lại bài học
+                  <ChevronLeft size={16} /> Quay lại bài học
                 </button>
               </div>
               <ReviewQuizUI
@@ -332,12 +334,12 @@ export default function LearnPage() {
           ) : activePodcast ? (
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="text-lg font-bold truncate">🎙 {activePodcast.lessonTitle}</h2>
+                <h2 className="flex items-center gap-1.5 text-lg font-bold truncate"><Headphones size={18} className="shrink-0" /> {activePodcast.lessonTitle}</h2>
                 <button
                   onClick={() => setActivePodcast(null)}
-                  className="shrink-0 text-sm font-medium text-gray-500 hover:text-gray-800"
+                  className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-800"
                 >
-                  ← Quay lại bài học
+                  <ChevronLeft size={16} /> Quay lại bài học
                 </button>
               </div>
               <div className="rounded-2xl bg-slate-50 p-5">
@@ -390,9 +392,9 @@ export default function LearnPage() {
                     <button
                       onClick={completeDocument}
                       disabled={completeMutation.isPending}
-                      className="rounded-full bg-green-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-700 disabled:opacity-60"
+                      className="inline-flex items-center gap-1 rounded-full bg-green-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-700 disabled:opacity-60"
                     >
-                      {completeMutation.isPending ? 'Đang lưu...' : '✓ Đánh dấu hoàn thành'}
+                      {completeMutation.isPending ? 'Đang lưu...' : <><Check size={16} /> Đánh dấu hoàn thành</>}
                     </button>
                   )}
                 </div>
@@ -402,7 +404,7 @@ export default function LearnPage() {
               {docUrlData?.data?.url ? (
                 <div className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 p-5">
                   <div className="flex min-w-0 items-center gap-3">
-                    <span className="shrink-0 text-2xl">📄</span>
+                    <FileText size={28} className="shrink-0 text-gray-500" />
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-medium text-gray-800">{lesson.documentAsset?.fileName ?? 'Tài liệu'}</span>
                       {lesson.documentAsset?.fileType && (
@@ -430,8 +432,8 @@ export default function LearnPage() {
                   onClick={() => setQaOpen((v) => !v)}
                   className="w-full flex items-center justify-between px-4 py-3.5 text-sm font-semibold text-gray-800 hover:bg-slate-100/70 transition-colors"
                 >
-                  <span>💬 Hỏi đáp</span>
-                  <span className={`text-gray-400 transition-transform ${qaOpen ? 'rotate-180' : ''}`}>⌄</span>
+                  <span className="inline-flex items-center gap-1.5"><MessageSquare size={16} /> Hỏi đáp</span>
+                  <ChevronDown size={16} className={`text-gray-400 transition-transform ${qaOpen ? 'rotate-180' : ''}`} />
                 </button>
                 {qaOpen && (
                   <div className="px-4 pb-4">
@@ -492,7 +494,7 @@ export default function LearnPage() {
                 {tab === 'content' && (
                   <div className="space-y-3">
                     {(transcriptStatus === 'pending' || transcriptStatus === 'processing') && (
-                      <p className="text-sm text-gray-500">⏳ Đang tạo phụ đề & phân tích nội dung video…</p>
+                      <p className="flex items-center gap-1.5 text-sm text-gray-500"><Loader2 size={14} className="animate-spin" /> Đang tạo phụ đề & phân tích nội dung video…</p>
                     )}
                     {transcriptStatus === 'failed' && (
                       <p className="text-sm text-gray-500">Không tạo được phụ đề cho video này.</p>
@@ -507,7 +509,7 @@ export default function LearnPage() {
                         className="block w-full text-left rounded-xl border border-gray-100 p-3 hover:bg-slate-50 transition-colors"
                       >
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-mono text-blue-600">⏱ {formatSeconds(c.startSec)}</span>
+                          <span className="inline-flex items-center gap-1 text-xs font-mono text-blue-600"><Clock size={12} /> {formatSeconds(c.startSec)}</span>
                           <span className="text-sm font-semibold text-gray-900">{c.title}</span>
                         </div>
                         {c.summary && <p className="mt-1 text-sm text-gray-600">{c.summary}</p>}

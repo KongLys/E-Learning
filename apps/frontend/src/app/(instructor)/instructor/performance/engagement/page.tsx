@@ -60,7 +60,7 @@ export default function EngagementPage() {
         {
           icon: Star,
           label: 'Đánh giá trung bình',
-          value: stats.avgRating ? `${stats.avgRating} ★` : '—',
+          value: stats.avgRating ? `${stats.avgRating}` : '—',
           description: `${stats.totalReviews ?? 0} lượt đánh giá`,
           color: 'text-yellow-500 bg-yellow-50',
         },

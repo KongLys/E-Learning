@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { couponApi, CreateCouponDto } from '@/lib/api/coupon.api';
 import { instructorApi } from '@/lib/api/instructor.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { Download, Plus, Trash2, Upload } from 'lucide-react';
+import { Check, Download, Plus, Trash2, Upload, X } from 'lucide-react';
 
 type Tab = 'list' | 'create' | 'import';
 
@@ -355,7 +355,7 @@ export default function CouponsPage() {
                   {bulkResults.map((r: any, i) => (
                     <div key={i} className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs ${r.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
                       <span className="font-mono font-medium">{r.code}</span>
-                      <span>{r.success ? '✓ Thành công' : `✗ ${r.error}`}</span>
+                      <span className="inline-flex items-center gap-1">{r.success ? <><Check size={12} /> Thành công</> : <><X size={12} /> {r.error}</>}</span>
                     </div>
                   ))}
                 </div>

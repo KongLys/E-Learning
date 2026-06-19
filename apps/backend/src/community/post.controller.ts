@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -7,14 +8,42 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import type { Express } from 'express';
+import { randomUUID } from 'crypto';
 import { PostService } from './post.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { StorageService } from '../storage/storage.service';
+
+const MAX_MEDIA_BYTES = 100 * 1024 * 1024; // 100MB
 
 @Controller()
 export class PostController {
-  constructor(private postService: PostService) {}
+  constructor(
+    private postService: PostService,
+    private storage: StorageService,
+  ) {}
+
+  @Post('community/upload')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadMedia(@UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('No file uploaded');
+    const isImage = file.mimetype.startsWith('image/');
+    const isVideo = file.mimetype.startsWith('video/');
+    if (!isImage && !isVideo) {
+      throw new BadRequestException('Only image or video files are allowed');
+    }
+    if (file.size > MAX_MEDIA_BYTES) {
+      throw new BadRequestException('File too large (max 100MB)');
+    }
+    const key = `community/${randomUUID()}-${file.originalname}`;
+    const url = await this.storage.uploadFile(key, file.buffer, file.mimetype);
+    return { url, type: isImage ? 'image' : 'video' };
+  }
 
   @Post('courses/:courseId/posts')
   createPost(

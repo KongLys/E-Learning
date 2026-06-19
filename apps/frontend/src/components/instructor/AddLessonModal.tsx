@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { X } from 'lucide-react';
 import { LESSON_TYPES, LESSON_TYPE_META, LessonTypeIcon, type LessonType } from './lessonTypeMeta';
 
 const TYPE_HINTS: Record<LessonType, string> = {
@@ -73,8 +74,8 @@ export function AddLessonModal({ sectionTitle, onSubmit, onClose, isPending }: A
               </p>
             )}
           </div>
-          <button onClick={onClose} className="text-xl leading-none text-gray-400 hover:text-gray-700">
-            ✕
+          <button onClick={onClose} className="leading-none text-gray-400 hover:text-gray-700" aria-label="Đóng">
+            <X size={20} />
           </button>
         </div>
 
