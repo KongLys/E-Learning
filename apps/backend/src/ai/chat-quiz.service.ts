@@ -8,7 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { GeminiService } from './gemini.service';
 import { VectorStoreService, ChunkScope } from './vector/vector-store.service';
 import { QuizGenerationService } from './quiz-generation.service';
-import { SubmitAiQuizDto } from './dto/submit-ai-quiz.dto';
+import { SubmitReviewAttemptDto } from '../review-quiz/dto/submit-review-attempt.dto';
 
 const MIN_QUESTIONS = 10;
 const MAX_QUESTIONS = 30;
@@ -23,11 +23,12 @@ export interface CreatedQuizInfo {
 }
 
 /**
- * Quiz cá nhân (per-user) tạo qua chat AI từ nội dung khoá học.
- * Chấm điểm stateless, không ảnh hưởng tiến độ khoá học.
+ * Quiz cá nhân (per-user) tạo qua chat AI từ nội dung khoá học. Lưu chung bảng
+ * review_quizzes (lessonId = null, userId/courseId/title set) để phân biệt với
+ * quiz ôn tập theo bài (dùng chung). Chấm điểm stateless, không đụng tiến độ.
  */
 @Injectable()
-export class AiQuizService {
+export class ChatQuizService {
   constructor(
     private prisma: PrismaService,
     private gemini: GeminiService,
@@ -56,8 +57,9 @@ export class AiQuizService {
     const questions = await this.quizGen.generate(source, { count });
 
     const title = this.buildTitle(query);
-    const quiz = await this.prisma.aiQuiz.create({
+    const quiz = await this.prisma.reviewQuiz.create({
       data: {
+        lessonId: null,
         userId,
         courseId,
         title,
@@ -82,9 +84,9 @@ export class AiQuizService {
     return { id: quiz.id, title, questionCount: questions.length };
   }
 
-  /** Danh sách quiz của user trong khoá (mới nhất trước). */
+  /** Danh sách quiz qua chat của user trong khoá (mới nhất trước). */
   async listMine(courseId: string, userId: string) {
-    const quizzes = await this.prisma.aiQuiz.findMany({
+    const quizzes = await this.prisma.reviewQuiz.findMany({
       where: { courseId, userId },
       orderBy: { createdAt: 'desc' },
       select: {
@@ -115,7 +117,7 @@ export class AiQuizService {
   }
 
   /** Chấm điểm stateless — không lưu lịch sử, không đụng tiến độ. */
-  async submit(quizId: string, userId: string, dto: SubmitAiQuizDto) {
+  async submit(quizId: string, userId: string, dto: SubmitReviewAttemptDto) {
     const quiz = await this.loadOwned(quizId, userId, false);
 
     let correct = 0;
@@ -144,8 +146,9 @@ export class AiQuizService {
 
   // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+  /** Chỉ nạp quiz qua chat (userId set) thuộc về user; loại quiz dùng chung. */
   private async loadOwned(quizId: string, userId: string, ordered: boolean) {
-    const quiz = await this.prisma.aiQuiz.findUnique({
+    const quiz = await this.prisma.reviewQuiz.findUnique({
       where: { id: quizId },
       include: {
         questions: {

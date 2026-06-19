@@ -131,6 +131,7 @@ model User {
   communityPosts       CommunityPost[]
   postComments         PostComment[]
   postVotes            PostVote[]
+  commentVotes         CommentVote[]
   notifications        Notification[]
   conversationsAsUser1 Conversation[]     @relation("ConvUser1")
   conversationsAsUser2 Conversation[]     @relation("ConvUser2")
@@ -138,7 +139,7 @@ model User {
   conversationReads    ConversationRead[]
   messageReactions     MessageReaction[]
   aiConversations      AiConversation[]
-  aiQuizzes            AiQuiz[]
+  reviewQuizzes        ReviewQuiz[]
   coupons              Coupon[]
 
   @@map("users")
@@ -202,7 +203,7 @@ model Course {
   communityPosts     CommunityPost[]
   chunks             CourseChunk[]
   aiConversations    AiConversation[]
-  aiQuizzes          AiQuiz[]
+  reviewQuizzes      ReviewQuiz[]
   referenceMaterials ReferenceMaterial[]
   mindmap            CourseMindmap?
   coupons            Coupon[]
@@ -407,19 +408,28 @@ model QuizAttemptAnswer {
 }
 
 // ─── Quiz ôn tập (AI) ─────────────────────────────────────────────────────────
-// Bộ câu hỏi luyện tập sinh tự động từ nội dung bài học (video/tài liệu). Tách
-// riêng khỏi QuizLesson "chính khoá": dùng chung mỗi bài, KHÔNG tính vào tiến độ,
-// chấm điểm stateless (không lưu lịch sử làm bài).
+// Bộ câu hỏi luyện tập sinh tự động bằng AI. Tách riêng khỏi QuizLesson "chính
+// khoá": KHÔNG tính vào tiến độ, chấm điểm stateless (không lưu lịch sử làm bài).
+// Hai dạng dùng chung 1 bảng:
+//   • Quiz theo bài (dùng chung): lessonId set, userId/courseId/title = null.
+//   • Quiz qua chat AI (per-user): lessonId null, userId/courseId/title set —
+//     chỉ người tạo dùng được, phạm vi khoá học, nhiều quiz / người.
 model ReviewQuiz {
   id        String   @id @default(uuid())
-  lessonId  String   @unique @map("lesson_id")
+  lessonId  String?  @unique @map("lesson_id") // set = quiz theo bài (dùng chung); null = quiz qua chat
+  userId    String?  @map("user_id") // set = chủ sở hữu quiz qua chat (per-user); null = quiz dùng chung
+  courseId  String?  @map("course_id") // set cho quiz qua chat (phạm vi khoá)
+  title     String? // tiêu đề quiz qua chat
   model     String? // model AI đã dùng để sinh (hiển thị/debug)
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
-  lesson    Lesson               @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  lesson    Lesson?              @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  user      User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course    Course?              @relation(fields: [courseId], references: [id], onDelete: Cascade)
   questions ReviewQuizQuestion[]
 
+  @@index([userId, courseId])
   @@map("review_quizzes")
 }
 
@@ -449,55 +459,6 @@ model ReviewQuizOption {
 
   @@index([questionId])
   @@map("review_quiz_options")
-}
-
-// ─── Quiz cá nhân tạo qua chat AI ──────────────────────────────────────────────
-// Bộ câu hỏi do học viên yêu cầu chatbot AI tạo từ nội dung khoá học. CÁ NHÂN
-// (chỉ người tạo dùng), phạm vi khoá học, nhiều quiz / người. KHÔNG tính tiến độ,
-// chấm điểm stateless. Tách riêng khỏi ReviewQuiz (theo bài, dùng chung).
-model AiQuiz {
-  id        String   @id @default(uuid())
-  userId    String   @map("user_id")
-  courseId  String   @map("course_id")
-  title     String?
-  model     String? // model AI đã dùng để sinh
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
-
-  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  course    Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  questions AiQuizQuestion[]
-
-  @@index([userId, courseId])
-  @@map("ai_quizzes")
-}
-
-model AiQuizQuestion {
-  id           String         @id @default(uuid())
-  quizId       String         @map("quiz_id")
-  content      String         @db.Text
-  questionType QuizOptionType @default(single) @map("question_type")
-  orderIndex   Int            @map("order_index")
-  explanation  String?        @db.Text
-
-  quiz    AiQuiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
-  options AiQuizOption[]
-
-  @@index([quizId])
-  @@map("ai_quiz_questions")
-}
-
-model AiQuizOption {
-  id         String  @id @default(uuid())
-  questionId String  @map("question_id")
-  content    String  @db.Text
-  isCorrect  Boolean @default(false) @map("is_correct")
-  orderIndex Int     @map("order_index")
-
-  question AiQuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
-
-  @@index([questionId])
-  @@map("ai_quiz_options")
 }
 
 // ─── Tài liệu tham khảo (cấp khóa học) ─────────────────────────────────────────
@@ -792,6 +753,7 @@ model PostComment {
   author  User          @relation(fields: [authorId], references: [id])
   parent  PostComment?  @relation("CommentReplies", fields: [parentId], references: [id])
   replies PostComment[] @relation("CommentReplies")
+  votes   CommentVote[]
 
   @@index([postId])
   @@map("post_comments")
@@ -808,6 +770,19 @@ model PostVote {
 
   @@unique([postId, userId])
   @@map("post_votes")
+}
+
+model CommentVote {
+  id        String      @id @default(uuid())
+  commentId String      @map("comment_id")
+  userId    String      @map("user_id")
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  comment PostComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [userId], references: [id])
+
+  @@unique([commentId, userId])
+  @@map("comment_votes")
 }
 
 // ─── Chat 1-1 ─────────────────────────────────────────────────────────────────

@@ -72,9 +72,9 @@ export const aiChatApi = {
     apiClient.get<AiMessage[]>(`/ai/conversations/${conversationId}/messages`),
 };
 
-// ─── Quiz cá nhân tạo qua chat AI ──────────────────────────────────────────────
+// ─── Quiz cá nhân tạo qua chat AI (lưu chung bảng review_quizzes, per-user) ─────
 
-export interface AiQuizSummary {
+export interface MyReviewQuizSummary {
   id: string;
   title: string | null;
   createdAt: string;
@@ -88,14 +88,16 @@ export interface CreatedQuizInfo {
   questionCount: number;
 }
 
-export const aiQuizApi = {
+export const myReviewQuizApi = {
   list: (courseId: string) =>
-    apiClient.get<AiQuizSummary[]>(`/courses/${courseId}/ai-quizzes`),
-  get: (id: string) => apiClient.get(`/ai-quizzes/${id}`),
+    apiClient.get<MyReviewQuizSummary[]>(
+      `/courses/${courseId}/review-quizzes/mine`,
+    ),
+  get: (id: string) => apiClient.get(`/review-quizzes/${id}`),
   submit: (
     id: string,
     answers: { questionId: string; optionIds: string[] }[],
-  ) => apiClient.post(`/ai-quizzes/${id}/attempts`, { answers }),
+  ) => apiClient.post(`/review-quizzes/${id}/attempts`, { answers }),
 };
 
 // ─── Mind map ────────────────────────────────────────────────────────────────

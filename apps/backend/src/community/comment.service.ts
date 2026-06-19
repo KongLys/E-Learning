@@ -91,6 +91,32 @@ export class CommentService {
     return { message: 'Comment deleted' };
   }
 
+  async voteComment(commentId: string, userId: string) {
+    const comment = await this.prisma.postComment.findUnique({
+      where: { id: commentId },
+    });
+    if (!comment || comment.status !== 'active')
+      throw new NotFoundException('Comment not found');
+
+    const existing = await this.prisma.commentVote.findUnique({
+      where: { commentId_userId: { commentId, userId } },
+    });
+    if (existing) {
+      await this.prisma.commentVote.delete({ where: { id: existing.id } });
+      await this.prisma.postComment.update({
+        where: { id: commentId },
+        data: { upvotes: { decrement: 1 } },
+      });
+      return { voted: false };
+    }
+    await this.prisma.commentVote.create({ data: { commentId, userId } });
+    await this.prisma.postComment.update({
+      where: { id: commentId },
+      data: { upvotes: { increment: 1 } },
+    });
+    return { voted: true };
+  }
+
   async markSolution(commentId: string, userId: string) {
     const comment = await this.prisma.postComment.findUnique({
       where: { id: commentId },

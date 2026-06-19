@@ -41,6 +41,36 @@ export class PodcastService {
 
   // ─── Public API ──────────────────────────────────────────────────────────────
 
+  /**
+   * Danh sách podcast (theo bài học) đã tạo trong khoá — mới nhất trước.
+   * Podcast dùng chung mỗi bài, không gắn user nên trả về theo khoá.
+   * Không ký URL audio ở đây (tránh ký N lần) — bấm nghe sẽ gọi getPodcast.
+   */
+  async listByCourse(courseId: string, userId: string, userRole: string) {
+    await this.assertCourseAccess(courseId, userId, userRole);
+    const assets = await this.prisma.podcastAsset.findMany({
+      where: { lesson: { section: { courseId } } },
+      orderBy: { updatedAt: 'desc' },
+      select: {
+        lessonId: true,
+        status: true,
+        durationSec: true,
+        errorMsg: true,
+        createdAt: true,
+        updatedAt: true,
+        lesson: { select: { title: true } },
+      },
+    });
+    return assets.map((a) => ({
+      lessonId: a.lessonId,
+      lessonTitle: a.lesson?.title ?? '',
+      status: a.status,
+      durationSec: a.durationSec,
+      errorMsg: a.errorMsg,
+      updatedAt: a.updatedAt,
+    }));
+  }
+
   /** Lấy podcast của bài học (kèm URL audio đã ký nếu sẵn sàng), hoặc null. */
   async getPodcast(lessonId: string, userId: string, userRole: string) {
     const lesson = await this.assertLessonAccess(lessonId, userId, userRole);
@@ -92,6 +122,27 @@ export class PodcastService {
   }
 
   // ─── Helpers (dùng chung với processor) ───────────────────────────────────────
+
+  /** Cho phép giảng viên sở hữu / admin HOẶC học viên đang theo học khoá đó. */
+  private async assertCourseAccess(
+    courseId: string,
+    userId: string,
+    userRole: string,
+  ) {
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
+      select: { id: true, instructorId: true },
+    });
+    if (!course) throw new NotFoundException('Course not found');
+    if (course.instructorId === userId || userRole === 'admin') return;
+
+    const enrollment = await this.prisma.enrollment.findFirst({
+      where: { studentId: userId, courseId, status: 'active' },
+    });
+    if (!enrollment) {
+      throw new ForbiddenException('Not enrolled in this course');
+    }
+  }
 
   /** Chỉ cho bài dạng đọc (document); giảng viên sở hữu/admin hoặc học viên đang học. */
   async assertLessonAccess(

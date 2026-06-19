@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ProgressBar } from '@/components/ui/ProgressBar';
-import { aiQuizApi } from '@/lib/api/ai.api';
+import { myReviewQuizApi } from '@/lib/api/ai.api';
 import { learnApi } from '@/lib/api/learn.api';
 import { youtubeEmbedUrl } from '@/lib/youtube';
 import { MaterialViewerModal, type MaterialKind } from './MaterialViewerModal';
@@ -27,22 +27,60 @@ interface LearnSidebarProps {
   isOpen: boolean;
   collapsed?: boolean;
   onClose: () => void;
-  /** Mở 1 quiz cá nhân (AI) đã tạo. Nếu không truyền thì ẩn mục "Quiz của tôi". */
-  onOpenAiQuiz?: (quizId: string) => void;
+  /** Đóng overlay mobile sau khi chọn bài, nhưng GIỮ outline trên desktop. */
+  onNavigate?: () => void;
+  /** Mở 1 quiz cá nhân (per-user) đã tạo qua chat AI. */
+  onOpenMyQuiz?: (quizId: string) => void;
+  /** Mở 1 quiz ôn tập (theo bài) đã tạo bằng nút "Tạo quiz ôn tập". */
+  onOpenReviewQuiz?: (lessonId: string) => void;
+  /** Quiz đang mở ở cột nội dung — để tô sáng trong mục lục ('ai:<id>' | 'review:<lessonId>'). */
+  activeQuizKey?: string;
+  /** Mở/nghe 1 podcast (theo bài) đã tạo — phát ở cột nội dung. */
+  onOpenPodcast?: (lessonId: string, lessonTitle: string) => void;
+  /** Podcast đang mở ở cột nội dung — để tô sáng trong mục lục ('podcast:<lessonId>'). */
+  activePodcastKey?: string;
+}
+
+/** mm:ss từ số giây (podcast ngắn). */
+function podcastDuration(durationSec: number): string {
+  const total = Math.max(0, Math.round(durationSec || 0));
+  const mm = Math.floor(total / 60);
+  const ss = total % 60;
+  return `${mm}:${String(ss).padStart(2, '0')}`;
 }
 
 type Viewer = { title: string; kind: MaterialKind; url: string };
 
-export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections, lessonProgress, progressPercent, isOpen, collapsed, onClose, onOpenAiQuiz }: LearnSidebarProps) {
+export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections, lessonProgress, progressPercent, isOpen, collapsed, onClose, onNavigate, onOpenMyQuiz, onOpenReviewQuiz, activeQuizKey, onOpenPodcast, activePodcastKey }: LearnSidebarProps) {
   const completedIds = new Set(lessonProgress.filter((lp: any) => lp.completed).map((lp: any) => lp.lessonId));
   const [viewer, setViewer] = useState<Viewer | null>(null);
 
-  const aiQuizzesQuery = useQuery({
-    queryKey: ['ai-quizzes', courseId],
-    queryFn: async () => (await aiQuizApi.list(courseId)).data,
-    enabled: !!onOpenAiQuiz,
+  const myQuizzesQuery = useQuery({
+    queryKey: ['my-review-quizzes', courseId],
+    queryFn: async () => (await myReviewQuizApi.list(courseId)).data,
+    enabled: !!onOpenMyQuiz,
   });
-  const aiQuizzes = aiQuizzesQuery.data ?? [];
+  const myQuizzes = myQuizzesQuery.data ?? [];
+
+  // Quiz ôn tập theo bài (tạo bằng nút "Tạo quiz ôn tập") — dùng chung mỗi bài.
+  const reviewQuizzesQuery = useQuery({
+    queryKey: ['review-quizzes', courseId],
+    queryFn: async () => (await learnApi.listReviewQuizzes(courseId)).data,
+    enabled: !!onOpenReviewQuiz,
+  });
+  const reviewQuizzes = reviewQuizzesQuery.data ?? [];
+
+  // Podcast theo bài (tạo bằng nút "Tạo podcast") — dùng chung mỗi bài.
+  const podcastsQuery = useQuery({
+    queryKey: ['podcasts', courseId],
+    queryFn: async () => (await learnApi.listPodcasts(courseId)).data,
+    enabled: !!onOpenPodcast,
+  });
+  const podcasts = podcastsQuery.data ?? [];
+
+  const showQuizSection = !!onOpenMyQuiz || !!onOpenReviewQuiz;
+  const quizCount = myQuizzes.length + reviewQuizzes.length;
+  const quizzesLoading = myQuizzesQuery.isLoading || reviewQuizzesQuery.isLoading;
 
   const refQuery = useQuery({
     queryKey: ['reference-materials', courseId],
@@ -110,13 +148,15 @@ export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections,
               </summary>
               <ul className="pb-1">
                 {section.lessons?.map((lesson: any) => {
-                  const isCurrent = lesson.id === currentLessonId;
+                  // Đang mở quiz ôn tập ở cột nội dung → không tô sáng bài học,
+                  // chỉ tô sáng mục quiz ôn tập (tránh 2 mục cùng active).
+                  const isCurrent = lesson.id === currentLessonId && !activeQuizKey;
                   const isCompleted = completedIds.has(lesson.id);
                   return (
                     <li key={lesson.id}>
                       <Link
                         href={`/learn/${courseId}/${lesson.id}`}
-                        onClick={onClose}
+                        onClick={onNavigate ?? onClose}
                         className={`flex items-start gap-3 px-5 py-3 border-l-[3px] transition-colors ${isCurrent ? 'bg-blue-50 border-blue-500' : 'border-transparent hover:bg-gray-50'}`}
                       >
                         {/* Status circle */}
@@ -137,29 +177,110 @@ export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections,
             </details>
           ))}
 
-          {/* ── Quiz của tôi (AI tạo qua chat) ── */}
-          {onOpenAiQuiz && aiQuizzes.length > 0 && (
-            <details className="group border-b border-gray-100">
+          {/* ── Quiz ôn tập của tôi (AI tạo qua chat + tạo theo bài) ── */}
+          {showQuizSection && (
+            <details className="group border-b border-gray-100" open={quizCount > 0}>
               <summary className="px-5 py-3.5 cursor-pointer hover:bg-gray-50 list-none flex items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-gray-900">📝 Quiz của tôi ({aiQuizzes.length})</p>
+                <p className="text-sm font-semibold text-gray-900">Quiz ôn tập của tôi{quizCount > 0 ? ` (${quizCount})` : ''}</p>
                 <span className="text-gray-400 text-xs transition-transform group-open:rotate-180">⌄</span>
               </summary>
-              <ul className="pb-1">
-                {aiQuizzes.map((quiz) => (
-                  <li key={quiz.id}>
-                    <button
-                      onClick={() => onOpenAiQuiz(quiz.id)}
-                      className="w-full text-left flex items-start gap-3 px-5 py-3 hover:bg-gray-50 transition-colors"
-                    >
-                      <span className="mt-0.5 shrink-0">📝</span>
-                      <span className="min-w-0">
-                        <span className="block text-sm leading-snug text-gray-800 truncate">{quiz.title || 'Quiz ôn tập'}</span>
-                        <span className="block text-xs text-gray-400 mt-0.5">{quiz.questionCount} câu · {new Date(quiz.createdAt).toLocaleDateString('vi-VN')}</span>
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              {quizzesLoading ? (
+                <p className="px-5 py-3 text-xs text-gray-400">Đang tải…</p>
+              ) : quizCount === 0 ? (
+                <p className="px-5 py-3 text-xs text-gray-500 leading-relaxed">
+                  Chưa có quiz ôn tập. Nhờ AI tạo quiz trong khung chat (✦ Hỏi AI) hoặc bấm “✦ Tạo quiz ôn tập” ở bài học để luyện tập.
+                </p>
+              ) : (
+                <ul className="pb-1">
+                  {onOpenReviewQuiz && reviewQuizzes.map((quiz) => {
+                    const active = activeQuizKey === `review:${quiz.lessonId}`;
+                    return (
+                    <li key={`rq-${quiz.lessonId}`}>
+                      <button
+                        onClick={() => onOpenReviewQuiz(quiz.lessonId)}
+                        className={`w-full text-left flex items-start gap-3 px-5 py-3 border-l-[3px] transition-colors ${active ? 'bg-blue-50 border-blue-500' : 'border-transparent hover:bg-gray-50'}`}
+                      >
+                        <span className="mt-0.5 shrink-0">📝</span>
+                        <span className="min-w-0">
+                          <span className={`block text-sm leading-snug truncate ${active ? 'text-blue-700 font-semibold' : 'text-gray-800'}`}>{quiz.lessonTitle}</span>
+                          <span className="block text-xs text-gray-400 mt-0.5">Theo bài · {quiz.questionCount} câu · {new Date(quiz.updatedAt).toLocaleDateString('vi-VN')}</span>
+                        </span>
+                      </button>
+                    </li>
+                    );
+                  })}
+                  {onOpenMyQuiz && myQuizzes.map((quiz) => {
+                    const active = activeQuizKey === `ai:${quiz.id}`;
+                    return (
+                    <li key={`my-${quiz.id}`}>
+                      <button
+                        onClick={() => onOpenMyQuiz(quiz.id)}
+                        className={`w-full text-left flex items-start gap-3 px-5 py-3 border-l-[3px] transition-colors ${active ? 'bg-blue-50 border-blue-500' : 'border-transparent hover:bg-gray-50'}`}
+                      >
+                        <span className="mt-0.5 shrink-0">📝</span>
+                        <span className="min-w-0">
+                          <span className={`block text-sm leading-snug truncate ${active ? 'text-blue-700 font-semibold' : 'text-gray-800'}`}>{quiz.title || 'Quiz ôn tập'}</span>
+                          <span className="block text-xs text-gray-400 mt-0.5">Qua chat · {quiz.questionCount} câu · {new Date(quiz.createdAt).toLocaleDateString('vi-VN')}</span>
+                        </span>
+                      </button>
+                    </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </details>
+          )}
+
+          {/* ── Podcast của khóa học (tạo theo bài bằng nút "Tạo podcast") ── */}
+          {onOpenPodcast && (
+            <details className="group border-b border-gray-100" open={podcasts.length > 0}>
+              <summary className="px-5 py-3.5 cursor-pointer hover:bg-gray-50 list-none flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-gray-900">Podcast{podcasts.length > 0 ? ` (${podcasts.length})` : ''}</p>
+                <span className="text-gray-400 text-xs transition-transform group-open:rotate-180">⌄</span>
+              </summary>
+              {podcastsQuery.isLoading ? (
+                <p className="px-5 py-3 text-xs text-gray-400">Đang tải…</p>
+              ) : podcasts.length === 0 ? (
+                <p className="px-5 py-3 text-xs text-gray-500 leading-relaxed">
+                  Chưa có podcast. Mở một bài tài liệu rồi bấm “🎙 Tạo podcast” trong khung chat (✦ Hỏi AI) để tạo.
+                </p>
+              ) : (
+                <ul className="pb-1">
+                  {podcasts.map((p) => {
+                    const active = activePodcastKey === `podcast:${p.lessonId}`;
+                    if (p.status === 'ready') {
+                      return (
+                        <li key={`pc-${p.lessonId}`}>
+                          <button
+                            onClick={() => onOpenPodcast(p.lessonId, p.lessonTitle)}
+                            className={`w-full text-left flex items-start gap-3 px-5 py-3 border-l-[3px] transition-colors ${active ? 'bg-blue-50 border-blue-500' : 'border-transparent hover:bg-gray-50'}`}
+                          >
+                            <span className="mt-0.5 shrink-0">🎙</span>
+                            <span className="min-w-0">
+                              <span className={`block text-sm leading-snug truncate ${active ? 'text-blue-700 font-semibold' : 'text-gray-800'}`}>{p.lessonTitle}</span>
+                              <span className="block text-xs text-gray-400 mt-0.5">Theo bài · {podcastDuration(p.durationSec)} · {new Date(p.updatedAt).toLocaleDateString('vi-VN')}</span>
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    }
+                    const isBusy = p.status === 'pending' || p.status === 'processing';
+                    return (
+                      <li key={`pc-${p.lessonId}`}>
+                        <div className="flex items-start gap-3 px-5 py-3 border-l-[3px] border-transparent">
+                          <span className="mt-0.5 shrink-0">{isBusy ? '⏳' : '⚠'}</span>
+                          <span className="min-w-0">
+                            <span className="block text-sm leading-snug truncate text-gray-800">{p.lessonTitle}</span>
+                            <span className={`block text-xs mt-0.5 ${isBusy ? 'text-gray-400' : 'text-red-500'}`}>
+                              {isBusy ? 'Đang tạo…' : 'Tạo thất bại'}
+                            </span>
+                          </span>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </details>
           )}
 
@@ -167,7 +288,7 @@ export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections,
           {refMaterials.length > 0 && (
             <details className="group border-b border-gray-100">
               <summary className="px-5 py-3.5 cursor-pointer hover:bg-gray-50 list-none flex items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-gray-900">📎 Tài liệu tham khảo ({refMaterials.length})</p>
+                <p className="text-sm font-semibold text-gray-900">Tài liệu tham khảo ({refMaterials.length})</p>
                 <span className="text-gray-400 text-xs transition-transform group-open:rotate-180">⌄</span>
               </summary>
               <ul className="pb-1">
@@ -194,7 +315,7 @@ export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections,
           {fileCount > 0 && (
             <details className="group border-b border-gray-100">
               <summary className="px-5 py-3.5 cursor-pointer hover:bg-gray-50 list-none flex items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-gray-900">📚 Tài liệu toàn khóa học ({fileCount})</p>
+                <p className="text-sm font-semibold text-gray-900">Tài liệu toàn khóa học ({fileCount})</p>
                 <span className="text-gray-400 text-xs transition-transform group-open:rotate-180">⌄</span>
               </summary>
               <div className="pb-1">

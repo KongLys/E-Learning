@@ -1,9 +1,10 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { learnApi } from '@/lib/api/learn.api';
-import { aiQuizApi } from '@/lib/api/ai.api';
+import { myReviewQuizApi, type AskScope } from '@/lib/api/ai.api';
+import { useAiChatBridge } from '@/store/ai-chat-bridge.store';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { VideoPlayer, formatSeconds } from '@/components/learn/VideoPlayer';
 import { NotesPanel } from '@/components/learn/NotesPanel';
@@ -12,7 +13,6 @@ import { QuizUI } from '@/components/learn/QuizUI';
 import { ReviewQuizUI } from '@/components/learn/ReviewQuizUI';
 import { LearnSidebar } from '@/components/learn/LearnSidebar';
 import { AiChatPanel } from '@/components/learn/AiChatPanel';
-import { SafeHtml } from '@/components/common/SafeHtml';
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 
@@ -27,6 +27,8 @@ export default function LearnPage() {
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const [aiPanelWidth, setAiPanelWidth] = useState(400);
   const [noteAddSignal, setNoteAddSignal] = useState(0);
+  // Đã cuộn khỏi đầu trang → đẩy widget thời gian/hoàn thành trượt sang phải.
+  const [docScrolled, setDocScrolled] = useState(false);
   const videoTimeRef = useRef(0);
   const completedRef = useRef(false);
   const aiResizingRef = useRef(false);
@@ -34,6 +36,9 @@ export default function LearnPage() {
   const { data: lessonData, isLoading: lessonLoading } = useQuery({
     queryKey: ['lesson', lessonId],
     queryFn: () => learnApi.getLessonDetail(lessonId),
+    // Giữ dữ liệu bài cũ khi chuyển bài → trang không sập về spinner toàn màn
+    // hình, sidebar không bị unmount/remount (tránh "mất" click phải bấm 2-3 lần).
+    placeholderData: keepPreviousData,
   });
 
   const { data: sectionsData } = useQuery({
@@ -79,12 +84,60 @@ export default function LearnPage() {
     enabled: lessonData?.data?.type === 'quiz',
   });
 
-  // Quiz cá nhân (AI) mở từ mục "Quiz của tôi" trong sidebar
-  const [aiQuizModal, setAiQuizModal] = useState<any>(null);
-  const openAiQuiz = useMutation({
-    mutationFn: (id: string) => aiQuizApi.get(id),
-    onSuccess: (res) => setAiQuizModal(res.data),
+  // Quiz đang làm — hiển thị ngay trong cột nội dung (không dùng modal).
+  // 'review' = quiz ôn tập theo bài; 'ai' = quiz cá nhân ("Quiz của tôi").
+  const [activeQuiz, setActiveQuiz] = useState<{
+    quiz: any;
+    kind: 'review' | 'ai';
+    scope?: AskScope;
+  } | null>(null);
+  const openMyQuiz = useMutation({
+    mutationFn: (id: string) => myReviewQuizApi.get(id),
+    onSuccess: (res) => openQuiz(res.data, 'ai'),
   });
+  // Mở quiz ôn tập theo bài (từ sidebar) — có thể là bài khác bài đang xem.
+  const openReviewQuiz = useMutation({
+    mutationFn: (lid: string) => learnApi.getReviewQuiz(lid),
+    onSuccess: (res) => openQuiz(res.data, 'review'),
+  });
+
+  // Podcast đang nghe — phát ở cột nội dung (giống quiz ôn tập), có thể là bài khác bài đang xem.
+  const [activePodcast, setActivePodcast] = useState<{
+    lessonId: string;
+    lessonTitle: string;
+    audioUrl: string;
+    durationSec: number;
+  } | null>(null);
+  const openPodcast = useMutation({
+    mutationFn: async ({ lid, title }: { lid: string; title: string }) => {
+      const res = await learnApi.getPodcast(lid);
+      return { lessonId: lid, lessonTitle: title, data: res.data };
+    },
+    onSuccess: ({ lessonId: lid, lessonTitle, data }) => {
+      if (data?.status !== 'ready' || !data?.audioUrl) return;
+      setActiveQuiz(null); // hai chế độ loại trừ nhau
+      setActivePodcast({ lessonId: lid, lessonTitle, audioUrl: data.audioUrl, durationSec: data.durationSec ?? 0 });
+      setSidebarOpen(false);
+    },
+  });
+
+  // Mở quiz ở cột nội dung, GIỮ mục lục khung chương trình để điều hướng dễ.
+  // Quiz ôn tập gắn với bài của chính nó (quiz.lessonId), không nhất thiết là bài đang xem.
+  const openQuiz = (quiz: any, kind: 'review' | 'ai') => {
+    const scope = kind === 'review' ? { lessonId: quiz.lessonId ?? lessonId } : undefined;
+    setActivePodcast(null); // hai chế độ loại trừ nhau
+    setActiveQuiz({ quiz, kind, scope });
+    setSidebarOpen(false); // đóng overlay mục lục trên mobile; mục lục desktop vẫn hiện
+  };
+
+  const activePodcastKey = activePodcast ? `podcast:${activePodcast.lessonId}` : undefined;
+
+  // Khoá quiz đang mở (để tô sáng trong mục lục): 'ai:<id>' hoặc 'review:<lessonId>'.
+  const activeQuizKey = activeQuiz
+    ? activeQuiz.kind === 'ai'
+      ? `ai:${activeQuiz.quiz.id}`
+      : `review:${activeQuiz.quiz.lessonId}`
+    : undefined;
 
   const lesson = lessonData?.data;
   const progress = progressData?.data;
@@ -115,6 +168,9 @@ export default function LearnPage() {
 
   // Reset cờ hoàn thành khi đổi bài
   useEffect(() => { completedRef.current = false; }, [lessonId]);
+
+  // Đổi bài học thì thoát quiz đang mở để hiện nội dung bài (điều hướng qua lại mượt).
+  useEffect(() => { setActiveQuiz(null); setActivePodcast(null); setDocScrolled(false); }, [lessonId]);
 
   // Kéo để mở rộng/thu nhỏ khung chat AI (cột phải)
   useEffect(() => {
@@ -149,6 +205,13 @@ export default function LearnPage() {
 
   // Mở khung chat AI bên phải, đồng thời thu gọn mục lục chương trình để lấy chỗ.
   const openAiPanel = () => { setAiPanelOpen(true); setOutlineCollapsed(true); setSidebarOpen(false); };
+
+  // Khi có prompt được bơm vào panel (vd: nút "Vì sao đúng/sai?"), đảm bảo panel mở.
+  const pendingAsk = useAiChatBridge((s) => s.pending);
+  useEffect(() => {
+    if (pendingAsk && !aiPanelOpen) openAiPanel();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingAsk]);
 
   const markCompleteOnce = (then?: () => void) => {
     if (completedRef.current) { then?.(); return; }
@@ -225,12 +288,66 @@ export default function LearnPage() {
           isOpen={sidebarOpen}
           collapsed={outlineCollapsed}
           onClose={() => { setSidebarOpen(false); setOutlineCollapsed(true); }}
-          onOpenAiQuiz={(id) => openAiQuiz.mutate(id)}
+          onNavigate={() => setSidebarOpen(false)}
+          onOpenMyQuiz={(id) => openMyQuiz.mutate(id)}
+          onOpenReviewQuiz={(lid) => openReviewQuiz.mutate(lid)}
+          activeQuizKey={activeQuizKey}
+          onOpenPodcast={(lid, title) => openPodcast.mutate({ lid, title })}
+          activePodcastKey={activePodcastKey}
         />
 
         {/* Main content */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6">
+        <main
+          className="flex-1 overflow-y-auto p-4 lg:p-6"
+          onScroll={(e) => {
+            const next = e.currentTarget.scrollTop > 24;
+            setDocScrolled((prev) => (prev === next ? prev : next));
+          }}
+        >
           <div className="max-w-4xl mx-auto space-y-5">
+          {activeQuiz ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-lg font-bold truncate">
+                  {activeQuiz.quiz.title || 'Quiz ôn tập'}
+                </h2>
+                <button
+                  onClick={() => setActiveQuiz(null)}
+                  className="shrink-0 text-sm font-medium text-gray-500 hover:text-gray-800"
+                >
+                  ← Quay lại bài học
+                </button>
+              </div>
+              <ReviewQuizUI
+                quiz={activeQuiz.quiz}
+                askScope={activeQuiz.scope}
+                submit={(ans) =>
+                  activeQuiz.kind === 'review'
+                    ? learnApi.submitReviewQuiz(activeQuiz.quiz.lessonId ?? lessonId, ans)
+                    : myReviewQuizApi.submit(activeQuiz.quiz.id, ans)
+                }
+                onClose={() => setActiveQuiz(null)}
+              />
+            </div>
+          ) : activePodcast ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-lg font-bold truncate">🎙 {activePodcast.lessonTitle}</h2>
+                <button
+                  onClick={() => setActivePodcast(null)}
+                  className="shrink-0 text-sm font-medium text-gray-500 hover:text-gray-800"
+                >
+                  ← Quay lại bài học
+                </button>
+              </div>
+              <div className="rounded-2xl bg-slate-50 p-5">
+                <audio controls autoPlay preload="auto" src={activePodcast.audioUrl} className="w-full">
+                  Trình duyệt của bạn không hỗ trợ phát audio.
+                </audio>
+              </div>
+            </div>
+          ) : (
+          <>
           {lesson.type === 'video' && videoUrlData?.data?.url && (
             <VideoPlayer
               lessonId={lessonId}
@@ -252,48 +369,76 @@ export default function LearnPage() {
 
           {lesson.type === 'document' && (
             <div className="space-y-4">
-              {/* Nội dung rich text */}
-              {lesson.documentAsset?.contentHtml && (
-                <SafeHtml html={lesson.documentAsset.contentHtml} className="prose prose-sm max-w-none rounded-2xl bg-slate-50 p-6" />
-              )}
+              {/* Thanh tiêu đề + hành động — dính trên cùng, nội dung cuộn bên dưới.
+                  Nút/đồng hồ canh phải thẳng mép phải nội dung; cuộn xuống trượt sang phải (motion). */}
+              <div className="sticky top-0 z-10 -mt-2 flex items-start justify-between gap-4 bg-canvas pt-2 pb-2">
+                <div className="min-w-0">
+                  <h2 className="text-xl lg:text-2xl font-bold text-gray-900 leading-snug">{lesson.title}</h2>
+                  {lesson.description && <p className="mt-1 text-sm text-gray-600">{lesson.description}</p>}
+                </div>
+                <div
+                  className={`shrink-0 transition-transform duration-300 ease-out will-change-transform ${
+                    docScrolled ? 'lg:translate-x-6' : 'lg:translate-x-0'
+                  }`}
+                >
+                  {minReadTime > 0 && !docReadEnough ? (
+                    <div className="flex flex-col items-center gap-1" title="Thời gian đọc còn lại">
+                      <ReadTimerRing remaining={Math.max(minReadTime - readSec, 0)} progress={readSec / minReadTime} />
+                      <span className="text-[11px] text-gray-400">Thời gian đọc</span>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={completeDocument}
+                      disabled={completeMutation.isPending}
+                      className="rounded-full bg-green-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-700 disabled:opacity-60"
+                    >
+                      {completeMutation.isPending ? 'Đang lưu...' : '✓ Đánh dấu hoàn thành'}
+                    </button>
+                  )}
+                </div>
+              </div>
 
-              {/* File đính kèm */}
+              {/* Chỉ tên file + nút tải về — KHÔNG hiển thị nội dung tài liệu */}
               {docUrlData?.data?.url ? (
-                lesson.documentAsset?.fileType === 'pdf' ? (
-                  <div className="space-y-2">
-                    {lesson.documentAsset?.fileName && (
-                      <p className="text-xs text-gray-500 flex items-center gap-1">
-                        📄 <span className="font-medium text-gray-700">{lesson.documentAsset.fileName}</span>
-                      </p>
-                    )}
-                    <iframe src={docUrlData.data.url} className="w-full h-150 rounded-2xl ring-1 ring-gray-100" title={lesson.documentAsset?.fileName ?? 'PDF'} />
+                <div className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 p-5">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="shrink-0 text-2xl">📄</span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-medium text-gray-800">{lesson.documentAsset?.fileName ?? 'Tài liệu'}</span>
+                      {lesson.documentAsset?.fileType && (
+                        <span className="mt-0.5 block text-xs text-gray-400">{lesson.documentAsset.fileType.toUpperCase()}</span>
+                      )}
+                    </span>
                   </div>
-                ) : (
-                  <div className="text-center text-gray-600 py-10 rounded-2xl bg-slate-50">
-                    <p className="mb-1 text-sm font-medium text-gray-800">
-                      📄 {lesson.documentAsset?.fileName ?? 'Tài liệu Word (.docx)'}
-                    </p>
-                    {lesson.documentAsset?.fileName && (
-                      <p className="mb-3 text-xs text-gray-400">DOCX</p>
-                    )}
-                    <a href={docUrlData.data.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline font-medium">Tải về để đọc</a>
-                  </div>
-                )
+                  <a
+                    href={docUrlData.data.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    download
+                    className="shrink-0 rounded-full bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                  >
+                    Tải về để đọc
+                  </a>
+                </div>
               ) : (
-                !lesson.documentAsset?.contentHtml && <div className="text-center py-10 text-gray-400">Tài liệu chưa được tải lên</div>
+                <div className="rounded-2xl bg-slate-50 py-10 text-center text-gray-400">Tài liệu chưa được tải lên</div>
               )}
 
-              <button
-                onClick={completeDocument}
-                disabled={!docReadEnough || completeMutation.isPending}
-                className={`w-full py-3 rounded-full text-sm font-semibold transition-colors disabled:cursor-not-allowed ${docReadEnough ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-slate-100 text-gray-400'}`}
-              >
-                {completeMutation.isPending
-                  ? 'Đang lưu...'
-                  : docReadEnough
-                    ? '✓ Đánh dấu hoàn thành'
-                    : `Cần đọc thêm ${minReadTime - readSec}s để hoàn thành`}
-              </button>
+              {/* Hỏi đáp (mặc định đóng) */}
+              <div className="rounded-2xl bg-slate-50 overflow-hidden">
+                <button
+                  onClick={() => setQaOpen((v) => !v)}
+                  className="w-full flex items-center justify-between px-4 py-3.5 text-sm font-semibold text-gray-800 hover:bg-slate-100/70 transition-colors"
+                >
+                  <span>💬 Hỏi đáp</span>
+                  <span className={`text-gray-400 transition-transform ${qaOpen ? 'rotate-180' : ''}`}>⌄</span>
+                </button>
+                {qaOpen && (
+                  <div className="px-4 pb-4">
+                    <QuestionsPanel lessonId={lessonId} positionType="none" getCurrentPosition={() => 0} />
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -313,19 +458,17 @@ export default function LearnPage() {
             />
           )}
 
-          {/* Tiêu đề bài học + hành động (video/document: hiện dưới nội dung) */}
-          {lesson.type !== 'quiz' && (
+          {/* Tiêu đề bài học + hành động (video: hiện dưới video) */}
+          {lesson.type === 'video' && (
             <>
               <div className="flex items-start justify-between gap-4 pt-1">
                 <h2 className="text-xl lg:text-2xl font-bold text-gray-900 leading-snug">{lesson.title}</h2>
-                {lesson.type === 'video' && (
-                  <button
-                    onClick={saveNote}
-                    className="shrink-0 inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700"
-                  >
-                    🗒 Lưu ghi chú
-                  </button>
-                )}
+                <button
+                  onClick={saveNote}
+                  className="shrink-0 inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700"
+                >
+                  🗒 Lưu ghi chú
+                </button>
               </div>
               {lesson.description && <p className="text-sm text-gray-600 -mt-3">{lesson.description}</p>}
             </>
@@ -394,26 +537,7 @@ export default function LearnPage() {
             </div>
           )}
 
-          {/* Document: nút mở Hỏi đáp (mặc định đóng) */}
-          {lesson.type === 'document' && (
-            <div className="rounded-2xl bg-slate-50 overflow-hidden">
-              <button
-                onClick={() => setQaOpen((v) => !v)}
-                className="w-full flex items-center justify-between px-4 py-3.5 text-sm font-semibold text-gray-800 hover:bg-slate-100/70 transition-colors"
-              >
-                <span>💬 Hỏi đáp</span>
-                <span className={`text-gray-400 transition-transform ${qaOpen ? 'rotate-180' : ''}`}>⌄</span>
-              </button>
-              {qaOpen && (
-                <div className="px-4 pb-4">
-                  <QuestionsPanel
-                    lessonId={lessonId}
-                    positionType="none"
-                    getCurrentPosition={() => 0}
-                  />
-                </div>
-              )}
-            </div>
+          </>
           )}
           </div>
         </main>
@@ -440,43 +564,46 @@ export default function LearnPage() {
                 courseId={courseId}
                 currentLessonId={lessonId}
                 currentLessonType={lesson.type}
+                currentLessonTitle={lesson.title}
                 onClose={() => setAiPanelOpen(false)}
+                onOpenQuiz={openQuiz}
+                onOpenPodcast={(lid, title) => openPodcast.mutate({ lid, title })}
               />
             </aside>
           </>
         )}
       </div>
+    </div>
+  );
+}
 
-      {/* Modal làm quiz cá nhân (AI) từ "Quiz của tôi" */}
-      {aiQuizModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4"
-          onClick={() => setAiQuizModal(null)}
-        >
-          <div
-            className="my-8 w-full max-w-lg rounded-2xl bg-white shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-              <h2 className="text-lg font-bold truncate">{aiQuizModal.title || 'Quiz ôn tập'}</h2>
-              <button
-                onClick={() => setAiQuizModal(null)}
-                className="text-xl text-gray-400 hover:text-gray-700 shrink-0"
-                aria-label="Đóng"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="px-6 py-5">
-              <ReviewQuizUI
-                quiz={aiQuizModal}
-                submit={(ans) => aiQuizApi.submit(aiQuizModal.id, ans)}
-                onClose={() => setAiQuizModal(null)}
-              />
-            </div>
-          </div>
-        </div>
-      )}
+/** Vòng tròn tiến trình thời gian đọc tài liệu, đếm ngược mm:ss ở giữa. */
+function ReadTimerRing({ remaining, progress }: { remaining: number; progress: number }) {
+  const R = 26;
+  const CIRC = 2 * Math.PI * R;
+  const pct = Math.min(Math.max(progress, 0), 1);
+  const mm = Math.floor(remaining / 60);
+  const ss = remaining % 60;
+  return (
+    <div className="relative h-16 w-16">
+      <svg viewBox="0 0 64 64" className="h-16 w-16 -rotate-90">
+        <circle cx="32" cy="32" r={R} fill="none" stroke="#e5e7eb" strokeWidth="5" />
+        <circle
+          cx="32"
+          cy="32"
+          r={R}
+          fill="none"
+          stroke="#2563eb"
+          strokeWidth="5"
+          strokeLinecap="round"
+          strokeDasharray={CIRC}
+          strokeDashoffset={CIRC * (1 - pct)}
+          className="transition-all duration-1000 ease-linear"
+        />
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center text-xs font-semibold tabular-nums text-gray-700">
+        {mm}:{String(ss).padStart(2, '0')}
+      </span>
     </div>
   );
 }

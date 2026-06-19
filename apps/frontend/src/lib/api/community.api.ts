@@ -27,4 +27,6 @@ export const communityApi = {
   deleteComment: (commentId: string) => apiClient.delete(`/comments/${commentId}`),
 
   markSolution: (commentId: string) => apiClient.post(`/comments/${commentId}/solution`),
+
+  voteComment: (commentId: string) => apiClient.post(`/comments/${commentId}/vote`),
 };

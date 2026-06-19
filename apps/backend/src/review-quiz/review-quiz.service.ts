@@ -21,6 +21,32 @@ export class ReviewQuizService {
 
   // ─── Public API ──────────────────────────────────────────────────────────────
 
+  /**
+   * Danh sách quiz ôn tập (theo bài học) đã tạo trong khoá — mới nhất trước.
+   * Quiz ôn tập dùng chung mỗi bài, không gắn user nên trả về theo khoá.
+   */
+  async listByCourse(courseId: string, userId: string, userRole: string) {
+    await this.assertCourseAccess(courseId, userId, userRole);
+    const quizzes = await this.prisma.reviewQuiz.findMany({
+      where: { lesson: { section: { courseId } } },
+      orderBy: { updatedAt: 'desc' },
+      select: {
+        lessonId: true,
+        createdAt: true,
+        updatedAt: true,
+        lesson: { select: { title: true } },
+        _count: { select: { questions: true } },
+      },
+    });
+    return quizzes.map((q) => ({
+      lessonId: q.lessonId!,
+      lessonTitle: q.lesson?.title ?? '',
+      questionCount: q._count.questions,
+      createdAt: q.createdAt,
+      updatedAt: q.updatedAt,
+    }));
+  }
+
   /** Lấy quiz ôn tập của bài học (đã ẩn đáp án đúng), hoặc null nếu chưa tạo. */
   async getReviewQuiz(lessonId: string, userId: string, userRole: string) {
     await this.assertLessonAccess(lessonId, userId, userRole);
@@ -129,6 +155,27 @@ export class ReviewQuizService {
   }
 
   // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+  /** Cho phép giảng viên sở hữu / admin HOẶC học viên đang theo học khoá đó. */
+  private async assertCourseAccess(
+    courseId: string,
+    userId: string,
+    userRole: string,
+  ) {
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
+      select: { id: true, instructorId: true },
+    });
+    if (!course) throw new NotFoundException('Course not found');
+    if (course.instructorId === userId || userRole === 'admin') return;
+
+    const enrollment = await this.prisma.enrollment.findFirst({
+      where: { studentId: userId, courseId, status: 'active' },
+    });
+    if (!enrollment) {
+      throw new ForbiddenException('Not enrolled in this course');
+    }
+  }
 
   /** Cho phép giảng viên sở hữu / admin HOẶC học viên đang theo học bài đó. */
   private async assertLessonAccess(

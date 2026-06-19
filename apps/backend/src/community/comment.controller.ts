@@ -33,6 +33,11 @@ export class CommentController {
     return this.commentService.deleteComment(id, u.userId, u.role);
   }
 
+  @Post('comments/:id/vote')
+  voteComment(@Param('id') id: string, @CurrentUser() u: { userId: string }) {
+    return this.commentService.voteComment(id, u.userId);
+  }
+
   @Post('comments/:id/solution')
   markSolution(@Param('id') id: string, @CurrentUser() u: { userId: string }) {
     return this.commentService.markSolution(id, u.userId);

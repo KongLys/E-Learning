@@ -4,6 +4,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePostDto } from './dto/create-post.dto';
 
@@ -11,7 +12,10 @@ const POST_EDIT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
 
 @Injectable()
 export class PostService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private events: EventEmitter2,
+  ) {}
 
   private async assertEnrolledOrInstructor(
     courseId: string,
@@ -45,7 +49,7 @@ export class PostService {
     ) {
       throw new ForbiddenException('Only instructors can create announcements');
     }
-    return this.prisma.communityPost.create({
+    const post = await this.prisma.communityPost.create({
       data: {
         courseId,
         authorId,
@@ -57,6 +61,17 @@ export class PostService {
         author: { select: { id: true, fullName: true, avatarUrl: true } },
       },
     });
+
+    // Thông báo tới toàn bộ học viên ghi danh khi giảng viên đăng thông báo.
+    if (post.type === 'announcement') {
+      this.events.emit('community.announcement.created', {
+        postId: post.id,
+        courseId,
+        authorId,
+      });
+    }
+
+    return post;
   }
 
   async listPosts(
@@ -97,6 +112,7 @@ export class PostService {
       where: { id: postId },
       include: {
         author: { select: { id: true, fullName: true, avatarUrl: true } },
+        course: { select: { slug: true, instructorId: true } },
         comments: {
           where: { status: 'active', parentId: null },
           orderBy: [

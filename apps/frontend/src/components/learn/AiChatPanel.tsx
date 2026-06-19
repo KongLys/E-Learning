@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { History, Plus, X } from 'lucide-react';
 import {
   aiChatApi,
-  aiQuizApi,
+  myReviewQuizApi,
   streamAsk,
   type AiConversation,
   type AiMessage,
@@ -15,7 +15,7 @@ import {
 import { learnApi } from '@/lib/api/learn.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorMessage } from '@/components/common/ErrorMessage';
-import { ReviewQuizUI } from '@/components/learn/ReviewQuizUI';
+import { useAiChatBridge } from '@/store/ai-chat-bridge.store';
 
 type Citation = NonNullable<AiMessage['citations']>[number];
 
@@ -36,15 +36,24 @@ interface AiChatPanelProps {
   /** Có => bật nút Quiz/Podcast theo bài và đặt phạm vi mặc định theo bài. */
   currentLessonId?: string;
   currentLessonType?: 'video' | 'document' | 'quiz';
+  /** Tiêu đề bài hiện tại — để mở podcast ở cột nội dung. */
+  currentLessonTitle?: string;
   /** Truyền vào khi dùng như panel để hiện nút đóng. */
   onClose?: () => void;
+  /** Mở quiz ở cột nội dung bài học (thay vì modal nội bộ). */
+  onOpenQuiz?: (quiz: any, kind: 'review' | 'ai') => void;
+  /** Mở/nghe podcast ở cột nội dung bài học. */
+  onOpenPodcast?: (lessonId: string, lessonTitle: string) => void;
 }
 
 export function AiChatPanel({
   courseId,
   currentLessonId,
   currentLessonType,
+  currentLessonTitle,
   onClose,
+  onOpenQuiz,
+  onOpenPodcast,
 }: AiChatPanelProps) {
   const qc = useQueryClient();
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -55,19 +64,13 @@ export function AiChatPanel({
   const [historyOpen, setHistoryOpen] = useState(false);
   // Phạm vi truy vấn: '' = cả khóa, 's:{sectionId}' = theo Phần, 'l:{lessonId}' = theo Bài
   const [scopeKey, setScopeKey] = useState(currentLessonId ? `l:${currentLessonId}` : '');
-  // Quiz vừa được tạo qua chat + quiz đang mở trong modal.
-  // `openQuizKind` quyết định endpoint nộp bài: 'review' theo bài, 'ai' theo quiz cá nhân.
+  // Quiz vừa được tạo qua chat (banner mời làm bài).
   const [createdQuiz, setCreatedQuiz] = useState<CreatedQuizInfo | null>(null);
-  const [openQuiz, setOpenQuiz] = useState<any>(null);
-  const [openQuizKind, setOpenQuizKind] = useState<'review' | 'ai'>('ai');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const openQuizMut = useMutation({
-    mutationFn: (id: string) => aiQuizApi.get(id),
-    onSuccess: (res) => {
-      setOpenQuizKind('ai');
-      setOpenQuiz(res.data);
-    },
+    mutationFn: (id: string) => myReviewQuizApi.get(id),
+    onSuccess: (res) => onOpenQuiz?.(res.data, 'ai'),
   });
 
   const conversationsQuery = useQuery({
@@ -97,15 +100,31 @@ export function AiChatPanel({
   });
 
   // ----- Quiz ôn tập (AI) cho bài hiện tại -----
-  const reviewQuizModal = useMutation({
+  // Kiểm tra bài này đã có quiz ôn tập chưa (null = chưa tạo).
+  const reviewQuizQuery = useQuery({
+    queryKey: ['review-quiz', currentLessonId],
+    queryFn: async () => (await learnApi.getReviewQuiz(currentLessonId!)).data ?? null,
+    enabled: !!currentLessonId && currentLessonType !== 'quiz',
+  });
+  const hasReviewQuiz = !!reviewQuizQuery.data;
+
+  // Đã có sẵn → mở thẳng quiz đó, KHÔNG tạo lại.
+  const openExistingReviewQuiz = () => {
+    if (reviewQuizQuery.data) onOpenQuiz?.(reviewQuizQuery.data, 'review');
+  };
+
+  // Tạo mới, hoặc tạo lại (đè lên nội dung cũ khi bài học đã cập nhật) rồi mở.
+  const generateReviewQuiz = useMutation({
     mutationFn: async () => {
-      const res = await learnApi.generateReviewQuiz(currentLessonId!);
+      // POST chỉ trả { count }; fetch lại quiz đầy đủ (đã ẩn đáp án) để mở.
+      await learnApi.generateReviewQuiz(currentLessonId!);
+      const res = await learnApi.getReviewQuiz(currentLessonId!);
       return res.data;
     },
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['review-quiz', currentLessonId] });
-      setOpenQuizKind('review');
-      setOpenQuiz(data);
+      qc.invalidateQueries({ queryKey: ['review-quizzes', courseId] });
+      onOpenQuiz?.(data, 'review');
     },
   });
 
@@ -121,9 +140,14 @@ export function AiChatPanel({
     },
   });
   const podcast = podcastQuery.data?.data ?? null;
+  // Hộp xác nhận trước khi tạo lại (podcast cũ vẫn dùng được — chỉ nên tạo lại khi nội dung bài đã đổi).
+  const [confirmRegen, setConfirmRegen] = useState(false);
   const generatePodcast = useMutation({
     mutationFn: () => learnApi.generatePodcast(currentLessonId!),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['podcast', currentLessonId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['podcast', currentLessonId] });
+      qc.invalidateQueries({ queryKey: ['podcasts', courseId] });
+    },
   });
 
   useEffect(() => {
@@ -136,8 +160,8 @@ export function AiChatPanel({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [pending, messagesQuery.data]);
 
-  const handleAsk = async () => {
-    const q = input.trim();
+  const handleAsk = async (override?: { query?: string; scope?: AskScope }) => {
+    const q = (override?.query ?? input).trim();
     if (!q || streaming) return;
     let convId = activeId;
     if (!convId) {
@@ -158,11 +182,13 @@ export function AiChatPanel({
     let buffer = '';
     let citations: Citation[] = [];
 
-    const scope: AskScope | undefined = scopeKey.startsWith('s:')
-      ? { sectionId: scopeKey.slice(2) }
-      : scopeKey.startsWith('l:')
-        ? { lessonId: scopeKey.slice(2) }
-        : undefined;
+    const scope: AskScope | undefined =
+      override?.scope ??
+      (scopeKey.startsWith('s:')
+        ? { sectionId: scopeKey.slice(2) }
+        : scopeKey.startsWith('l:')
+          ? { lessonId: scopeKey.slice(2) }
+          : undefined);
 
     await streamAsk(
       convId,
@@ -184,7 +210,7 @@ export function AiChatPanel({
         },
         onQuiz: (quiz) => {
           setCreatedQuiz(quiz);
-          qc.invalidateQueries({ queryKey: ['ai-quizzes', courseId] });
+          qc.invalidateQueries({ queryKey: ['my-review-quizzes', courseId] });
         },
         onError: (msg) => setStreamError(msg),
       },
@@ -196,6 +222,19 @@ export function AiChatPanel({
     qc.invalidateQueries({ queryKey: ['ai-messages', convId] });
     qc.invalidateQueries({ queryKey: ['ai-conversations', courseId] });
   };
+
+  // Tiêu thụ prompt được bơm từ ngoài (vd: nút "Vì sao đúng/sai?" trong quiz).
+  const pendingAsk = useAiChatBridge((s) => s.pending);
+  const consumeAsk = useAiChatBridge((s) => s.consume);
+  useEffect(() => {
+    if (!pendingAsk || streaming) return;
+    const p = consumeAsk();
+    if (!p) return;
+    if (p.scope?.lessonId) setScopeKey(`l:${p.scope.lessonId}`);
+    else if (p.scope?.sectionId) setScopeKey(`s:${p.scope.sectionId}`);
+    void handleAsk({ query: p.text, scope: p.scope });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingAsk, streaming]);
 
   const messages: (AiMessage | PendingMessage)[] = [
     ...(messagesQuery.data ?? []),
@@ -319,48 +358,117 @@ export function AiChatPanel({
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               {showQuizBtn && (
-                <button
-                  onClick={() => reviewQuizModal.mutate()}
-                  disabled={reviewQuizModal.isPending}
-                  className="inline-flex items-center gap-1 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-700 disabled:opacity-60"
-                >
-                  {reviewQuizModal.isPending ? '⏳ Đang tạo quiz…' : '✦ Tạo quiz ôn tập'}
-                </button>
+                reviewQuizQuery.isLoading ? (
+                  <span className="text-xs text-gray-400">Đang kiểm tra quiz ôn tập…</span>
+                ) : hasReviewQuiz ? (
+                  <>
+                    <button
+                      onClick={openExistingReviewQuiz}
+                      className="inline-flex items-center gap-1 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-700"
+                    >
+                      📝 Làm quiz ôn tập
+                    </button>
+                    <button
+                      onClick={() => generateReviewQuiz.mutate()}
+                      disabled={generateReviewQuiz.isPending}
+                      title="Tạo lại quiz, đè lên nội dung cũ (dùng khi bài học đã cập nhật)"
+                      className="inline-flex items-center gap-1 rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs font-medium text-purple-700 hover:bg-purple-100 disabled:opacity-60"
+                    >
+                      {generateReviewQuiz.isPending ? '⏳ Đang tạo lại…' : '↻ Tạo lại'}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => generateReviewQuiz.mutate()}
+                    disabled={generateReviewQuiz.isPending}
+                    className="inline-flex items-center gap-1 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-700 disabled:opacity-60"
+                  >
+                    {generateReviewQuiz.isPending ? '⏳ Đang tạo quiz…' : '✦ Tạo quiz ôn tập'}
+                  </button>
+                )
               )}
               {podcastEnabled && (
-                <button
-                  onClick={() => generatePodcast.mutate()}
-                  disabled={
-                    generatePodcast.isPending ||
-                    podcast?.status === 'pending' ||
-                    podcast?.status === 'processing'
-                  }
-                  className="inline-flex items-center gap-1 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-700 disabled:opacity-60"
-                >
-                  {podcast?.status === 'pending' || podcast?.status === 'processing'
-                    ? '⏳ Đang tạo podcast…'
-                    : podcast?.status === 'ready'
-                      ? '🎙 Tạo lại podcast'
-                      : '🎙 Tạo podcast'}
-                </button>
+                podcast?.status === 'pending' || podcast?.status === 'processing' ? (
+                  <button
+                    disabled
+                    className="inline-flex items-center gap-1 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+                  >
+                    ⏳ Đang tạo podcast…
+                  </button>
+                ) : podcast?.status === 'ready' ? (
+                  <>
+                    <button
+                      onClick={() => onOpenPodcast?.(currentLessonId!, currentLessonTitle ?? 'Podcast')}
+                      className="inline-flex items-center gap-1 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-700"
+                    >
+                      🎙 Nghe podcast
+                    </button>
+                    <button
+                      onClick={() => setConfirmRegen(true)}
+                      title="Tạo lại podcast, đè lên bản cũ (dùng khi bài học đã cập nhật)"
+                      className="inline-flex items-center gap-1 rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs font-medium text-purple-700 hover:bg-purple-100"
+                    >
+                      ↻ Tạo lại
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => generatePodcast.mutate()}
+                    disabled={generatePodcast.isPending}
+                    className="inline-flex items-center gap-1 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-700 disabled:opacity-60"
+                  >
+                    🎙 Tạo podcast
+                  </button>
+                )
               )}
             </div>
-            {reviewQuizModal.isError && (
+            {generateReviewQuiz.isError && (
               <p className="text-xs text-red-600">
-                {(reviewQuizModal.error as any)?.response?.data?.message ??
+                {(generateReviewQuiz.error as any)?.response?.data?.message ??
                   'Không tạo được quiz ôn tập, vui lòng thử lại.'}
               </p>
-            )}
-            {podcastEnabled && podcast?.status === 'ready' && podcast.audioUrl && (
-              <audio controls preload="none" src={podcast.audioUrl} className="w-full">
-                Trình duyệt của bạn không hỗ trợ phát audio.
-              </audio>
             )}
             {podcastEnabled && podcast?.status === 'failed' && (
               <p className="text-xs text-red-600">
                 {podcast.errorMsg ?? 'Không tạo được podcast, vui lòng thử lại.'}
               </p>
             )}
+          </div>
+        )}
+
+        {/* Xác nhận tạo lại podcast (ghi đè bản hiện tại). */}
+        {confirmRegen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+            onClick={() => setConfirmRegen(false)}
+          >
+            <div
+              className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-base font-bold text-gray-900">Tạo lại podcast?</h3>
+              <p className="mt-2 text-sm text-gray-600 leading-relaxed">
+                Bài học đã có podcast. Chỉ nên tạo lại nếu nội dung bài đã thay đổi — podcast hiện tại sẽ
+                bị thay thế.
+              </p>
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  onClick={() => setConfirmRegen(false)}
+                  className="rounded-lg px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={() => {
+                    generatePodcast.mutate();
+                    setConfirmRegen(false);
+                  }}
+                  className="rounded-lg bg-purple-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-purple-700"
+                >
+                  Tạo lại
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -404,7 +512,7 @@ export function AiChatPanel({
             className="flex-1 resize-none rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <button
-            onClick={handleAsk}
+            onClick={() => handleAsk()}
             disabled={streaming || !input.trim()}
             className="self-end rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
           >
@@ -412,41 +520,6 @@ export function AiChatPanel({
           </button>
         </div>
       </div>
-
-      {/* Modal làm quiz */}
-      {openQuiz && (
-        <div
-          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4"
-          onClick={() => setOpenQuiz(null)}
-        >
-          <div
-            className="my-8 w-full max-w-lg rounded-2xl bg-white shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-              <h2 className="text-lg font-bold truncate">{openQuiz.title || 'Quiz ôn tập'}</h2>
-              <button
-                onClick={() => setOpenQuiz(null)}
-                className="text-xl text-gray-400 hover:text-gray-700 shrink-0"
-                aria-label="Đóng"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="px-6 py-5">
-              <ReviewQuizUI
-                quiz={openQuiz}
-                submit={(ans) =>
-                  openQuizKind === 'review'
-                    ? learnApi.submitReviewQuiz(currentLessonId!, ans)
-                    : aiQuizApi.submit(openQuiz.id, ans)
-                }
-                onClose={() => setOpenQuiz(null)}
-              />
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

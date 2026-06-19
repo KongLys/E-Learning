@@ -56,6 +56,40 @@ export class NotificationListener {
     this.gateway.pushToUser(event.studentId, notif);
   }
 
+  @OnEvent('community.announcement.created')
+  async onCommunityAnnouncement(event: {
+    postId: string;
+    courseId: string;
+    authorId: string;
+  }) {
+    const [post, enrollments] = await Promise.all([
+      this.prisma.communityPost.findUnique({
+        where: { id: event.postId },
+        select: { title: true, course: { select: { title: true } } },
+      }),
+      this.prisma.enrollment.findMany({
+        where: { courseId: event.courseId },
+        select: { studentId: true },
+      }),
+    ]);
+    if (!post) return;
+
+    await Promise.all(
+      enrollments
+        .filter((e) => e.studentId !== event.authorId)
+        .map(async (e) => {
+          const notif = await this.notifService.create(
+            e.studentId,
+            'community_announcement',
+            'Thông báo mới',
+            `Giảng viên đăng thông báo trong khóa "${post.course.title}": ${post.title}`,
+            `/community/${event.postId}`,
+          );
+          this.gateway.pushToUser(e.studentId, notif);
+        }),
+    );
+  }
+
   @OnEvent('moderation.rejected')
   async onModerationRejected(event: {
     ownerId: string;

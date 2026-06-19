@@ -13,8 +13,8 @@ import { GuardrailService } from './guard/guardrail.service';
 import { AiChatService } from './ai-chat.service';
 import { AiChatController } from './ai-chat.controller';
 import { QuizGenerationService } from './quiz-generation.service';
-import { AiQuizService } from './ai-quiz.service';
-import { AiQuizController } from './ai-quiz.controller';
+import { ChatQuizService } from './chat-quiz.service';
+import { ChatQuizController } from './chat-quiz.controller';
 import {
   LessonIndexProcessor,
   LESSON_INDEX_QUEUE,
@@ -55,7 +55,7 @@ import { ModerationModule } from '../moderation/moderation.module';
     BullModule.registerQueue({ name: LESSON_INDEX_QUEUE }),
     BullModule.registerQueue({ name: VIDEO_TRANSCRIBE_QUEUE }),
   ],
-  controllers: [AiChatController, MindmapController, AiQuizController],
+  controllers: [AiChatController, MindmapController, ChatQuizController],
   providers: [
     GeminiService,
     GoogleTtsService,
@@ -67,7 +67,7 @@ import { ModerationModule } from '../moderation/moderation.module';
     GuardrailService,
     AiChatService,
     QuizGenerationService,
-    AiQuizService,
+    ChatQuizService,
     LessonIndexProcessor,
     VideoTranscribeProcessor,
     MindmapService,

@@ -51,11 +51,12 @@ export class QuizGenerationService {
   ): Promise<GeneratedQuestion[]> {
     const systemInstruction =
       'Bạn là trợ giảng tạo câu hỏi trắc nghiệm ôn tập bằng tiếng Việt. ' +
-      'Chỉ dựa vào nội dung được cung cấp. ' +
+      'Chỉ dựa vào nội dung được cung cấp, tập trung vào KIẾN THỨC TRỌNG TÂM để người học hiểu và vận dụng — ' +
+      'KHÔNG hỏi chi tiết hành chính/định dạng của tài liệu (trang, mục, chương, tác giả…) hay kiểu bắt học thuộc lòng. ' +
       'Luôn trả về JSON hợp lệ đúng định dạng yêu cầu, không kèm bất kỳ chữ nào ngoài JSON. ' +
       UNTRUSTED_DATA_RULE;
 
-    const prompt = `Dựa vào nội dung dưới đây, hãy tạo ${opts.count} câu hỏi trắc nghiệm ôn tập (mỗi câu có đúng 1 đáp án đúng và 4 lựa chọn).
+    const prompt = `Dựa vào nội dung dưới đây, hãy tạo ${opts.count} câu hỏi trắc nghiệm ÔN TẬP KIẾN THỨC TRỌNG TÂM (mỗi câu có đúng 1 đáp án đúng và 4 lựa chọn).
 
 Trả về DUY NHẤT một mảng JSON, mỗi phần tử có dạng:
 {
@@ -69,7 +70,13 @@ Trả về DUY NHẤT một mảng JSON, mỗi phần tử có dạng:
   "explanation": "giải thích ngắn gọn vì sao đáp án đúng"
 }
 
-Quy tắc: mỗi câu đúng 4 lựa chọn và đúng 1 lựa chọn isCorrect=true; câu hỏi không trùng nhau; chỉ hỏi nội dung có trong tài liệu.
+Yêu cầu nội dung:
+- CHỈ hỏi kiến thức trọng tâm, cốt lõi: khái niệm chính, nguyên lý, cách thực hành/quy trình, cách áp dụng vào thực tế.
+- Ưu tiên câu hỏi VẬN DỤNG: tình huống giả định thực tế, cách xử lý/sửa lỗi và vấn đề thường gặp, chọn cách làm đúng, phân biệt các khái niệm dễ nhầm.
+- TUYỆT ĐỐI KHÔNG hỏi kiểu đánh đố/học thuộc lòng hay chi tiết vụn vặt: nội dung nằm ở trang/mục/phần/chương nào, ai viết/tác giả, tên tiêu đề, định dạng/số trang của tài liệu, hay ngày tháng không gắn với kiến thức.
+- Câu hỏi và các lựa chọn phải tự diễn đạt rõ ràng, KHÔNG tham chiếu kiểu "theo tài liệu/đoạn trên/như đã nêu".
+
+Quy tắc định dạng: mỗi câu đúng 4 lựa chọn và đúng 1 lựa chọn isCorrect=true; các câu không trùng hoặc cùng một ý; chỉ dựa trên kiến thức có trong tài liệu.
 
 Nội dung:
 ${wrapUntrusted(source, 'tài liệu')}`;

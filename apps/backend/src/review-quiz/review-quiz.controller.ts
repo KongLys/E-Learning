@@ -3,6 +3,20 @@ import { ReviewQuizService } from './review-quiz.service';
 import { SubmitReviewAttemptDto } from './dto/submit-review-attempt.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
+@Controller('courses')
+export class ReviewQuizCourseController {
+  constructor(private reviewQuizService: ReviewQuizService) {}
+
+  /** Danh sách quiz ôn tập (theo bài) đã tạo trong khoá — để xem lại/làm lại. */
+  @Get(':courseId/review-quizzes')
+  list(
+    @CurrentUser() u: { userId: string; role: string },
+    @Param('courseId') courseId: string,
+  ) {
+    return this.reviewQuizService.listByCourse(courseId, u.userId, u.role);
+  }
+}
+
 @Controller('lessons')
 export class ReviewQuizController {
   constructor(private reviewQuizService: ReviewQuizService) {}

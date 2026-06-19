@@ -9,7 +9,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RagService, Citation } from './rag/rag.service';
 import { ChunkScope } from './vector/vector-store.service';
-import { AiQuizService, CreatedQuizInfo } from './ai-quiz.service';
+import { ChatQuizService, CreatedQuizInfo } from './chat-quiz.service';
 import { neutralizeInline, MAX_USER_QUERY_LEN } from './prompt-safety.util';
 import { GuardrailService } from './guard/guardrail.service';
 import { REFUSAL_MESSAGE, scrubOutput } from './guard/injection-guard.util';
@@ -21,7 +21,7 @@ export class AiChatService {
   constructor(
     private prisma: PrismaService,
     private rag: RagService,
-    private aiQuiz: AiQuizService,
+    private chatQuiz: ChatQuizService,
     private guardrail: GuardrailService,
   ) {}
 
@@ -159,12 +159,12 @@ export class AiChatService {
     // cá nhân thay vì trả lời RAG.
     const intent = detectQuizIntent(effectiveQuery);
     if (intent.isQuiz) {
-      const aiQuiz = this.aiQuiz;
+      const chatQuiz = this.chatQuiz;
       const courseId = conv.courseId;
       let createdQuiz: CreatedQuizInfo | null = null;
       async function* quizStream(): AsyncGenerator<string> {
         yield 'Đang tạo quiz ôn tập từ nội dung khoá học…\n\n';
-        const info = await aiQuiz.generateFromChat(
+        const info = await chatQuiz.generateFromChat(
           courseId,
           userId,
           effectiveQuery,
