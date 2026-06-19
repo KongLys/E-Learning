@@ -27,6 +27,7 @@ import {
   toXmind,
 } from './mindmap-builder';
 import { MINDMAP_QUEUE, GenerateMindmapJob } from './mindmap.queue';
+import { kmeans } from '../clustering.util';
 
 /** Cap on summarised leaves → bounds LLM calls & keeps the map readable. */
 const MAX_GROUPS = 80;
@@ -465,59 +466,4 @@ function toStringArray(v: unknown): string[] | undefined {
 function fallbackSummary(group: ContentGroup): GroupSummary {
   const title = group.path[group.path.length - 1] ?? 'Nội dung';
   return { title };
-}
-
-// ─── Minimal k-means (Euclidean over L2-ish embeddings) ─────────────────────────
-
-function kmeans(vectors: number[][], k: number, iters = 12): number[] {
-  const n = vectors.length;
-  const dim = vectors[0].length;
-  // Deterministic seeding: evenly spaced points across the ordered stream.
-  const centroids = Array.from({ length: k }, (_, i) =>
-    vectors[Math.floor((i * n) / k)].slice(),
-  );
-  const assign = new Array(n).fill(0);
-
-  for (let it = 0; it < iters; it++) {
-    let moved = false;
-    for (let i = 0; i < n; i++) {
-      let best = 0;
-      let bd = Infinity;
-      for (let c = 0; c < k; c++) {
-        const d = dist2(vectors[i], centroids[c]);
-        if (d < bd) {
-          bd = d;
-          best = c;
-        }
-      }
-      if (assign[i] !== best) {
-        assign[i] = best;
-        moved = true;
-      }
-    }
-    const sums = Array.from({ length: k }, () => new Array(dim).fill(0));
-    const counts = new Array(k).fill(0);
-    for (let i = 0; i < n; i++) {
-      counts[assign[i]]++;
-      const v = vectors[i];
-      const s = sums[assign[i]];
-      for (let j = 0; j < dim; j++) s[j] += v[j];
-    }
-    for (let c = 0; c < k; c++) {
-      if (counts[c] > 0) {
-        for (let j = 0; j < dim; j++) centroids[c][j] = sums[c][j] / counts[c];
-      }
-    }
-    if (!moved && it > 0) break;
-  }
-  return assign;
-}
-
-function dist2(a: number[], b: number[]): number {
-  let s = 0;
-  for (let i = 0; i < a.length; i++) {
-    const d = a[i] - b[i];
-    s += d * d;
-  }
-  return s;
 }

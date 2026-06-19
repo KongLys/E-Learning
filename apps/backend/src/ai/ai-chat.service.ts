@@ -10,6 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RagService, Citation } from './rag/rag.service';
 import { ChunkScope } from './vector/vector-store.service';
 import { ChatQuizService, CreatedQuizInfo } from './chat-quiz.service';
+import { ChatSummaryService, SummaryLevel } from './chat-summary.service';
 import { neutralizeInline, MAX_USER_QUERY_LEN } from './prompt-safety.util';
 import { GuardrailService } from './guard/guardrail.service';
 import { REFUSAL_MESSAGE, scrubOutput } from './guard/injection-guard.util';
@@ -22,6 +23,7 @@ export class AiChatService {
     private prisma: PrismaService,
     private rag: RagService,
     private chatQuiz: ChatQuizService,
+    private chatSummary: ChatSummaryService,
     private guardrail: GuardrailService,
   ) {}
 
@@ -183,6 +185,32 @@ export class AiChatService {
       };
     }
 
+    // Guardrail đầu ra: gỡ marker nội bộ / đoạn rò rỉ system prompt nếu model echo.
+    async function* scrubbedStream(
+      src: AsyncIterable<string>,
+    ): AsyncGenerator<string> {
+      for await (const piece of src) yield scrubOutput(piece);
+    }
+
+    // Nhánh tóm tắt: dùng cây RAPTOR (luồng riêng) thay vì RAG theo câu hỏi.
+    const summaryIntent = detectSummaryIntent(effectiveQuery);
+    if (summaryIntent.isSummary) {
+      const summary = await this.chatSummary.summarize(
+        conv.courseId,
+        effectiveQuery,
+        scope,
+        summaryIntent.level,
+      );
+      return {
+        stream: scrubbedStream(summary.stream),
+        citations: summary.citations,
+        conversationId: conv.id,
+        persist: (fullText: string) =>
+          persistAssistant(fullText, summary.citations)(),
+        getQuiz: (): CreatedQuizInfo | null => null,
+      };
+    }
+
     // Run RAG pipeline (có thể giới hạn phạm vi theo Phần/Bài)
     const result = await this.rag.ask(
       conv.courseId,
@@ -190,13 +218,6 @@ export class AiChatService {
       formattedHistory,
       scope,
     );
-
-    // Guardrail đầu ra: gỡ marker nội bộ / đoạn rò rỉ system prompt nếu model echo.
-    async function* scrubbedStream(
-      src: AsyncIterable<string>,
-    ): AsyncGenerator<string> {
-      for await (const piece of src) yield scrubOutput(piece);
-    }
 
     return {
       stream: scrubbedStream(result.stream),
@@ -238,4 +259,35 @@ export function detectQuizIntent(query: string): {
   const m = q.match(/(\d{1,3})\s*(câu|cau|question)/);
   const count = m ? parseInt(m[1], 10) : undefined;
   return { isQuiz: true, count };
+}
+
+/**
+ * Nhận diện ý định "tóm tắt / tổng quan nội dung" để route sang luồng RAPTOR.
+ * Suy thêm phạm vi (khóa/phần/bài) từ từ khóa, ghi đè scope mặc định khi người
+ * dùng nói rõ ("toàn khóa" / "bài này"). Tránh dương tính giả cho câu định nghĩa
+ * kiểu "tóm tắt là gì".
+ */
+export function detectSummaryIntent(query: string): {
+  isSummary: boolean;
+  level?: SummaryLevel;
+} {
+  const q = query.toLowerCase();
+  const isSummary =
+    /(tóm tắt|tóm lược|tóm gọn|sơ lược|khái quát|tổng quan|tổng hợp lại|nội dung chính|ý chính|các ý chính|những ý chính|điểm chính|summary|summarize|summarise|overview|recap)/.test(
+      q,
+    );
+  if (!isSummary) return { isSummary: false };
+  // "tóm tắt là gì" / "tổng quan là gì" → câu hỏi định nghĩa, để RAG xử lý.
+  if (/(tóm tắt|tổng quan|tổng hợp|khái quát)\s+(là gì|nghĩa là)/.test(q)) {
+    return { isSummary: false };
+  }
+  let level: SummaryLevel | undefined;
+  if (/(toàn khóa|cả khóa|toàn bộ khóa|khóa học|cả môn|toàn bộ môn)/.test(q)) {
+    level = 'course';
+  } else if (/(phần này|chương này|cả phần|toàn bộ phần)/.test(q)) {
+    level = 'section';
+  } else if (/(bài học này|bài này|bài hiện tại|bài đang học)/.test(q)) {
+    level = 'lesson';
+  }
+  return { isSummary: true, level };
 }

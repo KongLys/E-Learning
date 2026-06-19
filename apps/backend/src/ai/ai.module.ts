@@ -27,6 +27,10 @@ import { MindmapService } from './mindmap/mindmap.service';
 import { MindmapController } from './mindmap/mindmap.controller';
 import { MindmapProcessor } from './mindmap/mindmap.processor';
 import { MINDMAP_QUEUE } from './mindmap/mindmap.queue';
+import { ChatSummaryService } from './chat-summary.service';
+import { RaptorService } from './raptor/raptor.service';
+import { RaptorProcessor } from './raptor/raptor.processor';
+import { RAPTOR_BUILD_QUEUE } from './raptor/raptor.queue';
 import { ModerationModule } from '../moderation/moderation.module';
 
 @Module({
@@ -54,6 +58,7 @@ import { ModerationModule } from '../moderation/moderation.module';
     BullModule.registerQueue({ name: MINDMAP_QUEUE }),
     BullModule.registerQueue({ name: LESSON_INDEX_QUEUE }),
     BullModule.registerQueue({ name: VIDEO_TRANSCRIBE_QUEUE }),
+    BullModule.registerQueue({ name: RAPTOR_BUILD_QUEUE }),
   ],
   controllers: [AiChatController, MindmapController, ChatQuizController],
   providers: [
@@ -68,6 +73,9 @@ import { ModerationModule } from '../moderation/moderation.module';
     AiChatService,
     QuizGenerationService,
     ChatQuizService,
+    ChatSummaryService,
+    RaptorService,
+    RaptorProcessor,
     LessonIndexProcessor,
     VideoTranscribeProcessor,
     MindmapService,

@@ -206,6 +206,8 @@ model Course {
   reviewQuizzes      ReviewQuiz[]
   referenceMaterials ReferenceMaterial[]
   mindmap            CourseMindmap?
+  raptorTree         CourseRaptorTree?
+  raptorNodes        RaptorNode[]
   coupons            Coupon[]
 
   @@index([instructorId])
@@ -918,6 +920,49 @@ model CourseChunk {
   @@index([sectionId])
   @@index([lessonId])
   @@map("course_chunks")
+}
+
+// ─── RAPTOR (cây tóm tắt phân cấp) ───────────────────────────────────────────
+
+// Meta build cây RAPTOR theo từng khóa — cache theo source_hash giống CourseMindmap.
+model CourseRaptorTree {
+  courseId   String        @id @map("course_id")
+  status     MindmapStatus @default(pending)
+  errorMsg   String?       @map("error_msg")
+  tokenUsage Int           @default(0) @map("token_usage")
+  sourceHash String?       @map("source_hash")
+  createdAt  DateTime      @default(now()) @map("created_at")
+  updatedAt  DateTime      @updatedAt @map("updated_at")
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@map("course_raptor_trees")
+}
+
+// Node tóm tắt các tầng của cây RAPTOR (lá = course_chunks, không nhân bản).
+// level: 1 = tóm tắt bài, 2 = tóm tắt phần, 3 = gốc khóa.
+model RaptorNode {
+  id            String                      @id @default(uuid())
+  courseId      String                      @map("course_id")
+  sectionId     String?                     @map("section_id")
+  lessonId      String?                     @map("lesson_id")
+  level         Int
+  title         String?
+  content       String                      @db.Text
+  childChunkIds String[]                    @default([]) @map("child_chunk_ids")
+  childNodeIds  String[]                    @default([]) @map("child_node_ids")
+  tokenCount    Int                         @default(0) @map("token_count")
+  metadata      Json                        @default("{}")
+  embedding     Unsupported("vector(768)")?
+  contentTsv    Unsupported("tsvector")?    @default(dbgenerated("to_tsvector('simple'::regconfig, COALESCE(content, ''::text))")) @map("content_tsv")
+  createdAt     DateTime                    @default(now()) @map("created_at")
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([courseId])
+  @@index([lessonId])
+  @@index([level])
+  @@map("raptor_nodes")
 }
 
 model AiConversation {
