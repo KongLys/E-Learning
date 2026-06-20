@@ -12,7 +12,8 @@ import {
   NO_CONTEXT_MESSAGE,
   buildAnswerPrompt,
   buildCompressionPrompt,
-  buildQueryRewritePrompt,
+  buildQueryAnalysisPrompt,
+  QueryAnalysis,
 } from './prompts';
 
 export interface Citation {
@@ -55,9 +56,12 @@ export class RagService {
     conversationHistory: string[] = [],
     scope?: ChunkScope,
   ): Promise<AskResult> {
-    // 1. Query rewrite — sinh các biến thể truy vấn
-    const rewrites = await this.queryRewrite(query, conversationHistory);
-    const allQueries = unique([query, ...rewrites]).slice(0, 3);
+    // 1. Query analysis — phân tích intent + sinh biến thể
+    const analysis = await this.analyzeQuery(query, conversationHistory);
+    const allQueries = unique([analysis.resolvedQuery, ...analysis.variants]).slice(0, 4);
+    this.logger.log(`[RAG] original: "${query}" | intent: ${analysis.intent} | subject: "${analysis.subject}"`);
+    this.logger.log(`[RAG] resolvedQuery: "${analysis.resolvedQuery}"`);
+    this.logger.log(`[RAG] search queries:\n${allQueries.map((q, i) => `  [${i}] ${q}`).join('\n')}`);
 
     // 2. Embed song song + hybrid search song song (giới hạn theo Phần/Bài nếu có)
     const embeddings = await this.gemini.embedBatch(allQueries);
@@ -73,6 +77,10 @@ export class RagService {
       ),
     );
     const fused = reciprocalRankFusion(pools, this.retrieveTop);
+    this.logger.log(`[RAG] fused pool: ${fused.length} chunks`);
+    fused.slice(0, 10).forEach((c, i) =>
+      this.logger.log(`  [${i}] score=${c.score.toFixed(4)} | ${c.content.slice(0, 80).replace(/\n/g, ' ')}`),
+    );
 
     const noContextResult = (): AskResult => ({
       stream: emptyStream(NO_CONTEXT_MESSAGE),
@@ -90,14 +98,19 @@ export class RagService {
       fused.map((c) => c.content),
       this.rerankTop,
     );
+    this.logger.log(`[RAG] rerank top ${rerankResults.length}:`);
+    rerankResults.forEach((r, i) =>
+      this.logger.log(`  [${i}] score=${r.relevanceScore.toFixed(4)} | ${fused[r.index].content.slice(0, 80).replace(/\n/g, ' ')}`),
+    );
     const topK = rerankResults.map((r) => fused[r.index]);
 
     // 4. Compression — Gemini trích đoạn liên quan
     const compressed = await this.compress(
-      query,
+      analysis.resolvedQuery,
       topK.map((c) => c.content),
     );
 
+    this.logger.log(`[RAG] compressed context (${compressed.length} chars):\n${compressed.slice(0, 300).replace(/\n/g, ' ')}`);
     // Cổng B: compression không tìm thấy đoạn liên quan nào ⇒ "chưa đề cập".
     if (!compressed.trim()) {
       this.logger.debug('RAG gate: compression returned empty context');
@@ -114,7 +127,7 @@ export class RagService {
       excerpt: truncateExcerpt(c.content),
     }));
     const prompt = buildAnswerPrompt(
-      query,
+      analysis.resolvedQuery,
       compressed,
       topK.map((c, i) => ({
         index: i,
@@ -131,25 +144,30 @@ export class RagService {
     return { stream, citations, contextChunks: topK };
   }
 
-  private async queryRewrite(
+  private async analyzeQuery(
     query: string,
     history: string[],
-  ): Promise<string[]> {
+  ): Promise<QueryAnalysis> {
+    const fallback: QueryAnalysis = {
+      intent: 'other',
+      subject: query,
+      resolvedQuery: query,
+      variants: [query, query, query],
+    };
     try {
       const text = await this.gemini.generate(
-        buildQueryRewritePrompt(query, history),
-        { temperature: 0.5, maxOutputTokens: 256 },
+        buildQueryAnalysisPrompt(query, history),
+        { temperature: 0.1, maxOutputTokens: 512 },
       );
-      return text
-        .split(/\r?\n/)
-        .map((s) => s.replace(/^[\d\-*\.\s]+/, '').trim())
-        .filter((s) => s.length > 3)
-        .slice(0, 3);
+      const json = text.replace(/```(?:json)?|```/g, '').trim();
+      const parsed = JSON.parse(json) as QueryAnalysis;
+      if (!parsed.resolvedQuery || !Array.isArray(parsed.variants) || parsed.variants.length < 3) {
+        return fallback;
+      }
+      return parsed;
     } catch (err) {
-      this.logger.warn(
-        `Query rewrite failed, using original only: ${(err as Error).message}`,
-      );
-      return [];
+      this.logger.warn(`Query analysis failed, using original: ${(err as Error).message}`);
+      return fallback;
     }
   }
 

@@ -89,6 +89,7 @@ import { ModerationModule } from '../moderation/moderation.module';
     MarkdownChunkerService,
     LlamaParseService,
     QuizGenerationService,
+    RaptorService,
   ],
 })
 export class AiModule {}

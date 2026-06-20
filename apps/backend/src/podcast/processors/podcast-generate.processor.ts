@@ -5,6 +5,7 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../storage/storage.service';
 import { GoogleTtsService } from '../../ai/google-tts.service';
+import { RaptorService } from '../../ai/raptor/raptor.service';
 import { PodcastService } from '../podcast.service';
 import { PODCAST_QUEUE, GeneratePodcastJob } from '../podcast.queue';
 
@@ -26,6 +27,7 @@ export class PodcastGenerateProcessor extends WorkerHost {
     private prisma: PrismaService,
     private storage: StorageService,
     private tts: GoogleTtsService,
+    private raptor: RaptorService,
     private podcast: PodcastService,
   ) {
     super();
@@ -35,7 +37,10 @@ export class PodcastGenerateProcessor extends WorkerHost {
     const { lessonId } = job.data;
     const lesson = await this.prisma.lesson.findUnique({
       where: { id: lessonId },
-      include: { documentAsset: true },
+      include: {
+        documentAsset: true,
+        section: { select: { courseId: true } },
+      },
     });
     if (!lesson) {
       this.logger.warn(`Lesson ${lessonId} not found — skip podcast`);
@@ -48,8 +53,11 @@ export class PodcastGenerateProcessor extends WorkerHost {
     });
 
     try {
+      const courseId = lesson.section.courseId;
+      const raptorSummary = await this.fetchRaptorSummary(courseId, lessonId);
+
       const source = await this.podcast.collectLessonContent(lessonId, lesson);
-      const script = await this.podcast.generateScript(lesson.title, source);
+      const script = await this.podcast.generateScript(lesson.title, source, raptorSummary);
       const audio = await this.tts.synthesize(script);
 
       const key = `podcasts/${lessonId}/${randomUUID()}.mp3`;
@@ -81,6 +89,52 @@ export class PodcastGenerateProcessor extends WorkerHost {
         })
         .catch(() => undefined);
       throw err;
+    }
+  }
+
+  /**
+   * Lấy tóm tắt RAPTOR L1 cho bài học. Nếu tree chưa tồn tại hoặc chưa ready,
+   * build trực tiếp trong job này (không qua queue). Trả null nếu không thể build
+   * (không có chunk, hoặc đang có job khác build — tránh race condition).
+   */
+  private async fetchRaptorSummary(
+    courseId: string,
+    lessonId: string,
+  ): Promise<string | null> {
+    try {
+      const existingNode = await this.prisma.raptorNode.findFirst({
+        where: { courseId, lessonId, level: 1 },
+        select: { content: true },
+      });
+      if (existingNode) return existingNode.content;
+
+      const tree = await this.prisma.courseRaptorTree.findUnique({
+        where: { courseId },
+        select: { status: true },
+      });
+
+      if (tree?.status === 'generating') {
+        this.logger.log(
+          `RAPTOR tree already building for course ${courseId} — skipping enrichment`,
+        );
+        return null;
+      }
+
+      this.logger.log(
+        `Building RAPTOR tree for course ${courseId} (podcast enrichment)`,
+      );
+      await this.raptor.generate(courseId);
+
+      const node = await this.prisma.raptorNode.findFirst({
+        where: { courseId, lessonId, level: 1 },
+        select: { content: true },
+      });
+      return node?.content ?? null;
+    } catch (err) {
+      this.logger.warn(
+        `RAPTOR enrichment failed — proceeding with raw content: ${(err as Error).message}`,
+      );
+      return null;
     }
   }
 }

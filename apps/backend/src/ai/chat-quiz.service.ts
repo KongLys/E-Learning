@@ -2,12 +2,14 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { GeminiService } from './gemini.service';
 import { VectorStoreService, ChunkScope } from './vector/vector-store.service';
 import { QuizGenerationService } from './quiz-generation.service';
+import { RaptorService } from './raptor/raptor.service';
 import { SubmitReviewAttemptDto } from '../review-quiz/dto/submit-review-attempt.dto';
 
 const MIN_QUESTIONS = 10;
@@ -15,6 +17,15 @@ const MAX_QUESTIONS = 30;
 const RETRIEVE_K = 40;
 const MAX_SOURCE_CHARS = 14000;
 const MIN_SOURCE_CHARS = 200;
+
+/** Giới hạn ký tự dành cho phần tóm tắt RAPTOR (nội dung cốt lõi). */
+const RAPTOR_SUMMARY_CHARS = 5000;
+/** Khoảng cách poll (ms) khi chờ RAPTOR build hoàn thành. */
+const RAPTOR_POLL_INTERVAL_MS = 3_000;
+/** Tổng thời gian tối đa chờ RAPTOR build (ms). */
+const RAPTOR_MAX_WAIT_MS = 120_000;
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export interface CreatedQuizInfo {
   id: string;
@@ -34,6 +45,7 @@ export class ChatQuizService {
     private gemini: GeminiService,
     private vector: VectorStoreService,
     private quizGen: QuizGenerationService,
+    private raptor: RaptorService,
   ) {}
 
   /** Sinh quiz cá nhân từ yêu cầu trong chat; trả thông tin tóm tắt. */
@@ -164,12 +176,33 @@ export class ChatQuizService {
     return quiz;
   }
 
-  /** Gom nội dung liên quan tới yêu cầu: ưu tiên retrieval (hybrid search). */
+  /**
+   * Gom nội dung hai tầng:
+   *   Tầng 1 — RAPTOR summary nodes (nội dung cốt lõi / mục tiêu học tập).
+   *   Tầng 2 — hybrid search trên raw chunks (chi tiết cụ thể để ra câu hỏi).
+   * RAPTOR phải sẵn sàng trước khi tiến hành; nếu chưa có sẽ trigger build và chờ.
+   */
   private async collectCourseContent(
     courseId: string,
     query: string,
     scope?: ChunkScope,
   ): Promise<string> {
+    // 1. Đảm bảo RAPTOR sẵn sàng (trigger + poll nếu chưa build).
+    await this.ensureRaptorReady(courseId);
+
+    // 2. Lấy RAPTOR summaries → phần "nội dung cốt lõi".
+    const { label, nodes } = await this.raptor.getScopeNodes(courseId, scope);
+    let summarySection = '';
+    if (nodes.length > 0) {
+      const summaryText = nodes
+        .map((n) => (n.title ? `${n.title}\n${n.content}` : n.content))
+        .join('\n\n')
+        .trim()
+        .slice(0, RAPTOR_SUMMARY_CHARS);
+      summarySection = `=== NỘI DUNG CỐT LÕI (${label}) ===\n${summaryText}`;
+    }
+
+    // 3. Hybrid search trên chunk gốc → phần "nội dung chi tiết".
     let chunks: { content: string }[] = [];
     try {
       const embedding = await this.gemini.embedQuery(query);
@@ -183,7 +216,6 @@ export class ChatQuizService {
     } catch {
       chunks = [];
     }
-    // Fallback: nếu retrieval rỗng/lỗi, lấy chunk theo thứ tự (giới hạn theo scope).
     if (chunks.length === 0) {
       chunks = await this.prisma.courseChunk.findMany({
         where: {
@@ -197,6 +229,11 @@ export class ChatQuizService {
       });
     }
 
+    // Phân bổ ký tự còn lại cho phần chi tiết sau khi đã có summary.
+    const chunkLimit = summarySection
+      ? Math.max(2000, MAX_SOURCE_CHARS - summarySection.length - 50)
+      : MAX_SOURCE_CHARS;
+
     const seen = new Set<string>();
     const parts: string[] = [];
     let total = 0;
@@ -206,9 +243,50 @@ export class ChatQuizService {
       seen.add(t);
       parts.push(t);
       total += t.length;
-      if (total >= MAX_SOURCE_CHARS) break;
+      if (total >= chunkLimit) break;
     }
-    return parts.join('\n\n').slice(0, MAX_SOURCE_CHARS);
+    const chunkSection = parts.join('\n\n');
+
+    if (summarySection && chunkSection) {
+      return `${summarySection}\n\n=== NỘI DUNG CHI TIẾT ===\n${chunkSection}`.slice(
+        0,
+        MAX_SOURCE_CHARS,
+      );
+    }
+    return (summarySection || chunkSection).slice(0, MAX_SOURCE_CHARS);
+  }
+
+  /**
+   * Trigger build RAPTOR nếu chưa có / cũ, sau đó poll cho đến khi cây sẵn sàng
+   * hoặc hết timeout. Ném lỗi phù hợp thay vì fallback về flow cũ.
+   */
+  private async ensureRaptorReady(courseId: string): Promise<void> {
+    const readiness = await this.raptor.ensureReady(courseId);
+    if (readiness === 'empty') {
+      throw new UnprocessableEntityException(
+        'Khoá học chưa có đủ nội dung để tạo quiz',
+      );
+    }
+    if (readiness === 'ready') return;
+
+    // 'building' → đã enqueue, poll cho đến khi hoàn thành.
+    const deadline = Date.now() + RAPTOR_MAX_WAIT_MS;
+    while (Date.now() < deadline) {
+      await sleep(RAPTOR_POLL_INTERVAL_MS);
+      const tree = await this.prisma.courseRaptorTree.findUnique({
+        where: { courseId },
+        select: { status: true },
+      });
+      if (tree?.status === 'ready') return;
+      if (tree?.status === 'failed') {
+        throw new ServiceUnavailableException(
+          'Không thể xây dựng cấu trúc nội dung khoá học, vui lòng thử lại',
+        );
+      }
+    }
+    throw new ServiceUnavailableException(
+      'Đang xây dựng cấu trúc nội dung khoá học, vui lòng thử lại sau ít phút',
+    );
   }
 
   private buildTitle(query: string): string {

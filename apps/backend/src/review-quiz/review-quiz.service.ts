@@ -2,21 +2,31 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { QuizGenerationService } from '../ai/quiz-generation.service';
+import { RaptorService } from '../ai/raptor/raptor.service';
 import { SubmitReviewAttemptDto } from './dto/submit-review-attempt.dto';
 
 const QUESTION_COUNT = 5;
 const MIN_SOURCE_CHARS = 200;
 const MAX_SOURCE_CHARS = 12000;
 
+/** Giới hạn ký tự dành cho phần tóm tắt RAPTOR (nội dung cốt lõi bài học). */
+const RAPTOR_SUMMARY_CHARS = 3000;
+const RAPTOR_POLL_INTERVAL_MS = 3_000;
+const RAPTOR_MAX_WAIT_MS = 120_000;
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
 @Injectable()
 export class ReviewQuizService {
   constructor(
     private prisma: PrismaService,
     private quizGen: QuizGenerationService,
+    private raptor: RaptorService,
   ) {}
 
   // ─── Public API ──────────────────────────────────────────────────────────────
@@ -72,7 +82,8 @@ export class ReviewQuizService {
   /** Sinh (hoặc sinh lại) quiz ôn tập bằng AI từ nội dung bài học. */
   async generate(lessonId: string, userId: string, userRole: string) {
     const lesson = await this.assertLessonAccess(lessonId, userId, userRole);
-    const source = await this.collectLessonContent(lessonId, lesson);
+    const courseId = lesson.section.course.id;
+    const source = await this.collectLessonContent(courseId, lessonId, lesson);
     if (source.length < MIN_SOURCE_CHARS) {
       throw new UnprocessableEntityException(
         'Bài học chưa có đủ nội dung để tạo quiz ôn tập',
@@ -211,8 +222,14 @@ export class ReviewQuizService {
     return lesson;
   }
 
-  /** Gom nội dung nguồn để sinh câu hỏi: chunk đã index > transcript/tài liệu thô. */
+  /**
+   * Gom nội dung hai tầng cho bài học:
+   *   Tầng 1 — RAPTOR level-1 node của bài (nội dung cốt lõi / mục tiêu học tập).
+   *   Tầng 2 — chunk thô + transcript / tài liệu (chi tiết cụ thể để ra câu hỏi).
+   * RAPTOR phải sẵn sàng trước; nếu chưa có sẽ trigger build và chờ.
+   */
   private async collectLessonContent(
+    courseId: string,
     lessonId: string,
     lesson: {
       title: string;
@@ -221,29 +238,88 @@ export class ReviewQuizService {
       documentAsset: { contentHtml: string | null } | null;
     },
   ): Promise<string> {
-    const parts: string[] = [];
-    if (lesson.title) parts.push(lesson.title);
-    if (lesson.description) parts.push(lesson.description);
+    // 1. Đảm bảo RAPTOR sẵn sàng (trigger + poll nếu chưa build).
+    await this.ensureRaptorReady(courseId);
 
-    // Nguồn tốt nhất: các chunk đã parse/index sẵn cho RAG.
+    // 2. RAPTOR level-1 node của bài → phần "nội dung cốt lõi".
+    const { nodes } = await this.raptor.getScopeNodes(courseId, { lessonId });
+    let summarySection = '';
+    if (nodes.length > 0) {
+      const summaryText = nodes
+        .map((n) => (n.title ? `${n.title}\n${n.content}` : n.content))
+        .join('\n\n')
+        .trim()
+        .slice(0, RAPTOR_SUMMARY_CHARS);
+      summarySection = `=== NỘI DUNG CỐT LÕI ===\n${summaryText}`;
+    }
+
+    // 3. Nội dung chi tiết: chunk đã index > transcript/tài liệu thô.
+    const detailParts: string[] = [];
+    if (lesson.title) detailParts.push(lesson.title);
+    if (lesson.description) detailParts.push(lesson.description);
+
     const chunks = await this.prisma.courseChunk.findMany({
       where: { lessonId },
       orderBy: { chunkIndex: 'asc' },
       select: { content: true },
     });
-    for (const c of chunks) parts.push(c.content);
+    for (const c of chunks) detailParts.push(c.content);
 
-    // Bổ sung transcript video / nội dung tài liệu thô (phòng khi chưa có chunk).
-    if (lesson.videoAsset?.transcript) parts.push(lesson.videoAsset.transcript);
+    if (lesson.videoAsset?.transcript) detailParts.push(lesson.videoAsset.transcript);
     if (lesson.documentAsset?.contentHtml) {
-      parts.push(this.stripHtml(lesson.documentAsset.contentHtml));
+      detailParts.push(this.stripHtml(lesson.documentAsset.contentHtml));
     }
 
-    return parts
+    const chunkLimit = summarySection
+      ? Math.max(1000, MAX_SOURCE_CHARS - summarySection.length - 50)
+      : MAX_SOURCE_CHARS;
+
+    const chunkSection = detailParts
       .map((p) => p.trim())
       .filter(Boolean)
       .join('\n\n')
-      .slice(0, MAX_SOURCE_CHARS);
+      .slice(0, chunkLimit);
+
+    if (summarySection && chunkSection) {
+      return `${summarySection}\n\n=== NỘI DUNG CHI TIẾT ===\n${chunkSection}`.slice(
+        0,
+        MAX_SOURCE_CHARS,
+      );
+    }
+    return (summarySection || chunkSection).slice(0, MAX_SOURCE_CHARS);
+  }
+
+  /**
+   * Trigger build RAPTOR nếu chưa có / cũ, sau đó poll cho đến khi cây sẵn sàng
+   * hoặc hết timeout. Ném lỗi phù hợp thay vì fallback về flow cũ.
+   */
+  private async ensureRaptorReady(courseId: string): Promise<void> {
+    const readiness = await this.raptor.ensureReady(courseId);
+    if (readiness === 'empty') {
+      throw new UnprocessableEntityException(
+        'Bài học chưa có đủ nội dung để tạo quiz ôn tập',
+      );
+    }
+    if (readiness === 'ready') return;
+
+    // 'building' → đã enqueue, poll cho đến khi hoàn thành.
+    const deadline = Date.now() + RAPTOR_MAX_WAIT_MS;
+    while (Date.now() < deadline) {
+      await sleep(RAPTOR_POLL_INTERVAL_MS);
+      const tree = await this.prisma.courseRaptorTree.findUnique({
+        where: { courseId },
+        select: { status: true },
+      });
+      if (tree?.status === 'ready') return;
+      if (tree?.status === 'failed') {
+        throw new ServiceUnavailableException(
+          'Không thể xây dựng cấu trúc nội dung khoá học, vui lòng thử lại',
+        );
+      }
+    }
+    throw new ServiceUnavailableException(
+      'Đang xây dựng cấu trúc nội dung khoá học, vui lòng thử lại sau ít phút',
+    );
   }
 
   private stripHtml(html: string): string {

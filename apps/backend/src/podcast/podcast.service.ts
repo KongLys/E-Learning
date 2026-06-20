@@ -37,7 +37,7 @@ export class PodcastService {
     private gemini: GeminiService,
     private storage: StorageService,
     @InjectQueue(PODCAST_QUEUE) private queue: Queue<GeneratePodcastJob>,
-  ) {}
+  ) { }
 
   // ─── Public API ──────────────────────────────────────────────────────────────
 
@@ -217,26 +217,45 @@ export class PodcastService {
   }
 
   /** Sinh kịch bản lời dẫn podcast (văn xuôi thuần) từ nội dung bài học. */
-  async generateScript(lessonTitle: string, source: string): Promise<string> {
+  async generateScript(
+    lessonTitle: string,
+    source: string,
+    raptorSummary?: string | null,
+  ): Promise<string> {
     const systemInstruction =
-      'Bạn là người dẫn một podcast giáo dục bằng tiếng Việt. ' +
-      'Viết kịch bản lời dẫn tự nhiên, mạch lạc, dễ nghe, chỉ dựa trên nội dung bài học được cung cấp. ' +
-      'CHỈ trả về văn xuôi thuần để đọc thành tiếng: KHÔNG markdown, KHÔNG tiêu đề, KHÔNG ký hiệu *,#,- hay nhãn người nói. ' +
+      'You are the host of a Vietnamese-language educational podcast. ' +
+      'Write a natural, fluent narration script based solely on the provided lesson content. ' +
+      'Output ONLY plain prose ready to be read aloud in Vietnamese: NO markdown, NO headings, NO symbols like *,#,-, and NO speaker labels. ' +
       UNTRUSTED_DATA_RULE;
 
-    const prompt = `Hãy viết kịch bản cho một tập podcast ngắn (khoảng 2–4 phút khi đọc) tóm tắt và giảng lại nội dung bài học dưới đây cho người nghe.
+    const overviewBlock = raptorSummary
+      ? `\nLesson overview (use as structural guide):\n${wrapUntrusted(raptorSummary, 'overview')}\n`
+      : '';
 
-Yêu cầu:
-- Mở đầu chào người nghe và giới thiệu chủ đề.
-- Trình bày các ý chính theo trình tự dễ hiểu, có ví dụ/giải thích ngắn nếu cần.
-- Kết thúc bằng phần tóm tắt nhanh các điểm cần nhớ.
-- Văn nói tự nhiên, một người dẫn duy nhất, KHÔNG dùng markdown hay ký hiệu định dạng.
-- Chỉ dùng thông tin có trong nội dung bài học.
+    const prompt = `Write a podcast script (approximately 3–4 minutes when read aloud) that walks through the main content of the lesson below for a Vietnamese-speaking audience.
 
-Tiêu đề bài học: ${neutralizeInline(lessonTitle, 300)}
+Requirements:
+- Open by greeting the listener and briefly introducing the topic.
+- After the introduction, identify the real-world problems or challenges that this lesson addresses — explain concretely what goes wrong without this knowledge, or what question/need motivates the topic. Only mention problems that are explicitly or implicitly present in the lesson content.
+- Guide the listener through the lesson's concepts in the order they appear, using natural spoken transitions between them (e.g. "Từ đó dẫn đến…", "Liên quan đến điều này…", "Một điểm quan trọng khác là…"). Do NOT announce numbered sections, headings, or labels like "Phần 1", "Ý thứ hai", "Tiếp theo chúng ta có mục…". The flow must feel like a continuous conversation, not a structured list.
+- For each concept: name it naturally within the flow of speech, then explain the actual mechanism or process — how it works step by step, what its internal logic is, what conditions apply. Include concrete examples or numbers from the content where available.
+- DEPTH RULE: Every explanation must go into the actual "how" and "why", not just state that something exists or is important. If the lesson explains a process, describe that process. If it explains a formula or algorithm, walk through it. If it compares options, state the differences and trade-offs.
+- FORBIDDEN patterns — never write sentences of these forms:
+  • "Sau khi học xong / đọc xong bài này, bạn sẽ…"
+  • "Bài học giúp bạn hiểu / nắm được / áp dụng được…"
+  • "Nội dung này trang bị cho bạn…"
+  • Any sentence that promises future understanding instead of delivering the explanation right now.
+  Instead, deliver the explanation immediately and directly.
+- IGNORE peripheral material that is not part of the core lesson: author bios, publication dates, "further reading" lists, references, footnotes, acknowledgements, and any section that is purely administrative.
+- Close with a brief recap that names the key points covered — do not introduce new information here.
+- Use natural spoken Vietnamese, a single host voice, NO markdown or formatting symbols.
+- Use ONLY information found in the lesson content. Do not add outside knowledge.
+- The entire output must be in Vietnamese.
 
-Nội dung bài học:
-${wrapUntrusted(source, 'bài học')}`;
+Lesson title: ${neutralizeInline(lessonTitle, 300)}
+${overviewBlock}
+Lesson content:
+${wrapUntrusted(source, 'lesson')}`;
 
     const raw = await this.gemini.generate(prompt, {
       temperature: 0.6,
