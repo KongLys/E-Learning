@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { notificationApi } from '@/lib/api/notification.api';
 import { moderationApi } from '@/lib/api/ai.api';
 import { Bell } from 'lucide-react';
+import { notify, showPrompt } from '@/store/dialog.store';
 
 type NotificationActionData = {
   action: 'appeal';
@@ -57,14 +58,14 @@ export function NotificationBell() {
 
   const appealMutation = useMutation({
     mutationFn: async ({ contentType, contentId }: NotificationActionData) => {
-      const reason = window.prompt('Lý do kiến nghị (không bắt buộc):') ?? undefined;
+      const reason = (await showPrompt({ title: 'Lý do kiến nghị (không bắt buộc):' })) ?? undefined;
       if (contentType === 'course') {
         return moderationApi.appealCourse(contentId, reason);
       }
       return moderationApi.appealLesson(contentId, reason);
     },
-    onSuccess: () => alert('Đã gửi kiến nghị thành công!'),
-    onError: (err: any) => alert(err?.response?.data?.message ?? 'Gửi kiến nghị thất bại'),
+    onSuccess: () => notify.success('Đã gửi kiến nghị thành công!'),
+    onError: (err: any) => notify.error(err?.response?.data?.message ?? 'Gửi kiến nghị thất bại'),
   });
 
   useEffect(() => {
@@ -82,7 +83,7 @@ export function NotificationBell() {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="relative flex h-9 w-9 items-center justify-center rounded-full text-muted hover:text-ink hover:bg-surface-strong transition-colors"
+        className="relative flex h-11 w-11 items-center justify-center rounded-full text-muted hover:text-ink hover:bg-surface-strong transition-colors"
         aria-label="Thông báo"
       >
         <Bell size={18} strokeWidth={1.75} aria-hidden="true" />
@@ -94,7 +95,7 @@ export function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-80 bg-surface-card border border-hairline rounded-2xl shadow-lg z-50 overflow-hidden">
+        <div className="absolute right-0 top-full mt-2 w-80 bg-surface-card border border-hairline rounded-card shadow-modal z-50 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-hairline">
             <span className="text-sm font-semibold text-ink">Thông báo</span>
             {unreadCount > 0 && (
@@ -124,7 +125,7 @@ export function NotificationBell() {
                   <button
                     onClick={(e) => { e.stopPropagation(); appealMutation.mutate(n.data!); }}
                     disabled={appealMutation.isPending}
-                    className="mt-1.5 text-xs text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50"
+                    className="mt-1.5 text-xs text-sky hover:text-sky-deep font-medium disabled:opacity-50"
                   >
                     Kiến nghị lại
                   </button>

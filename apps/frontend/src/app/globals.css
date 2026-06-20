@@ -1,71 +1,80 @@
 @import "tailwindcss";
 
 @theme {
-  /* Surface colors */
-  --color-canvas: #f5f5f5;
-  --color-canvas-soft: #fafafa;
-  --color-surface-card: #ffffff;
-  --color-surface-strong: #f0efed;
-  --color-surface-dark: #0c0a09;
-  --color-surface-dark-elevated: #1c1917;
+  /* ── Base surface colors (Skylearn Background / Surface) ───────────── */
+  --color-canvas: #FFFFFF;
+  --color-canvas-soft: #F8FAFC;
+  --color-surface-card: #FFFFFF;
+  --color-surface-strong: #F1F5F9;
+  --color-surface-dark: #0F172A;
+  --color-surface-dark-elevated: #1E293B;
 
-  /* Hairline / divider */
-  --color-hairline: #e7e5e4;
-  --color-hairline-soft: #f0efed;
-  --color-hairline-strong: #d6d3d1;
+  /* ── Outline / divider (Skylearn Outline) ──────────────────────────── */
+  --color-hairline: #E2E8F0;
+  --color-hairline-soft: #F8FAFC;
+  --color-hairline-strong: #94A3B8;
 
-  /* Text */
-  --color-ink: #0c0a09;
-  --color-body-copy: #4e4e4e;
-  --color-muted: #777169;
-  --color-muted-soft: #a8a29e;
-  --color-emphasis: #292524;
+  /* ── Text (Skylearn Ink) ───────────────────────────────────────────── */
+  --color-ink: #0F172A;
+  --color-body-copy: #475569;
+  --color-muted: #475569;
+  --color-muted-soft: #94A3B8;
+  --color-emphasis: #3B82F6;
 
-  /* Atmospheric gradient stops — decoration only, never fills */
+  /* ── Atmospheric gradient stops — decoration only ──────────────────── */
   --color-gradient-mint: #a7e5d3;
   --color-gradient-peach: #f4c5a8;
   --color-gradient-lavender: #c8b8e0;
   --color-gradient-sky: #a8c8e8;
   --color-gradient-rose: #e8b8c4;
 
-  /* Semantic */
-  --color-semantic-success: #16a34a;
-  --color-semantic-error: #dc2626;
+  /* ── Semantic ──────────────────────────────────────────────────────── */
+  --color-semantic-success: #22C55E;
+  --color-semantic-error: #F87171;
 
-  /* Skylearn palette (DESIGN.md) — used by Community pages */
-  --color-sky: #3b82f6;
-  --color-sky-bright: #60a5fa;
-  --color-sky-deep: #1d4ed8;
-  --color-sky-soft: #dbeafe;
-  --color-sun: #fbbf24;
-  --color-sun-bright: #fcd34d;
-  --color-sun-deep: #d97706;
-  --color-sun-soft: #fef3c7;
-  --color-leaf: #22c55e;
-  --color-leaf-soft: #dcfce7;
-  --color-leaf-deep: #16a34a;
-  --color-coral: #f87171;
-  --color-coral-soft: #fee2e2;
-  --color-berry: #a855f7;
-  --color-skylearn-surface: #f8fafc;
-  --color-skylearn-sunken: #f1f5f9;
-  --color-ink-deep: #0f172a;
+  /* ── Skylearn full palette (DESIGN.md) ─────────────────────────────── */
+  --color-sky: #3B82F6;
+  --color-sky-bright: #60A5FA;
+  --color-sky-deep: #1D4ED8;
+  --color-sky-soft: #DBEAFE;
+  --color-sun: #FBBF24;
+  --color-sun-bright: #FCD34D;
+  --color-sun-deep: #D97706;
+  --color-sun-soft: #FEF3C7;
+  --color-leaf: #22C55E;
+  --color-leaf-soft: #DCFCE7;
+  --color-leaf-deep: #16A34A;
+  --color-coral: #F87171;
+  --color-coral-soft: #FEE2E2;
+  --color-berry: #A855F7;
+  --color-berry-soft: #EDE9FE;
+  --color-skylearn-surface: #F8FAFC;
+  --color-skylearn-sunken: #F1F5F9;
+  --color-ink-deep: #0F172A;
   --color-ink-mute: #475569;
-  --color-ink-subtle: #94a3b8;
-  --color-outline: #e2e8f0;
+  --color-ink-subtle: #94A3B8;
+  --color-ink-faint: #CBD5E1;
+  --color-outline: #E2E8F0;
 
-  /* Fonts */
-  --font-display: var(--font-eb-garamond), 'Times New Roman', serif;
-  --font-sans: var(--font-inter), sans-serif;
+  /* ── Fonts ─────────────────────────────────────────────────────────── */
+  --font-display: var(--font-roboto), Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-sans: var(--font-roboto), Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: var(--font-jetbrains), 'JetBrains Mono', monospace;
 
-  /* Custom border-radius */
+  /* ── Border radius ─────────────────────────────────────────────────── */
   --radius-pill: 9999px;
+  --radius-card: 20px;
+  --radius-modal: 28px;
+
+  /* ── Elevation shadows ─────────────────────────────────────────────── */
+  --shadow-card-hover: 0 8px 24px rgba(15, 23, 42, 0.06);
+  --shadow-modal: 0 24px 48px rgba(15, 23, 42, 0.12);
 }
 
 body {
-  background-color: #f5f5f5;
-  color: #0c0a09;
-  font-family: var(--font-inter), sans-serif;
+  background-color: #FFFFFF;
+  color: #0F172A;
+  font-family: var(--font-roboto), Roboto, 'Helvetica Neue', Arial, sans-serif;
   font-size: 16px;
   line-height: 1.5;
   letter-spacing: 0.01em;

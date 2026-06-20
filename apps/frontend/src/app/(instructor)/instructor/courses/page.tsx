@@ -13,16 +13,17 @@ import {
 } from '@/lib/api/ai.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
+import { notify, showConfirm } from '@/store/dialog.store';
 import { PriceDisplay } from '@/components/ui/PriceDisplay';
 import Link from 'next/link';
 import { Plus, Search, X } from 'lucide-react';
 
 const STATUS_COLORS: Record<string, string> = {
-  draft: 'bg-gray-100 text-gray-600',
-  pending: 'bg-yellow-100 text-yellow-700',
-  published: 'bg-green-100 text-green-700',
-  rejected: 'bg-red-100 text-red-700',
-  archived: 'bg-gray-200 text-gray-500',
+  draft: 'bg-surface-strong text-ink-mute',
+  pending: 'bg-sun-soft text-sun-deep',
+  published: 'bg-leaf-soft text-leaf-deep',
+  rejected: 'bg-coral-soft text-coral',
+  archived: 'bg-surface-strong text-muted',
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -68,33 +69,33 @@ function CreateCourseModal({ onClose }: { onClose: () => void }) {
   const valid = title.trim().length >= 5;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className="w-full max-w-lg rounded-modal bg-surface-card p-6 shadow-modal" onClick={(e) => e.stopPropagation()}>
         <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-gray-900">Tạo khóa học mới</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+          <h2 className="text-lg font-bold text-ink">Tạo khóa học mới</h2>
+          <button onClick={onClose} className="text-ink-subtle hover:text-ink"><X size={18} /></button>
         </div>
 
-        {error && <p className="mb-4 rounded-lg bg-red-50 px-4 py-2 text-sm text-red-500">{error}</p>}
+        {error && <p className="mb-4 rounded-lg bg-coral-soft px-4 py-2 text-sm text-semantic-error">{error}</p>}
 
         <div className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium">Tiêu đề khóa học</label>
+            <label className="mb-1 block text-sm font-medium text-ink">Tiêu đề khóa học</label>
             <input
               autoFocus
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Ví dụ: NestJS từ A đến Z"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-full rounded-lg border border-hairline-strong px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky"
             />
-            <p className="mt-1 text-xs text-gray-400">Bạn có thể thay đổi sau. Tối thiểu 5 ký tự.</p>
+            <p className="mt-1 text-xs text-ink-subtle">Bạn có thể thay đổi sau. Tối thiểu 5 ký tự.</p>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Lĩnh vực (tùy chọn)</label>
+            <label className="mb-1 block text-sm font-medium text-ink">Lĩnh vực (tùy chọn)</label>
             <select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-full rounded-lg border border-hairline-strong px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky"
             >
               <option value="">-- Chọn lĩnh vực --</option>
               {categories.map((c) => (
@@ -105,13 +106,13 @@ function CreateCourseModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="mt-6 flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">
+          <button onClick={onClose} className="rounded-pill border border-hairline px-4 py-2 text-sm font-medium text-ink-mute hover:bg-canvas-soft">
             Hủy
           </button>
           <button
             onClick={() => createMutation.mutate()}
             disabled={!valid || createMutation.isPending}
-            className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-700 disabled:opacity-50"
+            className="rounded-lg bg-sky px-4 py-2 text-sm font-semibold text-white hover:bg-sky-deep disabled:opacity-50"
           >
             {createMutation.isPending ? 'Đang tạo...' : 'Tạo & tiếp tục'}
           </button>
@@ -139,7 +140,7 @@ export default function InstructorCoursesPage() {
     mutationFn: (courseId: string) => moderationApi.appealCourse(courseId),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['instructor-courses'] }),
     onError: (err: { response?: { data?: { message?: string } } }) =>
-      alert(err?.response?.data?.message ?? 'Gửi kiến nghị thất bại'),
+      notify.error(err?.response?.data?.message ?? 'Gửi kiến nghị thất bại'),
   });
 
   const deleteMutation = useMutation({
@@ -149,7 +150,7 @@ export default function InstructorCoursesPage() {
       setCourseToDelete(null);
     },
     onError: (err: any) =>
-      alert(err?.response?.data?.message ?? 'Xóa khóa học thất bại'),
+      notify.error(err?.response?.data?.message ?? 'Xóa khóa học thất bại'),
   });
 
   const unpublishMutation = useMutation({
@@ -159,7 +160,7 @@ export default function InstructorCoursesPage() {
       setCourseToUnpublish(null);
     },
     onError: (err: any) =>
-      alert(err?.response?.data?.message ?? 'Hủy xuất bản thất bại'),
+      notify.error(err?.response?.data?.message ?? 'Hủy xuất bản thất bại'),
   });
 
   const allCourses: any[] = data?.data?.courses ?? data?.data ?? [];
@@ -181,10 +182,10 @@ export default function InstructorCoursesPage() {
   return (
     <div className="mx-auto max-w-5xl px-2 py-2 sm:px-6 sm:py-4">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Khóa học của tôi</h1>
+        <h1 className="text-2xl font-bold text-ink">Khóa học của tôi</h1>
         <button
           onClick={() => setShowCreate(true)}
-          className="flex items-center gap-1.5 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700"
+          className="flex items-center gap-1.5 rounded-lg bg-sky px-4 py-2 text-sm font-medium text-white hover:bg-sky-deep"
         >
           <Plus size={16} />
           Tạo khóa học mới
@@ -194,22 +195,22 @@ export default function InstructorCoursesPage() {
       {/* Control bar */}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" strokeWidth={1.75} />
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-subtle" strokeWidth={1.75} />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Tìm theo tên khóa học..."
-            className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-1 focus:ring-purple-400 sm:w-72"
+            className="w-full rounded-lg border border-hairline-strong py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-1 focus:ring-sky sm:w-72"
           />
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex rounded-lg border border-gray-200 p-0.5">
+          <div className="flex rounded-lg border border-hairline p-0.5">
             {STATUS_TABS.map((t) => (
               <button
                 key={t.key}
                 onClick={() => setStatusFilter(t.key)}
                 className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                  statusFilter === t.key ? 'bg-purple-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+                  statusFilter === t.key ? 'bg-sky text-white' : 'text-ink-mute hover:bg-surface-strong'
                 }`}
               >
                 {t.label}
@@ -219,7 +220,7 @@ export default function InstructorCoursesPage() {
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value as SortOrder)}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-purple-400"
+            className="rounded-lg border border-hairline-strong px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-sky"
           >
             <option value="newest">Mới nhất</option>
             <option value="oldest">Cũ nhất</option>
@@ -230,35 +231,35 @@ export default function InstructorCoursesPage() {
       {isLoading ? (
         <LoadingSpinner />
       ) : allCourses.length === 0 ? (
-        <div className="py-16 text-center text-gray-500">
+        <div className="py-16 text-center text-muted">
           <p className="mb-4">Bạn chưa có khóa học nào.</p>
-          <button onClick={() => setShowCreate(true)} className="text-purple-600 hover:underline">Tạo khóa học đầu tiên</button>
+          <button onClick={() => setShowCreate(true)} className="text-sky hover:underline">Tạo khóa học đầu tiên</button>
         </div>
       ) : courses.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 py-16 text-center text-sm text-gray-400">
+        <div className="rounded-card border border-hairline py-16 text-center text-sm text-ink-subtle">
           Không tìm thấy khóa học phù hợp.
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border">
+        <div className="overflow-hidden rounded-card border border-hairline">
           <table className="w-full text-sm">
-            <thead className="border-b bg-gray-50">
+            <thead className="border-b bg-canvas-soft">
               <tr>
-                <th className="px-4 py-3 text-left font-medium text-gray-600">Khóa học</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600">Trạng thái</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600">Kiểm duyệt</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600">Giá</th>
-                <th className="px-4 py-3 text-right font-medium text-gray-600">Thao tác</th>
+                <th className="px-4 py-3 text-left font-medium text-ink-mute">Khóa học</th>
+                <th className="px-4 py-3 text-left font-medium text-ink-mute">Trạng thái</th>
+                <th className="px-4 py-3 text-left font-medium text-ink-mute">Kiểm duyệt</th>
+                <th className="px-4 py-3 text-left font-medium text-ink-mute">Giá</th>
+                <th className="px-4 py-3 text-right font-medium text-ink-mute">Thao tác</th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody className="divide-y divide-hairline">
               {courses.map((course: any) => (
-                <tr key={course.id} className="hover:bg-gray-50">
+                <tr key={course.id} className="hover:bg-canvas-soft">
                   <td className="px-4 py-3">
-                    <p className="font-medium text-gray-900">{course.title}</p>
-                    <p className="text-xs text-gray-400">{course.totalLessons ?? 0} bài học</p>
+                    <p className="font-medium text-ink">{course.title}</p>
+                    <p className="text-xs text-ink-subtle">{course.totalLessons ?? 0} bài học</p>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[course.status] ?? 'bg-gray-100'}`}>
+                    <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[course.status] ?? 'bg-surface-strong'}`}>
                       {STATUS_LABELS[course.status] ?? course.status}
                     </span>
                   </td>
@@ -271,7 +272,7 @@ export default function InstructorCoursesPage() {
                         {MODERATION_LABELS[course.moderationStatus as ModerationStatus]}
                       </span>
                     ) : (
-                      <span className="text-xs text-gray-400">—</span>
+                      <span className="text-xs text-ink-faint">—</span>
                     )}
                   </td>
                   <td className="px-4 py-3">
@@ -280,22 +281,22 @@ export default function InstructorCoursesPage() {
                   <td className="px-4 py-3 text-right">
                     {course.moderationStatus === 'rejected' && (
                       <button
-                        onClick={() => {
-                          if (confirm(`Gửi kiến nghị duyệt lại khóa học "${course.title}"?`))
+                        onClick={async () => {
+                          if (await showConfirm({ title: `Gửi kiến nghị duyệt lại khóa học "${course.title}"?` }))
                             appealMutation.mutate(course.id);
                         }}
                         disabled={appealMutation.isPending}
-                        className="mr-3 text-xs text-amber-600 hover:underline disabled:opacity-50"
+                        className="mr-3 text-xs text-sun-deep hover:underline disabled:opacity-50"
                       >
                         Kiến nghị
                       </button>
                     )}
-                    <Link href={`/instructor/courses/${course.id}/manage/goals`} className="mr-3 text-xs text-purple-600 hover:underline">Sửa</Link>
-                    <Link href={`/courses/${course.slug}`} className="mr-3 text-xs text-gray-500 hover:text-gray-700">Xem</Link>
+                    <Link href={`/instructor/courses/${course.id}/manage/goals`} className="mr-3 text-xs text-sky hover:underline">Sửa</Link>
+                    <Link href={`/courses/${course.slug}`} className="mr-3 text-xs text-muted hover:text-ink">Xem</Link>
                     {course.status === 'published' && (
                       <button
                         onClick={() => setCourseToUnpublish({ id: course.id, title: course.title })}
-                        className="mr-3 text-xs text-orange-500 hover:underline"
+                        className="mr-3 text-xs text-coral hover:underline"
                       >
                         Hủy xuất bản
                       </button>
@@ -303,7 +304,7 @@ export default function InstructorCoursesPage() {
                     {(course.status === 'draft' || course.status === 'rejected') && (
                       <button
                         onClick={() => setCourseToDelete({ id: course.id, title: course.title })}
-                        className="text-xs text-red-500 hover:underline"
+                        className="text-xs text-coral hover:underline"
                       >
                         Xóa
                       </button>

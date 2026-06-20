@@ -22,7 +22,7 @@ export function CourseCard({ course }: { course: CourseCardData }) {
   return (
     <Link
       href={`/courses/${course.slug}`}
-      className="group block bg-surface-card rounded-2xl border border-hairline overflow-hidden hover:shadow-[0_6px_24px_rgba(0,0,0,0.08)] transition-shadow"
+      className="group block bg-surface-card rounded-card border border-hairline overflow-hidden hover:shadow-card-hover transition-shadow duration-240"
     >
       <div className="relative h-48 bg-surface-strong">
         {course.thumbnailUrl ? (
@@ -56,7 +56,7 @@ export function CourseCard({ course }: { course: CourseCardData }) {
           </span>
           {course.averageRating !== undefined && (
             <span className="flex items-center gap-1 text-sm">
-              <Star size={14} className="fill-amber-400 text-amber-400" />
+              <Star size={14} className="fill-sun text-sun" />
               <span className="font-medium text-ink">{course.averageRating.toFixed(1)}</span>
             </span>
           )}

@@ -47,9 +47,9 @@ export default function LoginPage() {
         <p className="text-sm text-muted">Chào mừng trở lại ELearn</p>
       </div>
 
-      <div className="bg-surface-card rounded-2xl border border-hairline p-8 shadow-[0_4px_16px_rgba(0,0,0,0.04)]">
+      <div className="bg-surface-card rounded-card border border-hairline p-8 shadow-[0_4px_16px_rgba(0,0,0,0.04)]">
         {error && (
-          <div className="mb-5 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-semantic-error">
+          <div className="mb-5 rounded-lg bg-coral-soft border border-coral px-4 py-3 text-sm text-semantic-error">
             {error}
           </div>
         )}
@@ -85,7 +85,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full inline-flex h-11 items-center justify-center rounded-pill bg-emphasis text-white text-[15px] font-medium hover:bg-ink transition-colors disabled:opacity-50"
+              className="w-full inline-flex h-14 items-center justify-center rounded-pill bg-sky text-white text-lg font-semibold hover:bg-sky-deep transition-colors disabled:opacity-50"
             >
               {isSubmitting ? 'Đang đăng nhập...' : 'Đăng nhập'}
             </button>

@@ -23,7 +23,7 @@ function Avatar({ name, url, size = 40 }: { name: string; url?: string | null; s
   }
   return (
     <div
-      className="rounded-full bg-blue-500 text-white flex items-center justify-center font-medium shrink-0"
+      className="rounded-full bg-sky text-white flex items-center justify-center font-medium shrink-0"
       style={{ width: size, height: size }}
     >
       {name?.charAt(0).toUpperCase() ?? '?'}
@@ -288,7 +288,7 @@ export default function ChatPage() {
                 <div className="relative">
                   <Avatar name={c.otherUser.fullName} url={c.otherUser.avatarUrl} />
                   {onlineUsers.has(c.otherUserId) && (
-                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-surface-card rounded-full" />
+                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-leaf border-2 border-surface-card rounded-full" />
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -304,7 +304,7 @@ export default function ChatPage() {
                   </p>
                 </div>
                 {c.unreadCount > 0 && (
-                  <span className="bg-blue-500 text-white text-xs rounded-full min-w-5 h-5 px-1.5 flex items-center justify-center shrink-0">
+                  <span className="bg-sky text-white text-xs rounded-full min-w-5 h-5 px-1.5 flex items-center justify-center shrink-0">
                     {c.unreadCount}
                   </span>
                 )}
@@ -323,8 +323,8 @@ export default function ChatPage() {
             <div>
               <p className="font-medium text-ink">{selected.otherUser.fullName}</p>
               {onlineUsers.has(selected.otherUserId) ? (
-                <span className="flex items-center gap-1 text-xs text-green-600">
-                  <span className="w-2 h-2 bg-green-600 rounded-full" /> Online
+                <span className="flex items-center gap-1 text-xs text-leaf">
+                  <span className="w-2 h-2 bg-leaf rounded-full" /> Online
                 </span>
               ) : (
                 <span className="flex items-center gap-1 text-xs text-muted">
@@ -363,9 +363,9 @@ export default function ChatPage() {
                                 if (e.key === 'Enter') handleEditSubmit(msg.id);
                                 if (e.key === 'Escape') setEditingId(null);
                               }}
-                              className="px-3 py-2 rounded-lg border border-blue-400 bg-canvas text-ink text-sm focus:outline-none"
+                              className="px-3 py-2 rounded-lg border border-sky bg-canvas text-ink text-sm focus:outline-none"
                             />
-                            <button onClick={() => handleEditSubmit(msg.id)} className="text-green-600">
+                            <button onClick={() => handleEditSubmit(msg.id)} className="text-leaf">
                               <Check className="w-4 h-4" />
                             </button>
                             <button onClick={() => setEditingId(null)} className="text-muted">
@@ -375,7 +375,7 @@ export default function ChatPage() {
                         ) : (
                           <div
                             className={`px-4 py-2 rounded-lg ${
-                              isOwn ? 'bg-blue-500 text-white' : 'bg-surface-strong text-ink'
+                              isOwn ? 'bg-sky text-white' : 'bg-surface-strong text-ink'
                             }`}
                           >
                             {msg.isDeleted ? (
@@ -533,7 +533,7 @@ export default function ChatPage() {
             <button
               onClick={handleSend}
               disabled={!input.trim() || !socket.isConnected}
-              className="p-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="p-2 rounded-lg bg-sky text-white hover:bg-sky-deep disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <Send className="w-5 h-5" />
             </button>

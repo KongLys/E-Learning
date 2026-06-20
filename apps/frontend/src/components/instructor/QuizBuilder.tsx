@@ -74,45 +74,45 @@ export function QuizBuilder({ lessonId, onError }: { lessonId: string; onError: 
     <div className="space-y-5">
       {/* Cấu hình quiz */}
       <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-gray-700">Cấu hình bài kiểm tra</h3>
+        <h3 className="text-sm font-semibold text-ink-mute">Cấu hình bài kiểm tra</h3>
         <div className="grid grid-cols-3 gap-3">
-          <label className="text-xs text-gray-500">Điểm đạt (%)
+          <label className="text-xs text-muted">Điểm đạt (%)
             <input type="number" min={1} max={100} value={passingScore ?? 70}
               onChange={(e) => setPassingScore(Number(e.target.value))}
-              className="mt-1 w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+              className="mt-1 w-full border border-hairline-strong rounded-lg px-2 py-1.5 text-sm" />
           </label>
-          <label className="text-xs text-gray-500">Giới hạn (phút, 0=không)
+          <label className="text-xs text-muted">Giới hạn (phút, 0=không)
             <input type="number" min={0} value={timeLimitMin ?? 0}
               onChange={(e) => setTimeLimitMin(Number(e.target.value))}
-              className="mt-1 w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+              className="mt-1 w-full border border-hairline-strong rounded-lg px-2 py-1.5 text-sm" />
           </label>
-          <label className="text-xs text-gray-500">Số lần làm (0=∞)
+          <label className="text-xs text-muted">Số lần làm (0=∞)
             <input type="number" min={0} value={maxAttempts ?? 0}
               onChange={(e) => setMaxAttempts(Number(e.target.value))}
-              className="mt-1 w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+              className="mt-1 w-full border border-hairline-strong rounded-lg px-2 py-1.5 text-sm" />
           </label>
         </div>
         <button onClick={() => saveConfig.mutate()} disabled={saveConfig.isPending}
-          className="text-xs bg-blue-600 text-white px-4 py-2 rounded-lg disabled:opacity-50">
+          className="text-xs bg-sky text-white px-4 py-2 rounded-lg disabled:opacity-50">
           {saveConfig.isPending ? 'Đang lưu...' : 'Lưu cấu hình'}
         </button>
       </div>
 
       {/* Danh sách câu hỏi */}
       <div className="space-y-2">
-        <h3 className="text-sm font-semibold text-gray-700">Câu hỏi ({questions.length})</h3>
+        <h3 className="text-sm font-semibold text-ink-mute">Câu hỏi ({questions.length})</h3>
         {questions.map((q: any, i: number) => (
-          <div key={q.id} className="border rounded-lg px-3 py-2 text-sm">
+          <div key={q.id} className="border border-hairline rounded-lg px-3 py-2 text-sm">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <span className="font-medium">{i + 1}. {q.content}</span>
-                <span className="ml-2 text-xs text-gray-400">({typeLabel[q.questionType as QType]} · {q.points}đ)</span>
+                <span className="font-medium text-ink">{i + 1}. {q.content}</span>
+                <span className="ml-2 text-xs text-ink-subtle">({typeLabel[q.questionType as QType]} · {q.points}đ)</span>
               </div>
-              <button onClick={() => deleteQuestion.mutate(q.id)} className="text-red-400 hover:text-red-600 text-xs">Xóa</button>
+              <button onClick={() => deleteQuestion.mutate(q.id)} className="text-coral hover:opacity-80 text-xs">Xóa</button>
             </div>
             <ul className="mt-1 ml-4 space-y-0.5">
               {q.options?.map((o: any) => (
-                <li key={o.id} className={`flex items-center gap-1 text-xs ${o.isCorrect ? 'text-green-600' : 'text-gray-500'}`}>
+                <li key={o.id} className={`flex items-center gap-1 text-xs ${o.isCorrect ? 'text-leaf' : 'text-muted'}`}>
                   {o.isCorrect ? <Check size={12} className="shrink-0" /> : <Circle size={12} className="shrink-0" />} {o.content}
                 </li>
               ))}
@@ -132,7 +132,7 @@ export function QuizBuilder({ lessonId, onError }: { lessonId: string; onError: 
         />
       ) : (
         <button onClick={() => setDraft(emptyDraft())}
-          className="text-xs border border-blue-500 text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50">
+          className="text-xs border border-sky text-sky px-4 py-2 rounded-lg hover:bg-sky-soft">
           + Thêm câu hỏi
         </button>
       )}
@@ -156,7 +156,7 @@ function QuestionForm({
   const toggleCorrect = (idx: number) => {
     const options = draft.options.map((o, i) => {
       if (draft.questionType === 'multiple') return i === idx ? { ...o, isCorrect: !o.isCorrect } : o;
-      return { ...o, isCorrect: i === idx }; // single & true_false: chỉ 1 đúng
+      return { ...o, isCorrect: i === idx };
     });
     setDraft({ ...draft, options });
   };
@@ -171,10 +171,10 @@ function QuestionForm({
   const isTF = draft.questionType === 'true_false';
 
   return (
-    <div className="border-2 border-blue-200 rounded-xl p-4 space-y-3 bg-blue-50/40">
+    <div className="border-2 border-sky-soft rounded-xl p-4 space-y-3 bg-sky-soft/30">
       <input value={draft.content} onChange={(e) => setDraft({ ...draft, content: e.target.value })}
         placeholder="Nội dung câu hỏi..."
-        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+        className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm" />
 
       <div className="flex items-center gap-3 flex-wrap">
         {(['single', 'multiple', 'true_false'] as QType[]).map((t) => (
@@ -183,15 +183,15 @@ function QuestionForm({
             {typeLabel[t]}
           </label>
         ))}
-        <label className="text-xs text-gray-500 ml-auto">Điểm
+        <label className="text-xs text-muted ml-auto">Điểm
           <input type="number" min={1} value={draft.points}
             onChange={(e) => setDraft({ ...draft, points: Math.max(1, Number(e.target.value) || 1) })}
-            className="ml-1 w-16 border border-gray-300 rounded px-2 py-1 text-sm" />
+            className="ml-1 w-16 border border-hairline-strong rounded px-2 py-1 text-sm" />
         </label>
       </div>
 
       <div className="space-y-2">
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-muted">
           Đáp án {draft.questionType === 'multiple' ? '(tick các đáp án đúng)' : '(tick đáp án đúng)'}
         </p>
         {draft.options.map((o, i) => (
@@ -200,27 +200,27 @@ function QuestionForm({
               checked={o.isCorrect} onChange={() => toggleCorrect(i)} />
             <input value={o.content} onChange={(e) => setOptContent(i, e.target.value)}
               disabled={isTF} placeholder={`Đáp án ${i + 1}`}
-              className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm disabled:bg-gray-100" />
+              className="flex-1 border border-hairline-strong rounded px-2 py-1 text-sm disabled:bg-surface-strong" />
             {!isTF && draft.options.length > 2 && (
-              <button onClick={() => removeOption(i)} className="text-red-400 hover:text-red-600" aria-label="Xóa đáp án"><X size={14} /></button>
+              <button onClick={() => removeOption(i)} className="text-coral hover:opacity-80" aria-label="Xóa đáp án"><X size={14} /></button>
             )}
           </div>
         ))}
         {!isTF && (
-          <button onClick={addOption} className="text-xs text-blue-600 hover:underline">+ Thêm đáp án</button>
+          <button onClick={addOption} className="text-xs text-sky hover:underline">+ Thêm đáp án</button>
         )}
       </div>
 
       <textarea value={draft.explanation} onChange={(e) => setDraft({ ...draft, explanation: e.target.value })}
         rows={2} placeholder="Giải thích (hiện sau khi nộp, tuỳ chọn)..."
-        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+        className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm" />
 
       <div className="flex gap-2">
         <button onClick={onSave} disabled={saving || !draft.content.trim()}
-          className="text-xs bg-blue-600 text-white px-4 py-2 rounded-lg disabled:opacity-50">
+          className="text-xs bg-sky text-white px-4 py-2 rounded-lg disabled:opacity-50">
           {saving ? 'Đang lưu...' : 'Lưu câu hỏi'}
         </button>
-        <button onClick={onCancel} className="text-xs border px-4 py-2 rounded-lg">Hủy</button>
+        <button onClick={onCancel} className="text-xs border border-hairline px-4 py-2 rounded-lg text-ink-mute hover:bg-canvas-soft">Hủy</button>
       </div>
     </div>
   );

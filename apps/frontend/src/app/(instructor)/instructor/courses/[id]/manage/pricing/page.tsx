@@ -6,8 +6,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { instructorApi } from '@/lib/api/instructor.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { formatVND } from '@/lib/utils';
+import { notify } from '@/store/dialog.store';
 
-const inputClass = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500';
+const inputClass = 'w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky';
 
 export default function CoursePricingPage() {
   const { id } = useParams<{ id: string }>();
@@ -39,7 +40,7 @@ export default function CoursePricingPage() {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     },
-    onError: (err: any) => alert(err?.response?.data?.message ?? 'Lưu thất bại'),
+    onError: (err: any) => notify.error(err?.response?.data?.message ?? 'Lưu thất bại'),
   });
 
   if (isLoading) return <LoadingSpinner />;
@@ -48,9 +49,9 @@ export default function CoursePricingPage() {
 
   return (
     <div className="space-y-6">
-      <header className="border-b border-gray-100 pb-4">
-        <h1 className="text-2xl font-bold text-gray-900">Định giá</h1>
-        <p className="mt-1 text-sm text-gray-500">
+      <header className="border-b border-hairline pb-4">
+        <h1 className="text-2xl font-bold text-ink">Định giá</h1>
+        <p className="mt-1 text-sm text-muted">
           Đặt giá cho khóa học của bạn. Để cung cấp miễn phí, hãy đặt giá bằng 0.
         </p>
       </header>
@@ -65,7 +66,7 @@ export default function CoursePricingPage() {
             onChange={(e) => setPrice(Number(e.target.value))}
             className={inputClass}
           />
-          <p className="mt-1 text-xs text-gray-500">{price > 0 ? formatVND(price) : 'Miễn phí'}</p>
+          <p className="mt-1 text-xs text-muted">{price > 0 ? formatVND(price) : 'Miễn phí'}</p>
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Giá khuyến mãi (VND)</label>
@@ -77,7 +78,7 @@ export default function CoursePricingPage() {
             className={inputClass}
             placeholder="Tùy chọn"
           />
-          {invalidDiscount && <p className="mt-1 text-xs text-red-500">Giá khuyến mãi phải nhỏ hơn giá gốc</p>}
+          {invalidDiscount && <p className="mt-1 text-xs text-semantic-error">Giá khuyến mãi phải nhỏ hơn giá gốc</p>}
         </div>
       </div>
 
@@ -85,11 +86,11 @@ export default function CoursePricingPage() {
         <button
           onClick={() => saveMutation.mutate()}
           disabled={saveMutation.isPending || invalidDiscount}
-          className="rounded-md bg-purple-600 px-5 py-2 text-sm font-semibold text-white hover:bg-purple-700 disabled:opacity-50"
+          className="rounded-md bg-sky px-5 py-2 text-sm font-semibold text-white hover:bg-sky-deep disabled:opacity-50"
         >
           {saveMutation.isPending ? 'Đang lưu...' : 'Lưu'}
         </button>
-        {saved && <span className="text-sm text-green-600">Đã lưu</span>}
+        {saved && <span className="text-sm text-leaf">Đã lưu</span>}
       </div>
     </div>
   );

@@ -52,9 +52,8 @@ export function AddLessonModal({ sectionTitle, onSubmit, onClose, isPending }: A
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 backdrop-blur-sm p-4"
       onClick={() => {
-        // Tránh mất dữ liệu đã nhập khi lỡ bấm ra ngoài
         if (!isDirty) onClose();
       }}
       onKeyDown={(e) => {
@@ -62,31 +61,31 @@ export function AddLessonModal({ sectionTitle, onSubmit, onClose, isPending }: A
       }}
     >
       <div
-        className="my-8 w-full max-w-lg rounded-2xl bg-white shadow-xl"
+        className="my-8 w-full max-w-lg rounded-modal bg-surface-card shadow-modal"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-hairline px-6 py-4">
           <div className="min-w-0">
-            <h2 className="text-lg font-bold">Thêm bài học</h2>
+            <h2 className="text-lg font-bold text-ink">Thêm bài học</h2>
             {sectionTitle && (
-              <p className="truncate text-xs text-gray-400">
-                vào phần: <span className="font-medium text-gray-500">{sectionTitle}</span>
+              <p className="truncate text-xs text-ink-subtle">
+                vào phần: <span className="font-medium text-muted">{sectionTitle}</span>
               </p>
             )}
           </div>
-          <button onClick={onClose} className="leading-none text-gray-400 hover:text-gray-700" aria-label="Đóng">
+          <button onClick={onClose} className="leading-none text-ink-subtle hover:text-ink" aria-label="Đóng">
             <X size={20} />
           </button>
         </div>
 
         <div className="space-y-4 px-6 py-5">
           {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>
+            <div className="rounded-lg border border-coral bg-coral-soft px-3 py-2 text-sm text-semantic-error">{error}</div>
           )}
 
           <div>
-            <label className="text-xs text-gray-500">
-              Tiêu đề <span className="text-red-500">*</span>
+            <label className="text-xs text-muted">
+              Tiêu đề <span className="text-coral">*</span>
             </label>
             <input
               ref={titleRef}
@@ -97,28 +96,28 @@ export function AddLessonModal({ sectionTitle, onSubmit, onClose, isPending }: A
                 if (e.key === 'Enter') submit(false);
               }}
               placeholder="VD: Giới thiệu về React Hooks"
-              className="w-full rounded-xl bg-white px-3 py-2.5 text-sm outline-none ring-1 ring-gray-200 focus:ring-2 focus:ring-blue-400"
+              className="w-full rounded-xl bg-surface-card px-3 py-2.5 text-sm outline-none ring-1 ring-hairline-strong focus:ring-2 focus:ring-sky"
             />
             {trimmedTitle.length > 0 && trimmedTitle.length < 2 && (
-              <p className="mt-1 text-xs text-amber-600">Tiêu đề cần ít nhất 2 ký tự.</p>
+              <p className="mt-1 text-xs text-sun-deep">Tiêu đề cần ít nhất 2 ký tự.</p>
             )}
           </div>
 
           <div>
-            <label className="text-xs text-gray-500">
-              Mục tiêu học tập <span className="text-gray-400">(không bắt buộc)</span>
+            <label className="text-xs text-muted">
+              Mục tiêu học tập <span className="text-ink-subtle">(không bắt buộc)</span>
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
               placeholder="Học viên có thể làm được gì sau khi hoàn thành bài học này?"
-              className="w-full rounded-xl bg-white px-3 py-2.5 text-sm outline-none ring-1 ring-gray-200 focus:ring-2 focus:ring-blue-400"
+              className="w-full rounded-xl bg-surface-card px-3 py-2.5 text-sm outline-none ring-1 ring-hairline-strong focus:ring-2 focus:ring-sky"
             />
           </div>
 
           <div>
-            <label className="mb-1.5 block text-xs text-gray-500">Loại bài học</label>
+            <label className="mb-1.5 block text-xs text-muted">Loại bài học</label>
             <div className="grid grid-cols-3 gap-2">
               {LESSON_TYPES.map((t) => (
                 <button
@@ -127,8 +126,8 @@ export function AddLessonModal({ sectionTitle, onSubmit, onClose, isPending }: A
                   onClick={() => setType(t)}
                   className={`flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-sm transition-colors ${
                     type === t
-                      ? 'border-blue-500 bg-blue-50 font-medium text-blue-700'
-                      : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                      ? 'border-sky bg-sky-soft font-medium text-sky-deep'
+                      : 'border-hairline text-ink-mute hover:bg-canvas-soft'
                   }`}
                 >
                   <LessonTypeIcon type={t} size={15} />
@@ -136,33 +135,33 @@ export function AddLessonModal({ sectionTitle, onSubmit, onClose, isPending }: A
                 </button>
               ))}
             </div>
-            <p className="mt-1.5 text-xs text-gray-400">
+            <p className="mt-1.5 text-xs text-ink-subtle">
               {TYPE_HINTS[type]} Không thể đổi loại bài học sau khi tạo.
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 border-t border-gray-100 px-6 py-4">
+        <div className="flex items-center gap-2 border-t border-hairline px-6 py-4">
           {addedCount > 0 && (
-            <span className="text-xs font-medium text-green-600">Đã thêm {addedCount} bài học</span>
+            <span className="text-xs font-medium text-leaf">Đã thêm {addedCount} bài học</span>
           )}
           <button
             onClick={onClose}
-            className="ml-auto rounded-full px-4 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-100"
+            className="ml-auto rounded-pill px-4 py-2 text-sm text-ink-mute transition-colors hover:bg-surface-strong"
           >
             Đóng
           </button>
           <button
             onClick={() => submit(true)}
             disabled={!canSubmit}
-            className="rounded-full border border-blue-200 px-4 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50 disabled:opacity-50"
+            className="rounded-pill border border-sky-soft px-4 py-2 text-sm font-medium text-sky transition-colors hover:bg-sky-soft disabled:opacity-50"
           >
             Lưu & thêm tiếp
           </button>
           <button
             onClick={() => submit(false)}
             disabled={!canSubmit}
-            className="rounded-full bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+            className="rounded-pill bg-sky px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-sky-deep disabled:opacity-50"
           >
             {isPending ? 'Đang thêm...' : 'Thêm bài học'}
           </button>

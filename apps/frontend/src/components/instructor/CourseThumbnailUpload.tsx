@@ -44,19 +44,19 @@ export function CourseThumbnailUpload({ courseId }: Props) {
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5">
+    <div className="bg-surface-card border border-hairline rounded-card p-5">
       <h2 className="text-sm font-semibold mb-3">Ảnh bìa khóa học</h2>
       <div className="flex items-start gap-5">
         {/* Preview 16:9 */}
         <div
-          className="relative w-56 flex-shrink-0 rounded-lg overflow-hidden border border-gray-200 cursor-pointer group"
+          className="relative w-56 flex-shrink-0 rounded-lg overflow-hidden border border-hairline cursor-pointer group"
           style={{ aspectRatio: '16/9' }}
           onClick={() => !uploading && inputRef.current?.click()}
         >
           {thumbnailUrl ? (
             <Image src={thumbnailUrl} alt="Ảnh bìa" fill className="object-cover" />
           ) : (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 text-gray-400">
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-canvas-soft text-ink-subtle">
               <ImageIcon className="w-8 h-8 mb-1" strokeWidth={1.5} />
               <span className="text-xs">Chưa có ảnh bìa</span>
             </div>
@@ -71,16 +71,16 @@ export function CourseThumbnailUpload({ courseId }: Props) {
         </div>
 
         <div className="flex-1 space-y-2">
-          <p className="text-xs text-gray-500 leading-relaxed">
+          <p className="text-xs text-muted leading-relaxed">
             Tải lên ảnh bìa hấp dẫn để thu hút học viên. Ảnh nên có tỉ lệ <strong>16:9</strong>.
           </p>
-          <p className="text-xs text-gray-400">Định dạng: JPEG, PNG, WebP · Tối đa 10MB</p>
-          {error && <p className="text-xs text-red-500">{error}</p>}
+          <p className="text-xs text-ink-subtle">Định dạng: JPEG, PNG, WebP · Tối đa 10MB</p>
+          {error && <p className="text-xs text-semantic-error">{error}</p>}
           <button
             type="button"
             disabled={uploading}
             onClick={() => inputRef.current?.click()}
-            className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            className="text-xs bg-sky text-white px-3 py-1.5 rounded-lg hover:bg-sky-deep disabled:opacity-50"
           >
             {uploading ? 'Đang tải...' : thumbnailUrl ? 'Thay đổi ảnh bìa' : 'Tải ảnh bìa lên'}
           </button>

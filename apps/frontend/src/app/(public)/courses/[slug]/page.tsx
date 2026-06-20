@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import {
   courseApi,
@@ -13,6 +14,7 @@ import {
 import { useAuthStore } from '@/store/auth.store';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorMessage } from '@/components/common/ErrorMessage';
+import { SafeHtml } from '@/components/common/SafeHtml';
 import { PriceDisplay } from '@/components/ui/PriceDisplay';
 import { StarRating } from '@/components/ui/StarRating';
 import { PaymentQrModal } from '@/components/payment/PaymentQrModal';
@@ -101,7 +103,8 @@ export default function CourseDetailPage() {
     <div className="min-h-screen bg-canvas">
       {/* Page header band */}
       <div className="bg-surface-dark py-10">
-        <div className="max-w-300 mx-auto px-6">
+        <div className="max-w-300 mx-auto px-6 flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 lg:flex-1">
           <h1 className="font-display text-3xl md:text-4xl text-white mb-3">{course.title}</h1>
           {course.shortDescription && (
             <p className="text-[15px] text-white/70 mb-4 max-w-3xl">{course.shortDescription}</p>
@@ -148,6 +151,20 @@ export default function CourseDetailPage() {
               </span>
             )}
           </div>
+          </div>
+
+          {course.thumbnailUrl && (
+            <div className="relative w-full shrink-0 overflow-hidden rounded-2xl border border-white/10 shadow-lg lg:w-96 aspect-video">
+              <Image
+                src={course.thumbnailUrl}
+                alt={course.title}
+                fill
+                sizes="(max-width: 1024px) 100vw, 24rem"
+                className="object-cover"
+                priority
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -175,7 +192,10 @@ export default function CourseDetailPage() {
             {course.description && (
               <section>
                 <h2 className="font-display text-2xl text-ink mb-3">Giới thiệu khóa học</h2>
-                <p className="text-body-copy leading-relaxed whitespace-pre-line">{course.description}</p>
+                <SafeHtml
+                  html={course.description}
+                  className="prose prose-sm max-w-none text-body-copy leading-relaxed"
+                />
               </section>
             )}
 

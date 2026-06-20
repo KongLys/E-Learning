@@ -24,7 +24,7 @@ function Avatar({ name, url, size = 40 }: { name: string; url?: string | null; s
   }
   return (
     <div
-      className="rounded-full bg-blue-500 text-white flex items-center justify-center font-medium shrink-0 text-sm"
+      className="rounded-full bg-sky text-white flex items-center justify-center font-medium shrink-0 text-sm"
       style={{ width: size, height: size }}
     >
       {name?.charAt(0).toUpperCase() ?? '?'}
@@ -227,15 +227,15 @@ export default function MessagesPage() {
   if (!mounted || conversationsQuery.isLoading) return <LoadingSpinner />;
 
   return createPortal(
-    <div className="fixed top-12 bottom-0 left-0 lg:left-60 right-0 flex bg-white border-t border-l border-gray-200 z-50">
+    <div className="fixed top-12 bottom-0 left-0 lg:left-60 right-0 flex bg-surface-card border-t border-l border-hairline z-50">
       {/* Conversation List — hidden on mobile when a chat is open */}
-      <div className={`border-r border-gray-200 flex flex-col ${selectedId ? 'hidden lg:flex lg:w-72 lg:shrink-0' : 'flex-1 lg:w-72 lg:flex-none lg:shrink-0'}`}>
-        <div className="px-4 py-3.5 border-b border-gray-200">
-          <h2 className="text-base font-semibold text-gray-900">Tin nhắn</h2>
+      <div className={`border-r border-hairline flex flex-col ${selectedId ? 'hidden lg:flex lg:w-72 lg:shrink-0' : 'flex-1 lg:w-72 lg:flex-none lg:shrink-0'}`}>
+        <div className="px-4 py-3.5 border-b border-hairline">
+          <h2 className="text-base font-semibold text-ink">Tin nhắn</h2>
         </div>
         <div className="flex-1 overflow-y-auto">
           {conversations.length === 0 ? (
-            <div className="text-center py-12 text-gray-400">
+            <div className="text-center py-12 text-muted">
               <MessageCircle className="w-10 h-10 mx-auto mb-2 opacity-40" />
               <p className="text-sm">Chưa có cuộc trò chuyện</p>
             </div>
@@ -246,20 +246,20 @@ export default function MessagesPage() {
                   key={c.id}
                   onClick={() => setSelectedId(c.id)}
                   className={`w-full text-left p-3 rounded-lg transition-colors flex items-center gap-3 ${
-                    selectedId === c.id ? 'bg-blue-50' : 'hover:bg-gray-50'
+                    selectedId === c.id ? 'bg-sky-soft' : 'hover:bg-canvas-soft'
                   }`}
                 >
                   <div className="relative">
                     <Avatar name={c.otherUser.fullName} url={c.otherUser.avatarUrl} size={38} />
                     {onlineUsers.has(c.otherUserId) && (
-                      <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full" />
+                      <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-leaf border-2 border-surface-card rounded-full" />
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium truncate ${selectedId === c.id ? 'text-blue-700' : 'text-gray-900'}`}>
+                    <p className={`text-sm font-medium truncate ${selectedId === c.id ? 'text-sky' : 'text-ink'}`}>
                       {c.otherUser.fullName}
                     </p>
-                    <p className="text-xs text-gray-400 truncate">
+                    <p className="text-xs text-ink-subtle truncate">
                       {c.lastMessage
                         ? c.lastMessage.isDeleted ? 'Tin nhắn đã thu hồi'
                           : c.lastMessage.messageType !== 'text' ? `[${c.lastMessage.messageType}]`
@@ -268,7 +268,7 @@ export default function MessagesPage() {
                     </p>
                   </div>
                   {c.unreadCount > 0 && (
-                    <span className="bg-blue-500 text-white text-xs rounded-full min-w-5 h-5 px-1.5 flex items-center justify-center shrink-0">
+                    <span className="bg-sky text-white text-xs rounded-full min-w-5 h-5 px-1.5 flex items-center justify-center shrink-0">
                       {c.unreadCount}
                     </span>
                   )}
@@ -283,31 +283,31 @@ export default function MessagesPage() {
       {selected ? (
         <div className="flex-1 flex flex-col min-w-0">
           {/* Header */}
-          <div className="px-4 py-3 border-b border-gray-200 flex items-center gap-3 bg-white shrink-0">
-            <button onClick={() => setSelectedId(null)} className="lg:hidden text-gray-400 hover:text-gray-600 -ml-1 shrink-0">
+          <div className="px-4 py-3 border-b border-hairline flex items-center gap-3 bg-surface-card shrink-0">
+            <button onClick={() => setSelectedId(null)} className="lg:hidden text-ink-subtle hover:text-ink -ml-1 shrink-0">
               <ArrowLeft size={18} />
             </button>
             <Avatar name={selected.otherUser.fullName} url={selected.otherUser.avatarUrl} size={34} />
             <div>
-              <p className="text-sm font-semibold text-gray-900">{selected.otherUser.fullName}</p>
+              <p className="text-sm font-semibold text-ink">{selected.otherUser.fullName}</p>
               {onlineUsers.has(selected.otherUserId) ? (
-                <span className="flex items-center gap-1 text-xs text-green-600">
-                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full" /> Online
+                <span className="flex items-center gap-1 text-xs text-leaf">
+                  <span className="w-1.5 h-1.5 bg-leaf rounded-full" /> Online
                 </span>
               ) : (
-                <span className="flex items-center gap-1 text-xs text-gray-400">
-                  <span className="w-1.5 h-1.5 bg-gray-300 rounded-full" /> Offline
+                <span className="flex items-center gap-1 text-xs text-ink-subtle">
+                  <span className="w-1.5 h-1.5 bg-ink-faint rounded-full" /> Offline
                 </span>
               )}
             </div>
           </div>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
+          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-canvas-soft">
             {messagesQuery.isLoading ? (
               <div className="flex items-center justify-center h-full"><LoadingSpinner /></div>
             ) : messages.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-sm text-gray-400">
+              <div className="flex items-center justify-center h-full text-sm text-muted">
                 Chưa có tin nhắn. Hãy bắt đầu!
               </div>
             ) : (
@@ -325,13 +325,13 @@ export default function MessagesPage() {
                               value={editingText}
                               onChange={(e) => setEditingText(e.target.value)}
                               onKeyDown={(e) => { if (e.key === 'Enter') handleEditSubmit(msg.id); if (e.key === 'Escape') setEditingId(null); }}
-                              className="px-3 py-2 rounded-lg border border-blue-400 bg-white text-gray-900 text-sm focus:outline-none"
+                              className="px-3 py-2 rounded-lg border border-sky bg-canvas text-ink text-sm focus:outline-none"
                             />
-                            <button onClick={() => handleEditSubmit(msg.id)} className="text-green-600"><Check className="w-4 h-4" /></button>
-                            <button onClick={() => setEditingId(null)} className="text-gray-400"><X className="w-4 h-4" /></button>
+                            <button onClick={() => handleEditSubmit(msg.id)} className="text-leaf"><Check className="w-4 h-4" /></button>
+                            <button onClick={() => setEditingId(null)} className="text-ink-subtle"><X className="w-4 h-4" /></button>
                           </div>
                         ) : (
-                          <div className={`px-3.5 py-2 rounded-2xl text-sm ${isOwn ? 'bg-blue-500 text-white rounded-br-sm' : 'bg-white text-gray-900 border border-gray-200 rounded-bl-sm'}`}>
+                          <div className={`px-3.5 py-2 rounded-2xl text-sm ${isOwn ? 'bg-sky text-white rounded-br-sm' : 'bg-surface-card text-ink border border-hairline rounded-bl-sm'}`}>
                             {msg.isDeleted ? (
                               <p className="italic opacity-60 text-xs">Tin nhắn đã thu hồi</p>
                             ) : (
@@ -356,7 +356,7 @@ export default function MessagesPage() {
                                   </div>
                                 ))}
                                 {msg.content && <p className="wrap-break-word whitespace-pre-wrap leading-relaxed">{msg.content}</p>}
-                                <p className={`text-xs mt-1 ${isOwn ? 'text-blue-100' : 'text-gray-400'}`}>
+                                <p className={`text-xs mt-1 ${isOwn ? 'text-sky-soft/80' : 'text-ink-subtle'}`}>
                                   {new Date(msg.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                                   {msg.editedAt && ' · đã sửa'}
                                 </p>
@@ -366,7 +366,7 @@ export default function MessagesPage() {
                         )}
 
                         {reactionPickerFor === msg.id && (
-                          <div className="absolute -top-9 z-10 flex gap-1 bg-white border border-gray-200 rounded-full px-2 py-1 shadow-lg">
+                          <div className="absolute -top-9 z-10 flex gap-1 bg-surface-card border border-hairline rounded-full px-2 py-1 shadow-lg">
                             {REACTION_EMOJIS.map((e) => (
                               <button key={e} onClick={() => toggleReaction(msg, e)} className="hover:scale-125 transition-transform">{e}</button>
                             ))}
@@ -375,17 +375,17 @@ export default function MessagesPage() {
                       </div>
 
                       {!msg.isDeleted && editingId !== msg.id && (
-                        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-gray-400">
-                          <button onClick={() => setReactionPickerFor(reactionPickerFor === msg.id ? null : msg.id)} className="hover:text-gray-600" title="Cảm xúc">
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-ink-subtle">
+                          <button onClick={() => setReactionPickerFor(reactionPickerFor === msg.id ? null : msg.id)} className="hover:text-ink" title="Cảm xúc">
                             <Smile className="w-3.5 h-3.5" />
                           </button>
                           {isOwn && msg.messageType === 'text' && (
-                            <button onClick={() => { setEditingId(msg.id); setEditingText(msg.content ?? ''); }} className="hover:text-gray-600" title="Sửa">
+                            <button onClick={() => { setEditingId(msg.id); setEditingText(msg.content ?? ''); }} className="hover:text-ink" title="Sửa">
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
                           )}
                           {isOwn && (
-                            <button onClick={() => socket.deleteMessage(msg.id)} className="hover:text-red-500" title="Thu hồi">
+                            <button onClick={() => socket.deleteMessage(msg.id)} className="hover:text-coral" title="Thu hồi">
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           )}
@@ -396,25 +396,25 @@ export default function MessagesPage() {
                     {msg.reactions.length > 0 && (
                       <div className={`flex gap-1 mt-1 ${isOwn ? 'mr-1' : 'ml-1'}`}>
                         {Object.entries(msg.reactions.reduce<Record<string, number>>((acc, r) => { acc[r.emoji] = (acc[r.emoji] || 0) + 1; return acc; }, {})).map(([emoji, count]) => (
-                          <button key={emoji} onClick={() => toggleReaction(msg, emoji)} className="text-xs bg-white border border-gray-200 rounded-full px-2 py-0.5 hover:bg-gray-50">
+                          <button key={emoji} onClick={() => toggleReaction(msg, emoji)} className="text-xs bg-surface-card border border-hairline rounded-full px-2 py-0.5 hover:bg-canvas-soft">
                             {emoji} {count}
                           </button>
                         ))}
                       </div>
                     )}
-                    {seen && <p className="text-xs text-gray-400 mt-0.5">Đã xem</p>}
+                    {seen && <p className="text-xs text-ink-subtle mt-0.5">Đã xem</p>}
                   </div>
                 );
               })
             )}
             {selected && typingUsers.has(selected.otherUserId) && (
               <div className="flex justify-start">
-                <div className="bg-white border border-gray-200 text-gray-500 px-3.5 py-2 rounded-2xl rounded-bl-sm text-sm">
+                <div className="bg-surface-card border border-hairline text-muted px-3.5 py-2 rounded-2xl rounded-bl-sm text-sm">
                   {selected.otherUser.fullName} đang nhập
                   <span className="inline-flex gap-0.5 ml-1">
-                    <span className="w-1 h-1 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]" />
-                    <span className="w-1 h-1 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]" />
-                    <span className="w-1 h-1 bg-gray-400 rounded-full animate-bounce" />
+                    <span className="w-1 h-1 bg-ink-subtle rounded-full animate-bounce [animation-delay:-0.3s]" />
+                    <span className="w-1 h-1 bg-ink-subtle rounded-full animate-bounce [animation-delay:-0.15s]" />
+                    <span className="w-1 h-1 bg-ink-subtle rounded-full animate-bounce" />
                   </span>
                 </div>
               </div>
@@ -423,12 +423,12 @@ export default function MessagesPage() {
           </div>
 
           {/* Input */}
-          <div className="px-4 py-3 bg-white border-t border-gray-200 flex items-center gap-2 shrink-0">
+          <div className="px-4 py-3 bg-surface-card border-t border-hairline flex items-center gap-2 shrink-0">
             <input ref={fileInputRef} type="file" onChange={handleFile} className="hidden" />
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading || !socket.isConnected}
-              className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 disabled:opacity-40 transition-colors"
+              className="p-2 rounded-lg text-ink-subtle hover:text-ink hover:bg-surface-strong disabled:opacity-40 transition-colors"
               title="Đính kèm tệp"
             >
               <Paperclip className="w-5 h-5" />
@@ -440,23 +440,23 @@ export default function MessagesPage() {
               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
               onBlur={emitStopTyping}
               placeholder={uploading ? 'Đang tải tệp lên...' : 'Nhập tin nhắn...'}
-              className="flex-1 px-4 py-2 rounded-full border border-gray-300 bg-white text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-400"
+              className="flex-1 px-4 py-2 rounded-full border border-hairline-strong bg-canvas text-sm text-ink placeholder:text-ink-subtle focus:outline-none focus:border-sky"
               disabled={!socket.isConnected}
             />
             <button
               onClick={handleSend}
               disabled={!input.trim() || !socket.isConnected}
-              className="p-2 rounded-full bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-40 transition-colors"
+              className="p-2 rounded-full bg-sky text-white hover:bg-sky-deep disabled:opacity-40 transition-colors"
             >
               <Send className="w-4 h-4" />
             </button>
           </div>
         </div>
       ) : (
-        <div className="hidden lg:flex flex-1 items-center justify-center bg-gray-50">
+        <div className="hidden lg:flex flex-1 items-center justify-center bg-canvas-soft">
           <div className="text-center">
-            <MessageCircle className="w-14 h-14 mx-auto mb-3 text-gray-300" />
-            <p className="text-sm text-gray-400">Chọn cuộc trò chuyện để bắt đầu</p>
+            <MessageCircle className="w-14 h-14 mx-auto mb-3 text-ink-faint" />
+            <p className="text-sm text-muted">Chọn cuộc trò chuyện để bắt đầu</p>
           </div>
         </div>
       )}

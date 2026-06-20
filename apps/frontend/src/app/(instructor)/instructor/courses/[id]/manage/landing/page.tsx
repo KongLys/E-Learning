@@ -8,6 +8,7 @@ import { courseApi } from '@/lib/api/course.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { RichTextEditor } from '@/components/common/RichTextEditor';
 import { CourseThumbnailUpload } from '@/components/instructor/CourseThumbnailUpload';
+import { notify } from '@/store/dialog.store';
 
 const LEVELS = [
   { value: 'beginner', label: 'Sơ cấp' },
@@ -15,7 +16,7 @@ const LEVELS = [
   { value: 'advanced', label: 'Nâng cao' },
 ];
 
-const inputClass = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500';
+const inputClass = 'w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky';
 
 export default function CourseLandingPage() {
   const { id } = useParams<{ id: string }>();
@@ -70,7 +71,7 @@ export default function CourseLandingPage() {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     },
-    onError: (err: any) => alert(err?.response?.data?.message ?? 'Lưu thất bại'),
+    onError: (err: any) => notify.error(err?.response?.data?.message ?? 'Lưu thất bại'),
   });
 
   if (isLoading) return <LoadingSpinner />;
@@ -79,9 +80,9 @@ export default function CourseLandingPage() {
 
   return (
     <div className="space-y-6">
-      <header className="border-b border-gray-100 pb-4">
-        <h1 className="text-2xl font-bold text-gray-900">Trang tổng quan khóa học</h1>
-        <p className="mt-1 text-sm text-gray-500">
+      <header className="border-b border-hairline pb-4">
+        <h1 className="text-2xl font-bold text-ink">Trang tổng quan khóa học</h1>
+        <p className="mt-1 text-sm text-muted">
           Trang tổng quan thể hiện lý do học viên nên ghi danh khóa học của bạn và giúp khóa học hiển thị tốt hơn trên công cụ tìm kiếm.
         </p>
       </header>
@@ -140,11 +141,11 @@ export default function CourseLandingPage() {
         <button
           onClick={() => saveMutation.mutate()}
           disabled={saveMutation.isPending}
-          className="rounded-md bg-purple-600 px-5 py-2 text-sm font-semibold text-white hover:bg-purple-700 disabled:opacity-50"
+          className="rounded-md bg-sky px-5 py-2 text-sm font-semibold text-white hover:bg-sky-deep disabled:opacity-50"
         >
           {saveMutation.isPending ? 'Đang lưu...' : 'Lưu'}
         </button>
-        {saved && <span className="text-sm text-green-600">Đã lưu</span>}
+        {saved && <span className="text-sm text-leaf">Đã lưu</span>}
       </div>
     </div>
   );

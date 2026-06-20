@@ -15,6 +15,7 @@ import {
 import { RichTextEditor } from '@/components/common/RichTextEditor';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
+import { showPrompt } from '@/store/dialog.store';
 import { QuizBuilder } from './QuizBuilder';
 import { ReviewQuizUI } from '@/components/learn/ReviewQuizUI';
 import { LESSON_TYPE_META, type LessonType } from './lessonTypeMeta';
@@ -28,11 +29,11 @@ const PARSE_LABEL: Record<DocumentParseStatus, string> = {
 };
 
 const PARSE_COLOR: Record<DocumentParseStatus, string> = {
-  uploaded: 'bg-gray-100 text-gray-700',
-  parsing: 'bg-blue-100 text-blue-700 animate-pulse',
-  parsed: 'bg-yellow-100 text-yellow-800 animate-pulse',
-  ready: 'bg-green-100 text-green-700',
-  failed: 'bg-red-100 text-red-700',
+  uploaded: 'bg-surface-strong text-ink-mute',
+  parsing: 'bg-sky-soft text-sky animate-pulse',
+  parsed: 'bg-sun-soft text-sun-deep animate-pulse',
+  ready: 'bg-leaf-soft text-leaf-deep',
+  failed: 'bg-coral-soft text-coral',
 };
 
 function formatFileSize(bytes: number): string {
@@ -71,17 +72,13 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
     enabled: lesson.type === 'video' && !!detail?.videoAsset?.videoUrl,
   });
 
-  // ----- Common: title + description -----
   const [title, setTitle] = useState(lesson.title);
   const [description, setDescription] = useState('');
-  // ----- Video -----
   const [completionMode, setCompletionMode] = useState<'percent_90' | 'ended_autonext'>('percent_90');
-  // ----- Document -----
   const [contentHtml, setContentHtml] = useState('');
   const [minReadTimeSec, setMinReadTimeSec] = useState(0);
   const [hydratedId, setHydratedId] = useState<string | null>(null);
 
-  // Prefill khi detail tải xong, và nạp lại khi đổi sang bài khác
   if (detail && hydratedId !== lesson.id) {
     setTitle(detail.title ?? lesson.title);
     setDescription(detail.description ?? '');
@@ -146,7 +143,6 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
     onError: onErr,
   });
 
-  // ----- Quiz ôn tập (AI) cho bài video/tài liệu -----
   const { data: reviewQuizResp } = useQuery({
     queryKey: ['review-quiz-edit', lesson.id],
     queryFn: () => instructorApi.getReviewQuiz(lesson.id),
@@ -170,44 +166,44 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
     <div className="space-y-6">
       {/* Read-only banner */}
       {readOnly && (
-        <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+        <div className="flex items-center gap-2 text-sm text-sun-deep bg-sun-soft border border-sun-deep rounded-lg px-3 py-2">
           <span>🔒</span>
           <span>Khóa học đang {courseStatus === 'published' ? 'xuất bản' : 'chờ duyệt'} — nội dung chỉ đọc. Hủy xuất bản để chỉnh sửa.</span>
         </div>
       )}
 
       {error && (
-        <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>
+        <div className="text-sm text-semantic-error bg-coral-soft border border-coral rounded-lg px-3 py-2">{error}</div>
       )}
 
       {/* Thông tin chung */}
       <section className="space-y-3">
-        <h3 className="text-sm font-semibold text-gray-700">Thông tin chung</h3>
+        <h3 className="text-sm font-semibold text-ink-mute">Thông tin chung</h3>
         <div>
-          <label className="text-xs text-gray-500">Tiêu đề</label>
+          <label className="text-xs text-muted">Tiêu đề</label>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             disabled={readOnly}
-            className="w-full text-sm bg-white rounded-xl px-3 py-2.5 outline-none ring-1 ring-gray-200 focus:ring-2 focus:ring-blue-400 disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
+            className="w-full text-sm bg-surface-card rounded-xl px-3 py-2.5 outline-none ring-1 ring-hairline-strong focus:ring-2 focus:ring-sky disabled:bg-surface-strong disabled:text-ink-faint disabled:cursor-not-allowed"
           />
         </div>
         <div>
-          <label className="text-xs text-gray-500">Mục tiêu học tập</label>
+          <label className="text-xs text-muted">Mục tiêu học tập</label>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             disabled={readOnly}
             rows={3}
             placeholder="Học viên có thể làm được gì sau khi hoàn thành bài học này?"
-            className="w-full text-sm bg-white rounded-xl px-3 py-2.5 outline-none ring-1 ring-gray-200 focus:ring-2 focus:ring-blue-400 disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
+            className="w-full text-sm bg-surface-card rounded-xl px-3 py-2.5 outline-none ring-1 ring-hairline-strong focus:ring-2 focus:ring-sky disabled:bg-surface-strong disabled:text-ink-faint disabled:cursor-not-allowed"
           />
         </div>
         {!readOnly && (
           <button
             onClick={() => saveBasics.mutate()}
             disabled={saveBasics.isPending}
-            className="text-xs bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50"
+            className="text-xs bg-sky text-white px-4 py-2 rounded-pill hover:bg-sky-deep transition-colors disabled:opacity-50"
           >
             {saveBasics.isPending ? 'Đang lưu...' : 'Lưu thông tin'}
           </button>
@@ -216,44 +212,41 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
 
       {/* ===== VIDEO ===== */}
       {lesson.type === 'video' && (
-        <section className="space-y-3 border-t border-gray-100 pt-5">
-          <h3 className="text-sm font-semibold text-gray-700">Video bài giảng</h3>
+        <section className="space-y-3 border-t border-hairline pt-5">
+          <h3 className="text-sm font-semibold text-ink-mute">Video bài giảng</h3>
 
-          {/* File đã upload */}
           {videoAsset?.videoUrl ? (
-            <div className="flex items-center justify-between gap-2 rounded-xl bg-green-50 px-3 py-2">
-              <span className="inline-flex items-center gap-1 text-xs text-green-700 truncate">
+            <div className="flex items-center justify-between gap-2 rounded-xl bg-leaf-soft px-3 py-2">
+              <span className="inline-flex items-center gap-1 text-xs text-leaf-deep truncate">
                 <Video size={14} className="shrink-0" /> {videoAsset.fileName ?? 'video'}
               </span>
               {!readOnly && (
                 <button
                   onClick={() => setDeleteVideoConfirm(true)}
-                  className="shrink-0 text-xs text-red-500 hover:text-red-700"
+                  className="shrink-0 text-xs text-coral hover:opacity-80"
                 >
                   Xóa
                 </button>
               )}
             </div>
           ) : (
-            <p className="text-xs text-gray-400">Chưa có video</p>
+            <p className="text-xs text-ink-subtle">Chưa có video</p>
           )}
 
-          {/* Progress bar */}
           {videoPct !== null && (
             <div className="space-y-1">
-              <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
+              <div className="h-1.5 w-full rounded-full bg-surface-strong overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-blue-500 transition-all duration-200"
+                  className="h-full rounded-full bg-sky transition-all duration-200"
                   style={{ width: `${videoPct}%` }}
                 />
               </div>
-              <p className="text-xs text-blue-600">Đang tải lên {videoPct}%</p>
+              <p className="text-xs text-sky">Đang tải lên {videoPct}%</p>
             </div>
           )}
 
-          {/* Upload button */}
           {!readOnly && (
-            <label className="inline-block cursor-pointer text-sm text-blue-600 hover:underline">
+            <label className="inline-block cursor-pointer text-sm text-sky hover:underline">
               {videoAsset?.videoUrl ? 'Thay video khác' : 'Tải video lên'}
               <input
                 type="file"
@@ -264,10 +257,9 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
             </label>
           )}
 
-          {/* Video preview */}
           {previewVideoUrl && (
             <div className="space-y-1">
-              <p className="text-xs text-gray-500">Xem trước</p>
+              <p className="text-xs text-muted">Xem trước</p>
               <video
                 src={`${previewVideoUrl}#t=1`}
                 controls
@@ -279,7 +271,7 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
 
           {!readOnly && (
             <div className="space-y-2">
-              <label className="text-xs text-gray-500">Điều kiện hoàn thành</label>
+              <label className="text-xs text-muted">Điều kiện hoàn thành</label>
               {([
                 ['percent_90', 'Xem đủ 90% thời lượng video'],
                 ['ended_autonext', 'Xem hết video, tự động chuyển bài kế tiếp'],
@@ -297,7 +289,7 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
               <button
                 onClick={() => saveVideoConfig.mutate()}
                 disabled={saveVideoConfig.isPending}
-                className="block text-xs bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50"
+                className="block text-xs bg-sky text-white px-4 py-2 rounded-pill hover:bg-sky-deep transition-colors disabled:opacity-50"
               >
                 {saveVideoConfig.isPending ? 'Đang lưu...' : 'Lưu cấu hình video'}
               </button>
@@ -308,10 +300,9 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
 
       {/* ===== DOCUMENT ===== */}
       {lesson.type === 'document' && (
-        <section className="space-y-3 border-t border-gray-100 pt-5">
-          <h3 className="text-sm font-semibold text-gray-700">Tài liệu</h3>
+        <section className="space-y-3 border-t border-hairline pt-5">
+          <h3 className="text-sm font-semibold text-ink-mute">Tài liệu</h3>
 
-          {/* Trạng thái AI: chuyển đổi tài liệu + kiểm duyệt nội dung bài */}
           <div className="flex flex-wrap items-center gap-2 text-xs">
             {docAsset?.fileUrl && docAsset?.parseStatus && (
               <span className={`px-2 py-1 rounded-full font-medium ${PARSE_COLOR[docAsset.parseStatus as DocumentParseStatus]}`}>
@@ -325,28 +316,27 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
             )}
             {detail?.moderationStatus === 'rejected' && (
               <button
-                onClick={() => {
-                  const reason = window.prompt('Lý do kiến nghị duyệt lại (tuỳ chọn):') ?? undefined;
+                onClick={async () => {
+                  const reason = (await showPrompt({ title: 'Lý do kiến nghị duyệt lại (tuỳ chọn):' })) ?? undefined;
                   appeal.mutate(reason || undefined);
                 }}
                 disabled={appeal.isPending}
-                className="px-2 py-1 rounded-full border border-amber-300 text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+                className="px-2 py-1 rounded-full border border-sun-deep text-sun-deep hover:bg-sun-soft disabled:opacity-50"
               >
                 {appeal.isPending ? 'Đang gửi…' : 'Kiến nghị duyệt lại'}
               </button>
             )}
           </div>
           {detail?.moderationReason && detail?.moderationStatus !== 'approved' && (
-            <p className="text-xs text-red-600">{detail.moderationReason}</p>
+            <p className="text-xs text-semantic-error">{detail.moderationReason}</p>
           )}
           {docAsset?.errorMsg && docAsset?.parseStatus === 'failed' && (
-            <p className="text-xs text-red-600">{docAsset.errorMsg}</p>
+            <p className="text-xs text-semantic-error">{docAsset.errorMsg}</p>
           )}
 
-          {/* File đã upload */}
           {docAsset?.fileUrl ? (
-            <div className="flex items-center justify-between gap-2 rounded-xl bg-green-50 px-3 py-2">
-              <span className="inline-flex items-center gap-1 text-xs text-green-700 truncate">
+            <div className="flex items-center justify-between gap-2 rounded-xl bg-leaf-soft px-3 py-2">
+              <span className="inline-flex items-center gap-1 text-xs text-leaf-deep truncate">
                 <FileText size={14} className="shrink-0" /> {docAsset.fileName ?? 'tài liệu'}
                 {' · '}{docAsset.fileType?.toUpperCase()}
                 {docAsset.fileSize ? ` · ${formatFileSize(Number(docAsset.fileSize))}` : ''}
@@ -354,32 +344,30 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
               {!readOnly && (
                 <button
                   onClick={() => setDeleteDocConfirm(true)}
-                  className="shrink-0 text-xs text-red-500 hover:text-red-700"
+                  className="shrink-0 text-xs text-coral hover:opacity-80"
                 >
                   Xóa
                 </button>
               )}
             </div>
           ) : (
-            <p className="text-xs text-gray-400">Chưa có file</p>
+            <p className="text-xs text-ink-subtle">Chưa có file</p>
           )}
 
-          {/* Progress bar */}
           {docPct !== null && (
             <div className="space-y-1">
-              <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
+              <div className="h-1.5 w-full rounded-full bg-surface-strong overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-blue-500 transition-all duration-200"
+                  className="h-full rounded-full bg-sky transition-all duration-200"
                   style={{ width: `${docPct}%` }}
                 />
               </div>
-              <p className="text-xs text-blue-600">Đang tải lên {docPct}%</p>
+              <p className="text-xs text-sky">Đang tải lên {docPct}%</p>
             </div>
           )}
 
-          {/* Upload button */}
           {!readOnly && (
-            <label className="inline-block cursor-pointer text-sm text-blue-600 hover:underline">
+            <label className="inline-block cursor-pointer text-sm text-sky hover:underline">
               Tải file PDF / DOCX
               <input
                 type="file"
@@ -391,18 +379,18 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
           )}
 
           <div>
-            <label className="text-xs text-gray-500">Nội dung để người học đọc (tuỳ chọn)</label>
+            <label className="text-xs text-muted">Nội dung để người học đọc (tuỳ chọn)</label>
             <RichTextEditor value={contentHtml} onChange={setContentHtml} readOnly={readOnly} placeholder="Soạn nội dung..." />
           </div>
           {!readOnly && (
           <div>
-            <label className="text-xs text-gray-500">Thời gian đọc tối thiểu để hoàn thành (giây)</label>
+            <label className="text-xs text-muted">Thời gian đọc tối thiểu để hoàn thành (giây)</label>
             <input
               type="number"
               min={0}
               value={minReadTimeSec}
               onChange={(e) => setMinReadTimeSec(Math.max(0, Number(e.target.value) || 0))}
-              className="w-32 text-sm bg-white rounded-xl px-3 py-2.5 outline-none ring-1 ring-gray-200 focus:ring-2 focus:ring-blue-400 block"
+              className="w-32 text-sm bg-surface-card rounded-xl px-3 py-2.5 outline-none ring-1 ring-hairline-strong focus:ring-2 focus:ring-sky block"
             />
           </div>
           )}
@@ -410,7 +398,7 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
             <button
               onClick={() => saveDocConfig.mutate()}
               disabled={saveDocConfig.isPending}
-              className="text-xs bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50"
+              className="text-xs bg-sky text-white px-4 py-2 rounded-pill hover:bg-sky-deep transition-colors disabled:opacity-50"
             >
               {saveDocConfig.isPending ? 'Đang lưu...' : 'Lưu nội dung tài liệu'}
             </button>
@@ -420,8 +408,8 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
 
       {/* ===== QUIZ ===== */}
       {lesson.type === 'quiz' && !readOnly && (
-        <section className="border-t border-gray-100 pt-5">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">
+        <section className="border-t border-hairline pt-5">
+          <h3 className="text-sm font-semibold text-ink-mute mb-3">
             {LESSON_TYPE_META.quiz.label}
           </h3>
           <QuizBuilder lessonId={lesson.id} onError={setError} />
@@ -430,9 +418,9 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
 
       {/* ===== QUIZ ÔN TẬP (AI) ===== */}
       {isMediaLesson && (
-        <section className="space-y-3 border-t border-gray-100 pt-5">
-          <h3 className="text-sm font-semibold text-gray-700">Quiz ôn tập (AI)</h3>
-          <p className="text-xs text-gray-500">
+        <section className="space-y-3 border-t border-hairline pt-5">
+          <h3 className="text-sm font-semibold text-ink-mute">Quiz ôn tập (AI)</h3>
+          <p className="text-xs text-muted">
             Sinh câu hỏi trắc nghiệm ôn tập tự động từ nội dung bài học để học viên luyện tập.
             Không tính vào tiến độ khoá học.
           </p>
@@ -440,7 +428,7 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
             <button
               onClick={() => genReviewQuiz.mutate()}
               disabled={genReviewQuiz.isPending}
-              className="text-xs bg-purple-600 text-white px-4 py-2 rounded-full hover:bg-purple-700 transition-colors disabled:opacity-50"
+              className="text-xs bg-berry text-white px-4 py-2 rounded-pill hover:opacity-90 transition-colors disabled:opacity-50"
             >
               {genReviewQuiz.isPending
                 ? 'Đang tạo...'
@@ -451,7 +439,7 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
             {reviewQuiz && (
               <button
                 onClick={() => setReviewPreviewOpen(true)}
-                className="text-xs border px-4 py-2 rounded-full hover:bg-gray-50"
+                className="text-xs border border-hairline px-4 py-2 rounded-pill hover:bg-canvas-soft"
               >
                 Làm thử ({reviewQuiz.questions?.length ?? 0} câu)
               </button>
@@ -460,7 +448,6 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
         </section>
       )}
 
-      {/* ConfirmDialog xóa video */}
       {deleteVideoConfirm && (
         <ConfirmDialog
           title="Xóa video?"
@@ -472,7 +459,6 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
         />
       )}
 
-      {/* ConfirmDialog xóa tài liệu */}
       {deleteDocConfirm && (
         <ConfirmDialog
           title="Xóa tài liệu?"
@@ -484,21 +470,20 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
         />
       )}
 
-      {/* Modal làm thử quiz ôn tập */}
       {reviewPreviewOpen && reviewQuiz && (
         <div
-          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4"
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 backdrop-blur-sm p-4"
           onClick={() => setReviewPreviewOpen(false)}
         >
           <div
-            className="my-8 w-full max-w-lg rounded-2xl bg-white shadow-xl"
+            className="my-8 w-full max-w-lg rounded-modal bg-surface-card shadow-modal"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-              <h2 className="text-lg font-bold">Quiz ôn tập — làm thử</h2>
+            <div className="flex items-center justify-between border-b border-hairline px-6 py-4">
+              <h2 className="text-lg font-bold text-ink">Quiz ôn tập — làm thử</h2>
               <button
                 onClick={() => setReviewPreviewOpen(false)}
-                className="text-gray-400 hover:text-gray-700"
+                className="text-ink-subtle hover:text-ink"
                 aria-label="Đóng"
               >
                 <X size={20} />

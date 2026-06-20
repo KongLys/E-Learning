@@ -6,6 +6,8 @@ import { useSearchParams } from 'next/navigation';
 import { adminApi } from '@/lib/api/admin.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
+import { SafeHtml } from '@/components/common/SafeHtml';
+import { notify, showPrompt } from '@/store/dialog.store';
 import {
   FileText, PenLine, X, ChevronDown, ChevronLeft, ChevronRight,
   Video, File as FileIcon, CheckCircle, Clock, AlertCircle, XCircle,
@@ -169,8 +171,8 @@ function LessonRow({
                 Duyệt nội dung
               </button>
               <button
-                onClick={() => {
-                  const r = prompt('Lý do từ chối (để trống = mặc định):') ?? undefined;
+                onClick={async () => {
+                  const r = (await showPrompt({ title: 'Lý do từ chối (để trống = mặc định):' })) ?? undefined;
                   onReject?.(r || undefined);
                 }}
                 disabled={isMutating}
@@ -206,14 +208,14 @@ function CourseDetailModal({ courseId, onClose }: { courseId: string; onClose: (
     mutationFn: ({ type, id }: { type: 'course' | 'lesson'; id: string }) =>
       adminApi.approveModeration(type, id),
     onSuccess: invalidate,
-    onError: (err: any) => alert(err?.response?.data?.message ?? 'Duyệt thất bại'),
+    onError: (err: any) => notify.error(err?.response?.data?.message ?? 'Duyệt thất bại'),
   });
 
   const rejectMod = useMutation({
     mutationFn: ({ type, id, reason }: { type: 'course' | 'lesson'; id: string; reason?: string }) =>
       adminApi.rejectModeration(type, id, reason),
     onSuccess: invalidate,
-    onError: (err: any) => alert(err?.response?.data?.message ?? 'Từ chối thất bại'),
+    onError: (err: any) => notify.error(err?.response?.data?.message ?? 'Từ chối thất bại'),
   });
 
   const isMutating = approveMod.isPending || rejectMod.isPending;
@@ -254,7 +256,7 @@ function CourseDetailModal({ courseId, onClose }: { courseId: string; onClose: (
               {course.description && (
                 <div>
                   <p className="text-sm font-medium text-gray-700 mb-1">Mô tả</p>
-                  <p className="text-sm text-gray-600">{course.description}</p>
+                  <SafeHtml html={course.description} className="prose prose-sm max-w-none text-sm text-gray-600" />
                 </div>
               )}
 
@@ -280,8 +282,8 @@ function CourseDetailModal({ courseId, onClose }: { courseId: string; onClose: (
                       Duyệt nội dung
                     </button>
                     <button
-                      onClick={() => {
-                        const r = prompt('Lý do từ chối (để trống = mặc định):') ?? undefined;
+                      onClick={async () => {
+                        const r = (await showPrompt({ title: 'Lý do từ chối (để trống = mặc định):' })) ?? undefined;
                         rejectMod.mutate({ type: 'course', id: courseId, reason: r || undefined });
                       }}
                       disabled={isMutating}
@@ -391,7 +393,7 @@ function AdminCoursesContent() {
       setDeleteTarget(null);
     },
     onError: (err: any) =>
-      alert(err?.response?.data?.message ?? 'Xóa khóa học thất bại'),
+      notify.error(err?.response?.data?.message ?? 'Xóa khóa học thất bại'),
   });
 
   const courses: any[] = data?.data?.courses ?? [];

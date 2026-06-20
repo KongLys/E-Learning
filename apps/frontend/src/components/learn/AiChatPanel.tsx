@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -245,25 +245,25 @@ export function AiChatPanel({
   const showQuizBtn = showActions && currentLessonType !== 'quiz';
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-white">
+    <div className="flex h-full min-h-0 flex-col bg-surface-card">
       {/* Header */}
-      <div className="relative flex shrink-0 items-center gap-2 border-b px-3 py-2.5">
-        <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-800">
-          <Sparkles size={16} className="text-purple-600" /> Hỏi AI
+      <div className="relative flex shrink-0 items-center gap-2 border-b border-hairline px-3 py-2.5">
+        <div className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+          <Sparkles size={16} className="text-berry" /> Hỏi AI
         </div>
         <div className="ml-auto flex items-center gap-1">
           <button
             onClick={() => createConv.mutate()}
             title="Hội thoại mới"
-            className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100"
+            className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-ink-mute hover:bg-surface-strong"
           >
             <Plus className="h-4 w-4" /> Mới
           </button>
           <button
             onClick={() => setHistoryOpen((v) => !v)}
             title="Lịch sử hội thoại"
-            className={`inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium hover:bg-gray-100 ${
-              historyOpen ? 'bg-gray-100 text-gray-900' : 'text-gray-600'
+            className={`inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium hover:bg-surface-strong ${
+              historyOpen ? 'bg-surface-strong text-ink' : 'text-ink-mute'
             }`}
           >
             <History className="h-4 w-4" /> Lịch sử
@@ -272,7 +272,7 @@ export function AiChatPanel({
             <button
               onClick={onClose}
               title="Đóng"
-              className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+              className="rounded-lg p-1.5 text-ink-subtle hover:bg-surface-strong hover:text-ink"
               aria-label="Đóng khung chat"
             >
               <X className="h-4 w-4" />
@@ -284,8 +284,8 @@ export function AiChatPanel({
         {historyOpen && (
           <>
             <div className="fixed inset-0 z-10" onClick={() => setHistoryOpen(false)} />
-            <div className="absolute right-2 top-full z-20 mt-1 max-h-80 w-72 overflow-y-auto rounded-xl border bg-white p-2 shadow-lg">
-              <p className="px-2 py-1 text-xs font-medium text-gray-400">
+            <div className="absolute right-2 top-full z-20 mt-1 max-h-80 w-72 overflow-y-auto rounded-xl border border-hairline bg-surface-card p-2 shadow-lg">
+              <p className="px-2 py-1 text-xs font-medium text-ink-subtle">
                 Hội thoại trong khóa học
               </p>
               {conversationsQuery.isLoading && (
@@ -294,7 +294,7 @@ export function AiChatPanel({
                 </div>
               )}
               {!conversationsQuery.isLoading && (conversationsQuery.data?.length ?? 0) === 0 && (
-                <p className="px-2 py-3 text-center text-xs text-gray-400">Chưa có hội thoại nào</p>
+                <p className="px-2 py-3 text-center text-xs text-ink-subtle">Chưa có hội thoại nào</p>
               )}
               {(conversationsQuery.data ?? []).map((c: AiConversation) => (
                 <button
@@ -305,7 +305,7 @@ export function AiChatPanel({
                     setHistoryOpen(false);
                   }}
                   className={`w-full truncate rounded-lg px-3 py-2 text-left text-sm ${
-                    activeId === c.id ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
+                    activeId === c.id ? 'bg-sky-soft text-sky-deep' : 'hover:bg-surface-strong'
                   }`}
                 >
                   {c.title || 'Hội thoại mới'}
@@ -319,7 +319,7 @@ export function AiChatPanel({
       {/* Tin nhắn — chỉ vùng này cuộn; cuộn ở đây thì lịch sử đoạn chat di chuyển */}
       <div ref={scrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4">
         {messages.length === 0 && !streaming && (
-          <p className="mt-12 text-center text-sm italic text-gray-500">
+          <p className="mt-12 text-center text-sm italic text-muted">
             Đặt câu hỏi đầu tiên để bắt đầu hội thoại với AI
           </p>
         )}
@@ -330,22 +330,22 @@ export function AiChatPanel({
       </div>
 
       {/* Khu nhập liệu */}
-      <div className="shrink-0 space-y-2 border-t p-3">
+      <div className="shrink-0 space-y-2 border-t border-hairline p-3">
         {createdQuiz && (
-          <div className="flex items-center gap-2 rounded-lg border border-purple-200 bg-purple-50 px-3 py-2 text-sm">
-            <span className="flex flex-1 items-center gap-1 truncate text-purple-800">
-              <CheckCircle2 size={14} className="shrink-0" /> Đã tạo quiz “{createdQuiz.title}” ({createdQuiz.questionCount} câu)
+          <div className="flex items-center gap-2 rounded-lg border border-berry/20 bg-berry/5 px-3 py-2 text-sm">
+            <span className="flex flex-1 items-center gap-1 truncate text-berry">
+              <CheckCircle2 size={14} className="shrink-0" /> Đã tạo quiz &ldquo;{createdQuiz.title}&rdquo; ({createdQuiz.questionCount} câu)
             </span>
             <button
               onClick={() => openQuizMut.mutate(createdQuiz.id)}
               disabled={openQuizMut.isPending}
-              className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-700 disabled:opacity-50"
+              className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-berry px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
             >
               {openQuizMut.isPending ? 'Đang mở…' : <><FileText size={13} /> Làm bài ôn tập</>}
             </button>
             <button
               onClick={() => setCreatedQuiz(null)}
-              className="shrink-0 text-purple-400 hover:text-purple-600"
+              className="shrink-0 text-berry/50 hover:text-berry"
               aria-label="Đóng"
             >
               <X size={16} />
@@ -359,7 +359,7 @@ export function AiChatPanel({
             <div className="flex flex-wrap items-center gap-2">
               {showQuizBtn && (
                 reviewQuizQuery.isLoading ? (
-                  <span className="text-xs text-gray-400">Đang kiểm tra quiz ôn tập…</span>
+                  <span className="text-xs text-ink-subtle">Đang kiểm tra quiz ôn tập…</span>
                 ) : hasReviewQuiz ? (
                   <SplitActionButton
                     mainIcon={<FileText size={13} />}
@@ -376,7 +376,7 @@ export function AiChatPanel({
                   <button
                     onClick={() => generateReviewQuiz.mutate()}
                     disabled={generateReviewQuiz.isPending}
-                    className="inline-flex items-center gap-1 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-700 disabled:opacity-60"
+                    className="inline-flex items-center gap-1 rounded-lg bg-berry px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-60"
                   >
                     {generateReviewQuiz.isPending ? <><Loader2 size={13} className="animate-spin" /> Đang tạo quiz…</> : <><Sparkles size={13} /> Tạo quiz ôn tập</>}
                   </button>
@@ -386,7 +386,7 @@ export function AiChatPanel({
                 podcast?.status === 'pending' || podcast?.status === 'processing' ? (
                   <button
                     disabled
-                    className="inline-flex items-center gap-1 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+                    className="inline-flex items-center gap-1 rounded-lg bg-berry px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
                   >
                     <Loader2 size={13} className="animate-spin" /> Đang tạo podcast…
                   </button>
@@ -404,7 +404,7 @@ export function AiChatPanel({
                   <button
                     onClick={() => generatePodcast.mutate()}
                     disabled={generatePodcast.isPending}
-                    className="inline-flex items-center gap-1 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-700 disabled:opacity-60"
+                    className="inline-flex items-center gap-1 rounded-lg bg-berry px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-60"
                   >
                     <Mic size={13} /> Tạo podcast
                   </button>
@@ -412,13 +412,13 @@ export function AiChatPanel({
               )}
             </div>
             {generateReviewQuiz.isError && (
-              <p className="text-xs text-red-600">
+              <p className="text-xs text-semantic-error">
                 {(generateReviewQuiz.error as any)?.response?.data?.message ??
                   'Không tạo được quiz ôn tập, vui lòng thử lại.'}
               </p>
             )}
             {podcastEnabled && podcast?.status === 'failed' && (
-              <p className="text-xs text-red-600">
+              <p className="text-xs text-semantic-error">
                 {podcast.errorMsg ?? 'Không tạo được podcast, vui lòng thử lại.'}
               </p>
             )}
@@ -432,18 +432,18 @@ export function AiChatPanel({
             onClick={() => setConfirmRegen(false)}
           >
             <div
-              className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
+              className="w-full max-w-sm rounded-2xl bg-surface-card p-5 shadow-xl"
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 className="text-base font-bold text-gray-900">Tạo lại podcast?</h3>
-              <p className="mt-2 text-sm text-gray-600 leading-relaxed">
+              <h3 className="text-base font-bold text-ink">Tạo lại podcast?</h3>
+              <p className="mt-2 text-sm text-muted leading-relaxed">
                 Bài học đã có podcast. Chỉ nên tạo lại nếu nội dung bài đã thay đổi — podcast hiện tại sẽ
                 bị thay thế.
               </p>
               <div className="mt-4 flex justify-end gap-2">
                 <button
                   onClick={() => setConfirmRegen(false)}
-                  className="rounded-lg px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100"
+                  className="rounded-lg px-3 py-1.5 text-sm font-medium text-ink-mute hover:bg-surface-strong"
                 >
                   Hủy
                 </button>
@@ -452,7 +452,7 @@ export function AiChatPanel({
                     generatePodcast.mutate();
                     setConfirmRegen(false);
                   }}
-                  className="rounded-lg bg-purple-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-purple-700"
+                  className="rounded-lg bg-berry px-3 py-1.5 text-sm font-medium text-white hover:opacity-90"
                 >
                   Tạo lại
                 </button>
@@ -462,12 +462,12 @@ export function AiChatPanel({
         )}
 
         <div className="flex items-center gap-2">
-          <label className="shrink-0 text-xs text-gray-500">Phạm vi:</label>
+          <label className="shrink-0 text-xs text-muted">Phạm vi:</label>
           <select
             value={scopeKey}
             onChange={(e) => setScopeKey(e.target.value)}
             disabled={streaming}
-            className="max-w-full flex-1 truncate rounded-lg border px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="max-w-full flex-1 truncate rounded-lg border border-hairline px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-sky"
           >
             <option value="">Cả khóa học</option>
             {(sectionsQuery.data ?? []).map((s) => (
@@ -498,12 +498,12 @@ export function AiChatPanel({
             placeholder="Hỏi điều gì đó về khóa học…"
             rows={2}
             disabled={streaming}
-            className="flex-1 resize-none rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 resize-none rounded-lg border border-hairline px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky"
           />
           <button
             onClick={() => handleAsk()}
             disabled={streaming || !input.trim()}
-            className="self-end rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="self-end rounded-lg bg-sky px-4 py-2 text-sm font-medium text-white hover:bg-sky-deep disabled:opacity-50"
           >
             {streaming ? '…' : 'Gửi'}
           </button>
@@ -544,7 +544,7 @@ function SplitActionButton({
     return (
       <button
         disabled
-        className="inline-flex items-center gap-1 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+        className="inline-flex items-center gap-1 rounded-lg bg-berry px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
       >
         <Loader2 size={13} className="animate-spin" /> {pendingLabel ?? 'Đang xử lý…'}
       </button>
@@ -555,7 +555,7 @@ function SplitActionButton({
     <div className="relative inline-flex">
       <button
         onClick={onMain}
-        className="inline-flex items-center gap-1 rounded-l-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-700"
+        className="inline-flex items-center gap-1 rounded-l-lg bg-berry px-3 py-1.5 text-xs font-medium text-white hover:opacity-90"
       >
         {mainIcon} {mainLabel}
       </button>
@@ -565,21 +565,21 @@ function SplitActionButton({
         aria-label="Tùy chọn khác"
         aria-haspopup="menu"
         aria-expanded={open}
-        className="inline-flex items-center rounded-r-lg border-l border-purple-500 bg-purple-600 px-1.5 py-1.5 text-white hover:bg-purple-700"
+        className="inline-flex items-center rounded-r-lg border-l border-berry/50 bg-berry px-1.5 py-1.5 text-white hover:opacity-90"
       >
         <ChevronDown size={14} />
       </button>
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full z-20 mt-1 w-48 rounded-xl border bg-white p-1 shadow-lg">
+          <div className="absolute right-0 top-full z-20 mt-1 w-48 rounded-xl border border-hairline bg-surface-card p-1 shadow-lg">
             <button
               onClick={() => {
                 setOpen(false);
                 onRegen();
               }}
               title={regenTitle}
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-medium text-gray-700 hover:bg-gray-100"
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-medium text-ink hover:bg-surface-strong"
             >
               {regenIcon} {regenLabel}
             </button>
@@ -596,7 +596,7 @@ function MessageBubble({ m }: { m: AiMessage | PendingMessage }) {
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
         className={`max-w-2xl whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm ${
-          isUser ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-900'
+          isUser ? 'bg-sky text-white' : 'bg-surface-strong text-ink'
         }`}
       >
         {isUser
@@ -670,7 +670,7 @@ function CitationRef({ n, citation }: { n: number; citation?: Citation }) {
         onFocus={show}
         onBlur={scheduleClose}
         aria-label={`Nguồn ${n}: ${source}`}
-        className="mx-0.5 inline-flex items-center rounded-full bg-blue-100 px-1.5 align-middle text-[10px] font-semibold leading-4 text-blue-700 transition-colors hover:bg-blue-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+        className="mx-0.5 inline-flex items-center rounded-full bg-sky-soft px-1.5 align-middle text-[10px] font-semibold leading-4 text-sky-deep transition-colors hover:bg-sky/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky"
       >
         {n}
       </button>
@@ -680,9 +680,9 @@ function CitationRef({ n, citation }: { n: number; citation?: Citation }) {
           onMouseLeave={scheduleClose}
           onWheel={(e) => e.stopPropagation()}
           style={{ left: pos.x, top: pos.y, maxHeight: pos.maxH }}
-          className="pointer-events-auto fixed z-50 block w-72 max-w-[80vw] -translate-x-1/2 overflow-y-auto overscroll-contain rounded-lg bg-gray-900 p-3 text-left text-xs leading-relaxed text-gray-100 shadow-lg"
+          className="pointer-events-auto fixed z-50 block w-72 max-w-[80vw] -translate-x-1/2 overflow-y-auto overscroll-contain rounded-lg bg-ink-deep p-3 text-left text-xs leading-relaxed text-white shadow-lg"
         >
-          <span className="mb-1.5 block font-medium text-blue-200">
+          <span className="mb-1.5 block font-medium text-sky-bright">
             {source}
             {citation.pageNumber ? ` · trang ${citation.pageNumber}` : ''}
           </span>

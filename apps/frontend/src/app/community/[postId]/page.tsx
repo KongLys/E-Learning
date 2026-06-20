@@ -8,6 +8,7 @@ import { useAuthStore } from '@/store/auth.store';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import Link from 'next/link';
 import { Check, CheckCircle2, ChevronLeft, ChevronUp, Pin, X } from 'lucide-react';
+import { showConfirm } from '@/store/dialog.store';
 
 /** Một comment hoặc reply — hỗ trợ sửa, upvote, xóa, đánh dấu giải pháp (chỉ top-level). */
 function CommentItem({
@@ -287,7 +288,7 @@ export default function CommunityPostPage() {
             )}
             {canDeletePost && (
               <button
-                onClick={() => { if (confirm('Xóa bài đăng này?')) deletePostMutation.mutate(); }}
+                onClick={async () => { if (await showConfirm({ title: 'Xóa bài đăng này?' })) deletePostMutation.mutate(); }}
                 className="text-ink-mute hover:text-coral transition-colors ml-auto"
               >
                 Xóa bài

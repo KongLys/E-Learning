@@ -87,21 +87,21 @@ export default function ReferencesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-bold text-gray-900">Tài liệu tham khảo</h2>
-        <p className="text-sm text-gray-500">
+        <h2 className="text-lg font-bold text-ink">Tài liệu tham khảo</h2>
+        <p className="text-sm text-muted">
           Thêm video, link YouTube hoặc tệp PDF/DOCX cho học viên đọc/xem thêm.
           Hiển thị ở mục &quot;Tài liệu tham khảo&quot; trong khung chương trình.
         </p>
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+        <div className="rounded-lg border border-coral bg-coral-soft px-3 py-2 text-sm text-semantic-error">
           {error}
         </div>
       )}
 
       {/* Form thêm */}
-      <div className="space-y-3 rounded-xl border border-gray-200 p-4">
+      <div className="space-y-3 rounded-card border border-hairline p-4">
         <div className="flex flex-wrap gap-2">
           {(['file', 'youtube', 'video'] as RefType[]).map((t) => (
             <button
@@ -109,8 +109,8 @@ export default function ReferencesPage() {
               onClick={() => setType(t)}
               className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition-colors ${
                 type === t
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'bg-sky text-white'
+                  : 'bg-surface-strong text-ink-mute hover:bg-hairline'
               }`}
             >
               {TYPE_META[t].icon} {TYPE_META[t].label}
@@ -122,14 +122,14 @@ export default function ReferencesPage() {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Tiêu đề"
-          className="w-full rounded-xl px-3 py-2.5 text-sm outline-none ring-1 ring-gray-200 focus:ring-2 focus:ring-blue-400"
+          className="w-full rounded-xl px-3 py-2.5 text-sm outline-none ring-1 ring-hairline-strong focus:ring-2 focus:ring-sky"
         />
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Mô tả (tuỳ chọn)"
           rows={2}
-          className="w-full rounded-xl px-3 py-2.5 text-sm outline-none ring-1 ring-gray-200 focus:ring-2 focus:ring-blue-400"
+          className="w-full rounded-xl px-3 py-2.5 text-sm outline-none ring-1 ring-hairline-strong focus:ring-2 focus:ring-sky"
         />
 
         {type === 'youtube' ? (
@@ -137,7 +137,7 @@ export default function ReferencesPage() {
             value={externalUrl}
             onChange={(e) => setExternalUrl(e.target.value)}
             placeholder="https://www.youtube.com/watch?v=..."
-            className="w-full rounded-xl px-3 py-2.5 text-sm outline-none ring-1 ring-gray-200 focus:ring-2 focus:ring-blue-400"
+            className="w-full rounded-xl px-3 py-2.5 text-sm outline-none ring-1 ring-hairline-strong focus:ring-2 focus:ring-sky"
           />
         ) : (
           <input
@@ -154,20 +154,20 @@ export default function ReferencesPage() {
 
         {pct !== null && (
           <div className="space-y-1">
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-strong">
               <div
-                className="h-full rounded-full bg-blue-500 transition-all duration-200"
+                className="h-full rounded-full bg-sky transition-all duration-200"
                 style={{ width: `${pct}%` }}
               />
             </div>
-            <p className="text-xs text-blue-600">Đang tải lên {pct}%</p>
+            <p className="text-xs text-sky">Đang tải lên {pct}%</p>
           </div>
         )}
 
         <button
           onClick={() => createMut.mutate()}
           disabled={!canSubmit}
-          className="rounded-full bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          className="rounded-full bg-sky px-4 py-2 text-sm font-medium text-white hover:bg-sky-deep disabled:opacity-50"
         >
           {createMut.isPending ? 'Đang thêm...' : 'Thêm tài liệu'}
         </button>
@@ -177,23 +177,23 @@ export default function ReferencesPage() {
       {listQuery.isLoading ? (
         <LoadingSpinner />
       ) : materials.length === 0 ? (
-        <p className="text-sm text-gray-400">Chưa có tài liệu tham khảo nào.</p>
+        <p className="text-sm text-muted">Chưa có tài liệu tham khảo nào.</p>
       ) : (
-        <ul className="divide-y divide-gray-100 rounded-xl border border-gray-200">
+        <ul className="divide-y divide-hairline rounded-card border border-hairline">
           {materials.map((m) => (
             <li key={m.id} className="flex items-center gap-3 px-4 py-3">
               <span className="shrink-0">
                 {TYPE_META[m.type as RefType]?.icon ?? <Paperclip size={16} />}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-gray-900">{m.title}</p>
-                <p className="truncate text-xs text-gray-400">
+                <p className="truncate text-sm font-medium text-ink">{m.title}</p>
+                <p className="truncate text-xs text-ink-subtle">
                   {m.type === 'youtube' ? m.externalUrl : m.fileName}
                 </p>
               </div>
               <button
                 onClick={() => setDeleteId(m.id)}
-                className="shrink-0 text-xs text-red-500 hover:text-red-700"
+                className="shrink-0 text-xs text-coral hover:opacity-80"
               >
                 Xóa
               </button>

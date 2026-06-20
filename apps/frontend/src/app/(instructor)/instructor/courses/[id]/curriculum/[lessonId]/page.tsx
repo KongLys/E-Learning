@@ -31,16 +31,16 @@ export default function CurriculumDetailPage() {
   return (
     <div className="-m-4 sm:-m-6 lg:-m-7 flex h-[calc(100vh-3rem)] flex-col lg:flex-row">
       {/* Sidebar khung chương trình */}
-      <aside className="w-full lg:w-80 shrink-0 border-b border-gray-100 lg:border-b-0 lg:border-r bg-white flex flex-col overflow-hidden">
-        <div className="p-4 border-b border-gray-100 shrink-0">
+      <aside className="w-full lg:w-80 shrink-0 border-b border-hairline lg:border-b-0 lg:border-r bg-surface-card flex flex-col overflow-hidden">
+        <div className="p-4 border-b border-hairline shrink-0">
           <Link
             href={`/instructor/courses/${id}/manage/curriculum`}
-            className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-blue-600"
+            className="inline-flex items-center gap-1.5 text-xs text-muted hover:text-sky"
           >
             <ArrowLeft size={14} />
             Quay lại khung chương trình
           </Link>
-          <h2 className="mt-2 text-base font-bold text-gray-900 leading-snug">
+          <h2 className="mt-2 text-base font-bold text-ink leading-snug">
             {courseData?.title || 'Khung chương trình'}
           </h2>
         </div>
@@ -50,13 +50,13 @@ export default function CurriculumDetailPage() {
             <div className="py-12"><LoadingSpinner /></div>
           ) : (
             sections.map((section: any, idx: number) => (
-              <details key={section.id} open className="group border-b border-gray-100">
-                <summary className="px-4 py-3 cursor-pointer hover:bg-gray-50 list-none flex items-start justify-between gap-2">
+              <details key={section.id} open className="group border-b border-hairline">
+                <summary className="px-4 py-3 cursor-pointer hover:bg-canvas-soft list-none flex items-start justify-between gap-2">
                   <div>
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">Phần {idx + 1}</p>
-                    <p className="text-sm font-semibold text-gray-900 leading-snug">{section.title}</p>
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-ink-subtle">Phần {idx + 1}</p>
+                    <p className="text-sm font-semibold text-ink leading-snug">{section.title}</p>
                   </div>
-                  <ChevronDown size={16} className="text-gray-400 mt-0.5 shrink-0 transition-transform group-open:rotate-180" />
+                  <ChevronDown size={16} className="text-ink-subtle mt-0.5 shrink-0 transition-transform group-open:rotate-180" />
                 </summary>
                 <ul className="pb-1">
                   {section.lessons?.map((lesson: any) => {
@@ -65,15 +65,15 @@ export default function CurriculumDetailPage() {
                       <li key={lesson.id}>
                         <Link
                           href={`/instructor/courses/${id}/curriculum/${lesson.id}`}
-                          className={`flex items-center gap-3 px-4 py-3 border-l-[3px] transition-colors ${isCurrent ? 'bg-blue-50 border-blue-500' : 'border-transparent hover:bg-gray-50'}`}
+                          className={`flex items-center gap-3 px-4 py-3 border-l-[3px] transition-colors ${isCurrent ? 'bg-sky-soft border-sky' : 'border-transparent hover:bg-canvas-soft'}`}
                         >
                           <LessonTypeIcon
                             type={lesson.type}
                             size={15}
-                            className={isCurrent ? 'text-blue-600' : 'text-gray-400'}
+                            className={isCurrent ? 'text-sky' : 'text-ink-subtle'}
                           />
                           <span
-                            className={`min-w-0 text-sm leading-snug ${isCurrent ? 'text-blue-700 font-semibold' : 'text-gray-800'}`}
+                            className={`min-w-0 text-sm leading-snug ${isCurrent ? 'text-sky font-semibold' : 'text-ink'}`}
                           >
                             {lesson.title}
                           </span>
@@ -89,16 +89,16 @@ export default function CurriculumDetailPage() {
       </aside>
 
       {/* Nội dung bài học */}
-      <main className="flex-1 min-w-0 overflow-y-auto bg-gray-50 p-4 sm:p-6 lg:p-8">
+      <main className="flex-1 min-w-0 overflow-y-auto bg-canvas-soft p-4 sm:p-6 lg:p-8">
         <div className="mx-auto max-w-3xl">
           {isLoading ? (
             <div className="py-12"><LoadingSpinner /></div>
           ) : currentLesson ? (
-            <div className="rounded-2xl border border-gray-100 bg-white p-6 sm:p-8">
+            <div className="rounded-card border border-hairline bg-surface-card p-6 sm:p-8">
               <LessonContentEditor courseId={id} lesson={currentLesson} courseStatus={courseData?.status} />
             </div>
           ) : (
-            <p className="text-sm text-gray-500">Không tìm thấy bài học. Chọn một bài học ở thanh bên.</p>
+            <p className="text-sm text-muted">Không tìm thấy bài học. Chọn một bài học ở thanh bên.</p>
           )}
         </div>
       </main>

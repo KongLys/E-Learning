@@ -1,18 +1,18 @@
 import type { Metadata } from 'next';
-import { Inter, EB_Garamond } from 'next/font/google';
+import { Roboto, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import { Providers } from '@/components/providers';
 
-const inter = Inter({
+const roboto = Roboto({
   subsets: ['latin', 'vietnamese'],
-  variable: '--font-inter',
+  weight: ['400', '500', '700', '900'],
+  variable: '--font-roboto',
   display: 'swap',
 });
 
-const ebGaramond = EB_Garamond({
+const jetbrainsMono = JetBrains_Mono({
   subsets: ['latin'],
-  weight: ['400', '500'],
-  variable: '--font-eb-garamond',
+  variable: '--font-jetbrains',
   display: 'swap',
 });
 
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="vi" className={`${inter.variable} ${ebGaramond.variable}`}>
+    <html lang="vi" className={`${roboto.variable} ${jetbrainsMono.variable}`}>
       <body className="min-h-screen flex flex-col bg-canvas text-ink font-sans antialiased">
         <Providers>{children}</Providers>
       </body>

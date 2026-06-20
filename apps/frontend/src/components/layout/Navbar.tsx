@@ -83,7 +83,7 @@ export function Navbar() {
           <Link
             href="/courses"
             className={`px-4 py-2 text-[15px] font-medium transition-colors ${isActive('/courses')
-              ? 'text-ink border-b-2 border-ink pb-1.5'
+              ? 'text-sky-deep border-b-2 border-sky pb-1.5'
               : 'text-muted hover:text-ink rounded-lg hover:bg-surface-strong'
               }`}
           >
@@ -102,7 +102,7 @@ export function Navbar() {
             <Link
               href="/my-courses"
               className={`px-4 py-2 text-[15px] font-medium transition-colors ${isActive('/my-courses')
-                ? 'text-ink border-b-2 border-ink pb-1.5'
+                ? 'text-sky-deep border-b-2 border-sky pb-1.5'
                 : 'text-muted hover:text-ink rounded-lg hover:bg-surface-strong'
                 }`}
             >
@@ -113,7 +113,7 @@ export function Navbar() {
             <Link
               href="/instructor/dashboard"
               className={`px-4 py-2 text-[15px] font-medium transition-colors ${isActive('/instructor/dashboard') || isActive('/instructor/courses') || isActive('/instructor/questions')
-                ? 'text-ink border-b-2 border-ink pb-1.5'
+                ? 'text-sky-deep border-b-2 border-sky pb-1.5'
                 : 'text-muted hover:text-ink rounded-lg hover:bg-surface-strong'
                 }`}
             >
@@ -124,7 +124,7 @@ export function Navbar() {
             <Link
               href="/admin"
               className={`px-4 py-2 text-[15px] font-medium transition-colors ${isActive('/admin')
-                ? 'text-ink border-b-2 border-ink pb-1.5'
+                ? 'text-sky-deep border-b-2 border-sky pb-1.5'
                 : 'text-muted hover:text-ink rounded-lg hover:bg-surface-strong'
                 }`}
             >

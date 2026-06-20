@@ -22,8 +22,8 @@ function AdminSidebar({ pendingCourses, pendingReports, pendingModeration }: { p
   ];
 
   return (
-    <aside className="w-60 shrink-0 bg-gray-900 min-h-screen flex flex-col">
-      <div className="px-5 py-5 border-b border-gray-800">
+    <aside className="w-60 shrink-0 bg-ink-deep min-h-screen flex flex-col">
+      <div className="px-5 py-5 border-b border-white/10">
         <span className="text-white font-semibold text-sm tracking-wide">Admin Portal</span>
       </div>
       <nav className="flex-1 px-3 py-4 space-y-0.5">
@@ -35,14 +35,14 @@ function AdminSidebar({ pendingCourses, pendingReports, pendingModeration }: { p
               href={href}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                 active
-                  ? 'bg-gray-800 text-white'
-                  : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                  ? 'bg-sky/20 text-sky-bright'
+                  : 'text-ink-subtle hover:bg-white/10 hover:text-white'
               }`}
             >
               <Icon size={16} strokeWidth={1.75} />
               <span className="flex-1">{label}</span>
               {badge ? (
-                <span className="bg-amber-500 text-white text-xs font-semibold rounded-full px-1.5 py-0.5 min-w-5 text-center leading-none">
+                <span className="bg-coral text-white text-xs font-semibold rounded-full px-1.5 py-0.5 min-w-5 text-center leading-none">
                   {badge}
                 </span>
               ) : null}
@@ -76,15 +76,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (!user || user.role !== 'admin') return null;
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-canvas">
       <AdminSidebar
         pendingCourses={statsData?.data?.pendingCourses ?? 0}
         pendingReports={statsData?.data?.pendingReports ?? 0}
         pendingModeration={statsData?.data?.pendingModeration ?? 0}
       />
       <div className="flex-1 flex flex-col">
-        <header className="h-12 bg-white border-b flex items-center px-6">
-          <span className="text-xs text-gray-400">{user.email}</span>
+        <header className="h-12 bg-surface-card border-b border-hairline flex items-center px-6">
+          <span className="text-xs text-ink-subtle">{user.email}</span>
         </header>
         <main className="flex-1 p-7">{children}</main>
       </div>

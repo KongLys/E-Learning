@@ -8,6 +8,7 @@ import {
   type ModerationStatus,
 } from '@/lib/api/ai.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { showPrompt } from '@/store/dialog.store';
 
 type ContentType = 'course' | 'lesson';
 
@@ -138,8 +139,8 @@ export default function AdminModerationPage() {
                   Duyệt
                 </button>
                 <button
-                  onClick={() => {
-                    const reason = prompt('Lý do từ chối (tùy chọn):') ?? undefined;
+                  onClick={async () => {
+                    const reason = (await showPrompt({ title: 'Lý do từ chối (tùy chọn):' })) ?? undefined;
                     rejectMutation.mutate({ type: item.type, id: item.id, reason });
                   }}
                   disabled={rejectMutation.isPending}

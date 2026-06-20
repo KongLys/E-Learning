@@ -118,7 +118,7 @@ function SortableLessonRow({
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={`flex items-center gap-2 px-3 py-2.5 ${
-        isDragging ? 'relative z-10 bg-blue-50/60 shadow-md ring-1 ring-blue-200' : ''
+        isDragging ? 'relative z-10 bg-sky-soft/60 shadow-md ring-1 ring-sky-soft' : ''
       }`}
     >
       {children(
@@ -186,8 +186,8 @@ function IconButton({
       onClick={onClick}
       className={`rounded-lg p-1.5 transition-colors disabled:opacity-25 ${
         danger
-          ? 'text-gray-400 hover:bg-red-50 hover:text-red-600'
-          : 'text-gray-400 hover:bg-gray-200/70 hover:text-gray-700'
+          ? 'text-ink-subtle hover:bg-coral-soft hover:text-coral'
+          : 'text-ink-subtle hover:bg-surface-strong hover:text-ink'
       }`}
     >
       {children}
@@ -232,13 +232,13 @@ function InlineTitleForm({
             if (e.key === 'Escape') onCancel();
           }}
           placeholder={placeholder}
-          className="min-w-0 flex-1 rounded-xl bg-white px-3 py-2 text-sm outline-none ring-1 ring-gray-200 focus:ring-2 focus:ring-blue-400"
+          className="min-w-0 flex-1 rounded-xl bg-canvas px-3 py-2 text-sm outline-none ring-1 ring-hairline-strong focus:ring-2 focus:ring-sky"
         />
         <button
           type="button"
           onClick={() => onSave(trimmed)}
           disabled={!canSave}
-          className="flex shrink-0 items-center gap-1 rounded-full bg-blue-600 px-3.5 py-2 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+          className="flex shrink-0 items-center gap-1 rounded-full bg-sky px-3.5 py-2 text-xs font-medium text-white transition-colors hover:bg-sky-deep disabled:opacity-50"
         >
           <Check size={13} />
           {isPending ? 'Đang lưu...' : saveLabel}
@@ -246,14 +246,14 @@ function InlineTitleForm({
         <button
           type="button"
           onClick={onCancel}
-          className="flex shrink-0 items-center gap-1 rounded-full px-3 py-2 text-xs text-gray-500 transition-colors hover:bg-gray-100"
+          className="flex shrink-0 items-center gap-1 rounded-full px-3 py-2 text-xs text-ink-mute transition-colors hover:bg-canvas-soft"
         >
           <X size={13} />
           Hủy
         </button>
       </div>
       {trimmed.length > 0 && trimmed.length < 2 && (
-        <p className="mt-1 text-xs text-amber-600">Tiêu đề cần ít nhất 2 ký tự.</p>
+        <p className="mt-1 text-xs text-sun-deep">Tiêu đề cần ít nhất 2 ký tự.</p>
       )}
     </div>
   );
@@ -456,10 +456,10 @@ export default function CourseCurriculumPage() {
 
   return (
     <div className="space-y-4">
-      <header className="flex items-start justify-between gap-4 border-b border-gray-100 pb-4">
+      <header className="flex items-start justify-between gap-4 border-b border-hairline pb-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Khung chương trình</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="text-2xl font-bold text-ink">Khung chương trình</h1>
+          <p className="mt-1 text-sm text-muted">
             Tạo khóa học theo từng chương, mỗi chương tập trung vào một mục tiêu học tập. Sau đó
             thêm nội dung, hoạt động thực hành và bài kiểm tra.
           </p>
@@ -470,7 +470,7 @@ export default function CourseCurriculumPage() {
 
       {/* Tổng quan + thu gọn/mở rộng */}
       {sections.length > 0 && (
-        <div className="flex items-center justify-between text-xs text-gray-500">
+        <div className="flex items-center justify-between text-xs text-muted">
           <span>
             {sections.length} phần &bull; {totalLessons} bài học
           </span>
@@ -478,7 +478,7 @@ export default function CourseCurriculumPage() {
             onClick={() =>
               setCollapsed(allCollapsed ? new Set() : new Set(sections.map((s) => s.id)))
             }
-            className="font-medium text-blue-600 hover:underline"
+            className="font-medium text-sky hover:underline"
           >
             {allCollapsed ? 'Mở rộng tất cả' : 'Thu gọn tất cả'}
           </button>
@@ -488,7 +488,7 @@ export default function CourseCurriculumPage() {
       {/* Thêm phần ở trên cùng */}
       {sections.length > 0 &&
         (addSectionAt === 'top' ? (
-          <div className="rounded-2xl border-2 border-dashed border-blue-300 bg-blue-50/40 p-3">
+          <div className="rounded-card border-2 border-dashed border-sky bg-sky-soft/40 p-3">
             <InlineTitleForm
               placeholder="Nhập tên phần mới..."
               saveLabel="Thêm phần"
@@ -500,7 +500,7 @@ export default function CourseCurriculumPage() {
         ) : (
           <button
             onClick={() => setAddSectionAt('top')}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-gray-200 py-3 text-sm text-gray-400 hover:border-blue-400 hover:text-blue-600"
+            className="flex w-full items-center justify-center gap-2 rounded-card border-2 border-dashed border-hairline py-3 text-sm text-muted hover:border-sky hover:text-sky"
           >
             <Plus size={16} />
             Thêm phần lên đầu
@@ -508,8 +508,8 @@ export default function CourseCurriculumPage() {
         ))}
 
       {sections.length === 0 && (
-        <div className="rounded-2xl border-2 border-dashed border-gray-200 py-10 text-center">
-          <p className="text-sm text-gray-500">
+        <div className="rounded-card border-2 border-dashed border-hairline py-10 text-center">
+          <p className="text-sm text-muted">
             Chưa có phần nào. Hãy tạo phần đầu tiên cho khóa học của bạn.
           </p>
         </div>
@@ -539,20 +539,20 @@ export default function CourseCurriculumPage() {
               >
                 {(handleProps, isDragging) => (
                   <div
-                    className={`overflow-hidden rounded-2xl border bg-white ${
+                    className={`overflow-hidden rounded-card border bg-surface-card ${
                       isDragging
-                        ? 'border-blue-300 shadow-lg ring-2 ring-blue-200'
-                        : 'border-gray-100'
+                        ? 'border-sky shadow-lg ring-2 ring-sky-soft'
+                        : 'border-hairline'
                     }`}
                   >
                     {/* Header phần */}
-                    <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-2.5">
+                    <div className="flex items-center gap-1.5 bg-canvas-soft px-3 py-2.5">
                       <button
                         type="button"
                         {...handleProps}
                         title="Kéo để đổi vị trí phần (hoặc nhấn Space rồi dùng phím mũi tên)"
                         aria-label="Kéo để đổi vị trí phần"
-                        className="shrink-0 cursor-grab touch-none rounded-lg p-1.5 text-gray-300 transition-colors hover:bg-gray-200/70 hover:text-gray-600 active:cursor-grabbing"
+                        className="shrink-0 cursor-grab touch-none rounded-lg p-1.5 text-ink-faint transition-colors hover:bg-surface-strong hover:text-ink-mute active:cursor-grabbing"
                       >
                         <GripVertical size={15} />
                       </button>
@@ -580,9 +580,9 @@ export default function CourseCurriculumPage() {
                         />
                       ) : (
                         <>
-                          <span className="min-w-0 flex-1 truncate text-sm font-medium text-gray-900">
-                            <span className="text-gray-400">Phần {idx + 1}:</span> {section.title}
-                            <span className="ml-2 text-xs font-normal text-gray-400">
+                          <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">
+                            <span className="text-ink-subtle">Phần {idx + 1}:</span> {section.title}
+                            <span className="ml-2 text-xs font-normal text-ink-subtle">
                               {lessons.length} bài học
                             </span>
                           </span>
@@ -615,7 +615,7 @@ export default function CourseCurriculumPage() {
                     {!isCollapsed && (
                       <>
                         {/* Lessons */}
-                        <ul className="divide-y divide-gray-100">
+                        <ul className="divide-y divide-hairline">
                           <LessonsDnd
                             items={lessons.map((l) => l.id)}
                             onReorder={(ids) =>
@@ -650,34 +650,34 @@ export default function CourseCurriculumPage() {
                                         {...lessonHandle}
                                         title="Kéo để đổi vị trí bài học (hoặc nhấn Space rồi dùng phím mũi tên)"
                                         aria-label="Kéo để đổi vị trí bài học"
-                                        className="shrink-0 cursor-grab touch-none rounded-lg p-1 text-gray-300 transition-colors hover:bg-gray-200/70 hover:text-gray-600 active:cursor-grabbing"
+                                        className="shrink-0 cursor-grab touch-none rounded-lg p-1 text-ink-faint transition-colors hover:bg-surface-strong hover:text-ink-mute active:cursor-grabbing"
                                       >
                                         <GripVertical size={14} />
                                       </button>
-                                      <span className="w-4 shrink-0 text-right text-xs text-gray-400">
+                                      <span className="w-4 shrink-0 text-right text-xs text-ink-subtle">
                                         {li + 1}.
                                       </span>
                                       <LessonTypeIcon
                                         type={lesson.type}
                                         size={15}
-                                        className="shrink-0 text-gray-400"
+                                        className="shrink-0 text-ink-subtle"
                                       />
                                       <Link
                                         href={`/instructor/courses/${id}/curriculum/${lesson.id}`}
                                         title="Mở trang soạn nội dung bài học"
                                         className="min-w-0 flex-1 truncate"
                                       >
-                                        <span className="block text-sm text-gray-800 hover:text-blue-600 truncate">
+                                        <span className="block text-sm text-ink hover:text-sky truncate">
                                           {lesson.title}
                                         </span>
                                         {lesson.type === 'video' && (
-                                          <span className={`flex items-center gap-1 truncate text-xs ${lesson.videoAsset?.videoUrl ? 'text-green-600' : 'text-gray-400'}`}>
+                                          <span className={`flex items-center gap-1 truncate text-xs ${lesson.videoAsset?.videoUrl ? 'text-leaf' : 'text-ink-subtle'}`}>
                                             <Video size={12} className="shrink-0" />
                                             <span className="truncate">{lesson.videoAsset?.videoUrl ? (lesson.videoAsset.fileName ?? 'video đã tải lên') : 'Chưa có video'}</span>
                                           </span>
                                         )}
                                         {lesson.type === 'document' && (
-                                          <span className={`flex items-center gap-1 truncate text-xs ${lesson.documentAsset?.fileUrl ? 'text-green-600' : 'text-gray-400'}`}>
+                                          <span className={`flex items-center gap-1 truncate text-xs ${lesson.documentAsset?.fileUrl ? 'text-leaf' : 'text-ink-subtle'}`}>
                                             <FileText size={12} className="shrink-0" />
                                             <span className="truncate">{lesson.documentAsset?.fileUrl ? (lesson.documentAsset.fileName ?? `${lesson.documentAsset.fileType?.toUpperCase() ?? 'tài liệu'} đã tải lên`) : 'Chưa có file'}</span>
                                           </span>
@@ -711,7 +711,7 @@ export default function CourseCurriculumPage() {
                             ))}
                           </LessonsDnd>
                           {lessons.length === 0 && (
-                            <li className="px-4 py-3 text-xs text-gray-400">
+                            <li className="px-4 py-3 text-xs text-ink-subtle">
                               Chưa có bài học nào trong phần này.
                             </li>
                           )}
@@ -720,7 +720,7 @@ export default function CourseCurriculumPage() {
                         {/* Thêm bài học */}
                         <button
                           onClick={() => setAddLessonForSection(section.id)}
-                          className="flex w-full items-center gap-1.5 border-t border-gray-100 px-4 py-2.5 text-xs font-medium text-blue-600 hover:bg-blue-50"
+                          className="flex w-full items-center gap-1.5 border-t border-hairline px-4 py-2.5 text-xs font-medium text-sky hover:bg-sky-soft"
                         >
                           <Plus size={14} />
                           Thêm bài học
@@ -737,7 +737,7 @@ export default function CourseCurriculumPage() {
 
       {/* Thêm phần ở cuối */}
       {addSectionAt === 'bottom' ? (
-        <div className="rounded-2xl border-2 border-dashed border-blue-300 bg-blue-50/40 p-3">
+        <div className="rounded-card border-2 border-dashed border-sky bg-sky-soft/40 p-3">
           <InlineTitleForm
             placeholder="Nhập tên phần mới..."
             saveLabel="Thêm phần"
@@ -749,7 +749,7 @@ export default function CourseCurriculumPage() {
       ) : (
         <button
           onClick={() => setAddSectionAt('bottom')}
-          className="w-full rounded-full bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+          className="w-full rounded-full bg-sky px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-sky-deep"
         >
           + Thêm phần mới
         </button>

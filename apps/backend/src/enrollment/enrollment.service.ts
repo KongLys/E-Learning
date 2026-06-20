@@ -88,6 +88,7 @@ export class EnrollmentService {
             thumbnailUrl: true,
             totalLessons: true,
             totalDurationSec: true,
+            categoryId: true,
             instructor: { select: { id: true, fullName: true } },
           },
         },

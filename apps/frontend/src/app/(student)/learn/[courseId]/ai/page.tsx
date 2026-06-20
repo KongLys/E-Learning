@@ -16,13 +16,13 @@ export default function CourseAiChatPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
-      <div className="flex gap-1 border-b bg-white px-3 pt-2">
+      <div className="flex gap-1 border-b border-hairline bg-surface-card px-3 pt-2">
         <button
           onClick={() => setTab('chat')}
           className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 ${
             tab === 'chat'
-              ? 'border-blue-600 text-blue-700'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
+              ? 'border-sky-deep text-sky-deep'
+              : 'border-transparent text-muted hover:text-ink'
           }`}
         >
           <MessageSquare className="w-4 h-4" /> Hỏi AI
@@ -31,8 +31,8 @@ export default function CourseAiChatPage() {
           onClick={() => setTab('mindmap')}
           className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 ${
             tab === 'mindmap'
-              ? 'border-blue-600 text-blue-700'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
+              ? 'border-sky-deep text-sky-deep'
+              : 'border-transparent text-muted hover:text-ink'
           }`}
         >
           <Network className="w-4 h-4" /> Sơ đồ tư duy
@@ -91,18 +91,18 @@ function MindMapTab({ courseId }: { courseId: string }) {
   return (
     <div className="flex-1 flex flex-col min-h-0 p-4 gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-muted">
           Sơ đồ tư duy toàn khóa: Khóa học → Phần → Bài → đề mục nội dung.
         </p>
         <button
           onClick={() => generate.mutate(ready)}
           disabled={busy}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+          className="bg-sky text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-sky-deep disabled:opacity-50"
         >
           {busy ? 'Đang tạo…' : ready ? 'Tạo lại' : 'Tạo sơ đồ tư duy'}
         </button>
         {ready && mindmapQuery.data?.updatedAt && (
-          <span className="text-xs text-gray-400">
+          <span className="text-xs text-ink-subtle">
             Cập nhật: {new Date(mindmapQuery.data.updatedAt).toLocaleString('vi-VN')}
           </span>
         )}
@@ -110,7 +110,7 @@ function MindMapTab({ courseId }: { courseId: string }) {
 
       <div className="flex-1 min-h-0">
         {busy ? (
-          <div className="h-full flex flex-col items-center justify-center gap-3 text-gray-500">
+          <div className="h-full flex flex-col items-center justify-center gap-3 text-muted">
             <LoadingSpinner />
             <p className="text-sm">Đang phân tích nội dung bài học và tạo sơ đồ tư duy…</p>
           </div>
@@ -121,7 +121,7 @@ function MindMapTab({ courseId }: { courseId: string }) {
             />
             <button
               onClick={() => generate.mutate(true)}
-              className="text-sm text-blue-600 hover:underline"
+              className="text-sm text-sky hover:underline"
             >
               Thử lại
             </button>
@@ -134,8 +134,8 @@ function MindMapTab({ courseId }: { courseId: string }) {
           />
         ) : (
           <div className="h-full flex items-center justify-center p-8">
-            <p className="text-center text-gray-500 text-sm">
-              Bấm <span className="font-medium">“Tạo sơ đồ tư duy”</span> để dựng sơ đồ từ nội dung
+            <p className="text-center text-muted text-sm">
+              Bấm <span className="font-medium">"Tạo sơ đồ tư duy"</span> để dựng sơ đồ từ nội dung
               các bài học trong khóa.
             </p>
           </div>

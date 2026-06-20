@@ -104,13 +104,13 @@ function InstructorSidebar({ open, onClose }: { open: boolean; onClose: () => vo
         <div className="fixed inset-0 z-30 bg-black/50 lg:hidden" onClick={onClose} />
       )}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-60 shrink-0 bg-gray-900 flex flex-col transition-transform duration-200 ease-in-out lg:relative lg:inset-auto lg:z-auto ${
+        className={`fixed inset-y-0 left-0 z-40 w-60 shrink-0 bg-ink-deep flex flex-col transition-transform duration-200 ease-in-out lg:relative lg:inset-auto lg:z-auto ${
           open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
-        <div className="px-5 py-5 border-b border-gray-800 flex items-center justify-between shrink-0">
+        <div className="px-5 py-5 border-b border-white/10 flex items-center justify-between shrink-0">
           <span className="text-white font-semibold text-sm tracking-wide">Instructor Studio</span>
-          <button onClick={onClose} className="text-gray-400 hover:text-white lg:hidden">
+          <button onClick={onClose} className="text-ink-subtle hover:text-white lg:hidden">
             <X size={18} />
           </button>
         </div>
@@ -124,7 +124,7 @@ function InstructorSidebar({ open, onClose }: { open: boolean; onClose: () => vo
                   href={group.href}
                   onClick={onClose}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    active ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                    active ? 'bg-sky/20 text-sky-bright' : 'text-ink-subtle hover:bg-white/10 hover:text-white'
                   }`}
                 >
                   <group.icon size={16} strokeWidth={1.75} />
@@ -141,7 +141,7 @@ function InstructorSidebar({ open, onClose }: { open: boolean; onClose: () => vo
                 <button
                   onClick={() => toggleGroup(group.id)}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    groupActive ? 'text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                    groupActive ? 'text-sky-bright' : 'text-ink-subtle hover:bg-white/10 hover:text-white'
                   }`}
                 >
                   <group.icon size={16} strokeWidth={1.75} />
@@ -162,7 +162,7 @@ function InstructorSidebar({ open, onClose }: { open: boolean; onClose: () => vo
                           href={child.href}
                           onClick={onClose}
                           className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
-                            active ? 'bg-gray-800 text-white' : 'text-gray-500 hover:bg-gray-800 hover:text-white'
+                            active ? 'bg-sky/20 text-sky-bright' : 'text-ink-faint hover:bg-white/10 hover:text-white'
                           }`}
                         >
                           <child.icon size={14} strokeWidth={1.75} />
@@ -202,14 +202,14 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
   if (!user || (user.role !== 'instructor' && user.role !== 'admin')) return null;
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-canvas">
       <InstructorSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-12 bg-white border-b flex items-center justify-between px-4 sm:px-6 shrink-0">
+        <header className="h-12 bg-surface-card border-b border-hairline flex items-center justify-between px-4 sm:px-6 shrink-0">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="lg:hidden text-gray-500 hover:text-gray-700 -ml-1"
+              className="lg:hidden text-ink-mute hover:text-ink -ml-1"
               aria-label="Mở menu"
             >
               <Menu size={20} />
@@ -218,7 +218,7 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
           <div className="flex items-center gap-2">
             <Link
               href="/"
-              className="px-3 py-1.5 text-sm font-medium text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition-colors"
+              className="px-3 py-1.5 text-sm font-medium text-ink-mute hover:text-ink rounded-lg hover:bg-surface-strong transition-colors"
             >
               Học viên
             </Link>

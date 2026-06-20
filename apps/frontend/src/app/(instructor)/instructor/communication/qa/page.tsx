@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { instructorApi } from '@/lib/api/instructor.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { notify } from '@/store/dialog.store';
 
 const STATUS_LABELS: Record<string, string> = {
   pending: 'Chờ trả lời',
@@ -12,9 +13,9 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-amber-50 text-amber-700',
-  answered: 'bg-green-50 text-green-700',
-  closed: 'bg-gray-100 text-gray-500',
+  pending: 'bg-sun-soft text-sun-deep',
+  answered: 'bg-leaf-soft text-leaf-deep',
+  closed: 'bg-surface-strong text-ink-mute',
 };
 
 export default function QaPage() {
@@ -43,7 +44,7 @@ export default function QaPage() {
       qc.invalidateQueries({ queryKey: ['instructor-qa'] });
       setReplyMap((prev) => ({ ...prev, [qId]: '' }));
     },
-    onError: (err: any) => alert(err?.response?.data?.message ?? 'Lỗi gửi trả lời'),
+    onError: (err: any) => notify.error(err?.response?.data?.message ?? 'Lỗi gửi trả lời'),
   });
 
   const closeMutation = useMutation({
@@ -54,15 +55,15 @@ export default function QaPage() {
   return (
     <div className="max-w-4xl">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">Hỏi đáp</h1>
-        <p className="text-sm text-gray-500">Câu hỏi của học viên từ các khóa học</p>
+        <h1 className="text-2xl font-bold text-ink mb-1">Hỏi đáp</h1>
+        <p className="text-sm text-muted">Câu hỏi của học viên từ các khóa học</p>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <select
           value={selectedCourseId}
           onChange={(e) => setSelectedCourseId(e.target.value)}
-          className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          className="flex-1 border border-hairline-strong rounded-lg px-3 py-2 text-sm"
         >
           <option value="">Chọn khóa học</option>
           {courses.map((c: any) => (
@@ -72,7 +73,7 @@ export default function QaPage() {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          className="border border-hairline-strong rounded-lg px-3 py-2 text-sm"
         >
           <option value="">Tất cả trạng thái</option>
           <option value="pending">Chờ trả lời</option>
@@ -82,19 +83,19 @@ export default function QaPage() {
       </div>
 
       {!selectedCourseId ? (
-        <div className="text-center py-16 text-gray-400 text-sm">Chọn khóa học để xem câu hỏi</div>
+        <div className="text-center py-16 text-muted text-sm">Chọn khóa học để xem câu hỏi</div>
       ) : isLoading ? (
         <LoadingSpinner />
       ) : questions.length === 0 ? (
-        <div className="text-center py-16 text-gray-400 text-sm">Không có câu hỏi nào</div>
+        <div className="text-center py-16 text-muted text-sm">Không có câu hỏi nào</div>
       ) : (
         <div className="space-y-4">
           {questions.map((q: any) => (
-            <div key={q.id} className="bg-white rounded-xl border border-gray-200 p-5">
+            <div key={q.id} className="bg-surface-card rounded-card border border-hairline p-5">
               <div className="flex items-start justify-between gap-4 mb-3">
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">{q.content}</p>
-                  <p className="text-xs text-gray-400 mt-1">
+                  <p className="text-sm font-medium text-ink">{q.content}</p>
+                  <p className="text-xs text-ink-subtle mt-1">
                     {q.student?.fullName ?? 'Học viên'} ·{' '}
                     {new Date(q.createdAt).toLocaleDateString('vi-VN')}
                   </p>
@@ -105,11 +106,11 @@ export default function QaPage() {
               </div>
 
               {q.replies?.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-gray-100 space-y-2">
+                <div className="mt-3 pt-3 border-t border-hairline space-y-2">
                   {q.replies.map((r: any) => (
                     <div key={r.id} className="flex gap-2 text-sm">
-                      <span className="text-gray-400 shrink-0">↳</span>
-                      <p className="text-gray-700">{r.content}</p>
+                      <span className="text-ink-subtle shrink-0">↳</span>
+                      <p className="text-ink-mute">{r.content}</p>
                     </div>
                   ))}
                 </div>
@@ -128,7 +129,7 @@ export default function QaPage() {
                       }
                     }}
                     placeholder="Nhập câu trả lời..."
-                    className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
+                    className="flex-1 border border-hairline-strong rounded-lg px-3 py-1.5 text-sm"
                   />
                   <button
                     onClick={() => {
@@ -136,14 +137,14 @@ export default function QaPage() {
                       if (content) replyMutation.mutate({ qId: q.id, content });
                     }}
                     disabled={!replyMap[q.id]?.trim() || replyMutation.isPending}
-                    className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+                    className="px-3 py-1.5 bg-sky text-white rounded-lg text-sm font-medium hover:bg-sky-deep disabled:opacity-50"
                   >
                     Gửi
                   </button>
                   <button
                     onClick={() => closeMutation.mutate(q.id)}
                     disabled={closeMutation.isPending}
-                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                    className="px-3 py-1.5 border border-hairline-strong rounded-lg text-sm text-ink-mute hover:bg-canvas-soft disabled:opacity-50"
                   >
                     Đóng
                   </button>

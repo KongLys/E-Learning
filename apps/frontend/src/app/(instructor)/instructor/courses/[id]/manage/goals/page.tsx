@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { instructorApi } from '@/lib/api/instructor.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { DynamicListField } from '@/components/instructor/DynamicListField';
+import { notify } from '@/store/dialog.store';
 
 export default function CourseGoalsPage() {
   const { id } = useParams<{ id: string }>();
@@ -35,16 +36,16 @@ export default function CourseGoalsPage() {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     },
-    onError: (err: any) => alert(err?.response?.data?.message ?? 'Lưu thất bại'),
+    onError: (err: any) => notify.error(err?.response?.data?.message ?? 'Lưu thất bại'),
   });
 
   if (isLoading) return <LoadingSpinner />;
 
   return (
     <div className="space-y-8">
-      <header className="border-b border-gray-100 pb-4">
-        <h1 className="text-2xl font-bold text-gray-900">Học viên mục tiêu</h1>
-        <p className="mt-1 text-sm text-gray-500">
+      <header className="border-b border-hairline pb-4">
+        <h1 className="text-2xl font-bold text-ink">Học viên mục tiêu</h1>
+        <p className="mt-1 text-sm text-muted">
           Các mô tả sau sẽ hiển thị công khai trên trang tổng quan khóa học và giúp học viên quyết định khóa học có phù hợp với họ hay không.
         </p>
       </header>
@@ -77,11 +78,11 @@ export default function CourseGoalsPage() {
         <button
           onClick={() => saveMutation.mutate()}
           disabled={saveMutation.isPending}
-          className="rounded-md bg-purple-600 px-5 py-2 text-sm font-semibold text-white hover:bg-purple-700 disabled:opacity-50"
+          className="rounded-md bg-sky px-5 py-2 text-sm font-semibold text-white hover:bg-sky-deep disabled:opacity-50"
         >
           {saveMutation.isPending ? 'Đang lưu...' : 'Lưu'}
         </button>
-        {saved && <span className="text-sm text-green-600">Đã lưu</span>}
+        {saved && <span className="text-sm text-leaf">Đã lưu</span>}
       </div>
     </div>
   );

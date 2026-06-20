@@ -5,6 +5,7 @@ import { apiClient } from '@/lib/api/axios';
 import { moderationApi } from '@/lib/api/ai.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { Bell, BellOff } from 'lucide-react';
+import { notify, showPrompt } from '@/store/dialog.store';
 
 type NotificationActionData = {
   action: 'appeal';
@@ -50,17 +51,17 @@ export default function NotificationsPage() {
 
   const appealMutation = useMutation({
     mutationFn: async (actionData: NotificationActionData) => {
-      const reason = window.prompt('Lý do kiến nghị (không bắt buộc):') ?? undefined;
+      const reason = (await showPrompt({ title: 'Lý do kiến nghị (không bắt buộc):' })) ?? undefined;
       if (actionData.contentType === 'course') {
         return moderationApi.appealCourse(actionData.contentId, reason);
       }
       return moderationApi.appealLesson(actionData.contentId, reason);
     },
     onSuccess: () => {
-      alert('Đã gửi kiến nghị thành công!');
+      notify.success('Đã gửi kiến nghị thành công!');
       qc.invalidateQueries({ queryKey: ['instructor-notifications'] });
     },
-    onError: (err: any) => alert(err?.response?.data?.message ?? 'Gửi kiến nghị thất bại'),
+    onError: (err: any) => notify.error(err?.response?.data?.message ?? 'Gửi kiến nghị thất bại'),
   });
 
   const notifications: any[] = data?.data?.notifications ?? data?.data ?? [];
@@ -70,14 +71,14 @@ export default function NotificationsPage() {
     <div className="max-w-3xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Thông báo</h1>
-          <p className="text-sm text-gray-500">Lịch sử thông báo của bạn</p>
+          <h1 className="text-2xl font-bold text-ink mb-1">Thông báo</h1>
+          <p className="text-sm text-muted">Lịch sử thông báo của bạn</p>
         </div>
         {unreadCount > 0 && (
           <button
             onClick={() => markAllMutation.mutate()}
             disabled={markAllMutation.isPending}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 border border-hairline-strong rounded-lg text-sm text-ink-mute hover:bg-canvas-soft disabled:opacity-50 transition-colors"
           >
             <BellOff size={14} />
             Đánh dấu tất cả đã đọc
@@ -88,21 +89,21 @@ export default function NotificationsPage() {
       {isLoading ? (
         <LoadingSpinner />
       ) : notifications.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-          <Bell size={32} className="mx-auto text-gray-300 mb-3" />
-          <p className="text-sm text-gray-500">Chưa có thông báo nào</p>
+        <div className="bg-surface-card rounded-card border border-hairline p-12 text-center">
+          <Bell size={32} className="mx-auto text-ink-faint mb-3" />
+          <p className="text-sm text-muted">Chưa có thông báo nào</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
+        <div className="bg-surface-card rounded-card border border-hairline divide-y divide-hairline">
           {notifications.map((n: any) => (
             <div
               key={n.id}
               className={`flex items-start gap-4 px-5 py-4 transition-colors ${
-                !n.isRead ? 'bg-blue-50/40' : ''
+                !n.isRead ? 'bg-sky-soft/40' : ''
               }`}
             >
               <div
-                className={`mt-0.5 w-2 h-2 rounded-full shrink-0 cursor-pointer ${!n.isRead ? 'bg-blue-500' : 'bg-transparent'}`}
+                className={`mt-0.5 w-2 h-2 rounded-full shrink-0 cursor-pointer ${!n.isRead ? 'bg-sky' : 'bg-transparent'}`}
                 onClick={() => !n.isRead && markReadMutation.mutate(n.id)}
               />
               <div className="flex-1 min-w-0">
@@ -110,15 +111,15 @@ export default function NotificationsPage() {
                   className="cursor-pointer"
                   onClick={() => !n.isRead && markReadMutation.mutate(n.id)}
                 >
-                  <p className="text-sm font-medium text-gray-900">{n.title}</p>
-                  <p className="text-sm text-gray-600 mt-0.5">{n.body}</p>
-                  <p className="text-xs text-gray-400 mt-1">{timeAgo(n.createdAt)}</p>
+                  <p className="text-sm font-medium text-ink">{n.title}</p>
+                  <p className="text-sm text-ink-mute mt-0.5">{n.body}</p>
+                  <p className="text-xs text-ink-subtle mt-1">{timeAgo(n.createdAt)}</p>
                 </div>
                 {n.data?.action === 'appeal' && (
                   <button
                     onClick={() => appealMutation.mutate(n.data as NotificationActionData)}
                     disabled={appealMutation.isPending}
-                    className="mt-2 text-xs font-medium text-blue-600 hover:text-blue-800 border border-blue-200 rounded-md px-2.5 py-1 hover:bg-blue-50 disabled:opacity-50 transition-colors"
+                    className="mt-2 text-xs font-medium text-sky hover:text-sky-deep border border-sky-soft rounded-md px-2.5 py-1 hover:bg-sky-soft disabled:opacity-50 transition-colors"
                   >
                     Kiến nghị lại
                   </button>

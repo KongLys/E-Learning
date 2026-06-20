@@ -35,13 +35,13 @@ export function DynamicListField({
 
   return (
     <div>
-      <label className="block text-sm font-medium mb-1">{label}</label>
-      {hint && <p className="text-xs text-gray-500 mb-2">{hint}</p>}
+      <label className="block text-sm font-medium text-ink mb-1">{label}</label>
+      {hint && <p className="text-xs text-muted mb-2">{hint}</p>}
       <div className="space-y-2">
         {items.map((item, idx) => (
-          <div key={idx} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 text-sm">
-            <span className="flex-1 text-gray-800">{item}</span>
-            <button type="button" onClick={() => remove(idx)} className="text-gray-400 hover:text-red-500 transition-colors">
+          <div key={idx} className="flex items-center gap-2 bg-canvas-soft rounded-lg px-3 py-2 text-sm">
+            <span className="flex-1 text-ink">{item}</span>
+            <button type="button" onClick={() => remove(idx)} className="text-ink-subtle hover:text-coral transition-colors">
               <X size={14} />
             </button>
           </div>
@@ -52,19 +52,19 @@ export function DynamicListField({
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
             placeholder={placeholder}
-            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky"
           />
           <button
             type="button"
             onClick={add}
-            className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 bg-surface-strong hover:bg-hairline rounded-lg text-sm font-medium transition-colors"
           >
             <Plus size={14} />
             Thêm
           </button>
         </div>
       </div>
-      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+      {error && <p className="text-xs text-semantic-error mt-1">{error}</p>}
     </div>
   );
 }
