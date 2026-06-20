@@ -336,6 +336,7 @@ export class CourseService {
     page?: number;
     limit?: number;
     category?: string;
+    categoryId?: string;
     level?: string;
     search?: string;
     sort?: string;
@@ -360,6 +361,9 @@ export class CourseService {
     }
     if (query.category) {
       where.category = { slug: query.category };
+    }
+    if (query.categoryId) {
+      where.categoryId = query.categoryId;
     }
     if (query.price === 'free') where.price = 0;
     if (query.price === 'paid') where.price = { gt: 0 };
