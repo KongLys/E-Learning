@@ -84,27 +84,13 @@ export class RagService {
       return noContextResult();
     }
 
-    // 3. Rerank với Cohere → top K, LỌC theo ngưỡng relevance.
+    // 3. Rerank với Cohere → top K (threshold tạm bỏ).
     const rerankResults = await this.cohere.rerank(
       query,
       fused.map((c) => c.content),
       this.rerankTop,
     );
-    // Khi Cohere lỗi/thiếu key, fallback trả relevanceScore=0 cho mọi kết quả ⇒
-    // bỏ qua cổng điểm để không chặn nhầm; lúc đó dựa vào cổng compression + prompt.
-    const hasScores = rerankResults.some((r) => r.relevanceScore > 0);
-    const keptResults = hasScores
-      ? rerankResults.filter((r) => r.relevanceScore >= this.rerankMinScore)
-      : rerankResults;
-    const topK = keptResults.map((r) => fused[r.index]);
-
-    // Cổng A: không còn đoạn nào đủ liên quan ⇒ báo "chưa đề cập", không gọi LLM.
-    if (topK.length === 0) {
-      this.logger.debug(
-        `RAG gate: no chunk above relevance ${this.rerankMinScore} for query`,
-      );
-      return noContextResult();
-    }
+    const topK = rerankResults.map((r) => fused[r.index]);
 
     // 4. Compression — Gemini trích đoạn liên quan
     const compressed = await this.compress(
