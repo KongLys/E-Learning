@@ -22,3 +22,5 @@ plan/
 *.venv
 
 DESIGN.md
+/apps/backend/tmp
+/apps/backend/scripts

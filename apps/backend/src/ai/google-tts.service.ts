@@ -27,7 +27,7 @@ export class GoogleTtsService {
     this.languageCode = config.get<string>('GOOGLE_TTS_LANGUAGE', 'vi-VN');
     if (!this.apiKey) {
       this.logger.warn(
-        'GOOGLE_TTS_API_KEY chưa cấu hình — tính năng tạo podcast sẽ lỗi khi chạy',
+        'GOOGLE_TTS_API_KEY chưa cấu hình — tính năng giọng đọc/video AI sẽ lỗi khi chạy',
       );
     }
   }
@@ -36,7 +36,7 @@ export class GoogleTtsService {
   async synthesize(text: string): Promise<Buffer> {
     if (!this.apiKey) {
       throw new ServiceUnavailableException(
-        'GOOGLE_TTS_API_KEY chưa cấu hình — không thể tạo podcast',
+        'GOOGLE_TTS_API_KEY chưa cấu hình — không thể tạo giọng đọc',
       );
     }
     const chunks = this.splitText(text);

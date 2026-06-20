@@ -19,6 +19,9 @@ export interface GenerateOpts {
   // độc lập với CHAT_PROVIDER dùng cho RAG/chat). Bỏ trống = dùng cấu hình mặc định.
   provider?: 'gemini' | 'ollama';
   model?: string;
+  // Ép Ollama trả JSON hợp lệ: 'json' (chỉ ràng buộc cú pháp) hoặc 1 JSON schema
+  // (structured outputs). Chỉ áp dụng cho provider 'ollama'.
+  format?: 'json' | Record<string, unknown>;
 }
 
 export interface TranscriptCue {
@@ -342,6 +345,7 @@ export class GeminiService {
       prompt,
       stream,
       ...(opts.systemInstruction ? { system: opts.systemInstruction } : {}),
+      ...(opts.format ? { format: opts.format } : {}),
       options: {
         temperature: opts.temperature ?? 0.3,
         num_predict: opts.maxOutputTokens ?? 2048,

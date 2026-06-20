@@ -165,14 +165,51 @@ export class ModerationService {
     );
   }
 
-  /** Classify text and map to a stored moderation outcome. */
-  async evaluate(segments: string[]): Promise<ModerationOutcome> {
+  /**
+   * One-line preview of the content being moderated, for terminal logs.
+   * Collapses whitespace and truncates so a verdict line stays readable.
+   */
+  private preview(segments: string[], max = 200): string {
+    const joined = segments
+      .map((s) => (s ?? '').trim())
+      .filter(Boolean)
+      .join(' ⏐ ')
+      .replace(/\s+/g, ' ');
+    return joined.length > max ? `${joined.slice(0, max)}…` : joined;
+  }
+
+  /** Always-on, human-readable verdict line for the terminal. */
+  private logVerdict(label: string, outcome: ModerationOutcome) {
+    const detail =
+      outcome.label != null
+        ? ` (${outcome.label}${
+            outcome.score != null ? ` ${outcome.score.toFixed(3)}` : ''
+          })`
+        : '';
+    const reason = outcome.reason ? ` — ${outcome.reason}` : '';
+    this.logger.log(
+      `Kết quả kiểm duyệt ${label} → ${outcome.status}${detail}${reason}`,
+    );
+  }
+
+  /**
+   * Classify text and map to a stored moderation outcome.
+   * `context` is a short label (e.g. `khóa học "X"`) shown in the terminal log.
+   */
+  async evaluate(
+    segments: string[],
+    context = 'nội dung',
+  ): Promise<ModerationOutcome> {
     if (!this.enabled) {
-      this.debugLog(
-        'evaluate skipped — MODERATION_ENABLED=false → auto-approve',
+      this.logger.log(
+        `Bỏ qua kiểm duyệt ${context} (MODERATION_ENABLED=false) → tự động duyệt`,
       );
       return { status: 'approved' };
     }
+
+    this.logger.log(
+      `Bắt đầu kiểm duyệt ${context} — nội dung: "${this.preview(segments)}"`,
+    );
 
     const result = await this.classify(segments);
     let outcome: ModerationOutcome;
@@ -186,10 +223,10 @@ export class ModerationService {
             label: 'others',
             reason: REASONS.others ?? undefined,
           };
-      this.debugLog('evaluate → service unavailable', {
-        failOpen: this.failOpen,
-        status: outcome.status,
-      });
+      this.logger.warn(
+        `Dịch vụ kiểm duyệt không khả dụng khi xử lý ${context} (failOpen=${this.failOpen})`,
+      );
+      this.logVerdict(context, outcome);
       return outcome;
     }
 
@@ -204,11 +241,7 @@ export class ModerationService {
         reason: REASONS[result.label] ?? REASONS.others ?? undefined,
       };
     }
-    this.debugLog('evaluate → outcome', {
-      status: outcome.status,
-      label: outcome.label,
-      score: outcome.score,
-    });
+    this.logVerdict(context, outcome);
     return outcome;
   }
 
@@ -227,7 +260,10 @@ export class ModerationService {
       titleLen: title.length,
     });
     const text = [title, description].filter(Boolean).join('\n');
-    const outcome = await this.evaluate([text]);
+    const outcome = await this.evaluate(
+      [text],
+      `khóa học "${title}" (id=${courseId})`,
+    );
     await this.prisma.course.update({
       where: { id: courseId },
       data: {
@@ -389,7 +425,7 @@ export class ModerationService {
   }
 
   async approve(type: ContentType, id: string) {
-    this.debugLog('admin approve', { type, id });
+    this.logger.log(`Admin duyệt thủ công: ${type} (id=${id}) → approved`);
     if (type === 'course') {
       const course = await this.prisma.course.update({
         where: { id },
@@ -432,9 +468,11 @@ export class ModerationService {
   }
 
   async reject(type: ContentType, id: string, reason?: string) {
-    this.debugLog('admin reject (lock)', { type, id });
     const finalReason =
       reason ?? 'Nội dung không phù hợp với quy định của hệ thống.';
+    this.logger.log(
+      `Admin từ chối thủ công: ${type} (id=${id}) → locked — ${finalReason}`,
+    );
     if (type === 'course') {
       const course = await this.prisma.course.update({
         where: { id },

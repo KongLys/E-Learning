@@ -3,7 +3,9 @@ import { BullModule } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
 import { StorageModule } from '../storage/storage.module';
 import { GeminiService } from './gemini.service';
+import { AssemblyAiService } from './assemblyai.service';
 import { GoogleTtsService } from './google-tts.service';
+import { RemotionRenderService } from './remotion-render.service';
 import { CohereService } from './cohere.service';
 import { LlamaParseService } from './chunking/llama-parse.service';
 import { MarkdownChunkerService } from './chunking/markdown-chunker.service';
@@ -63,7 +65,9 @@ import { ModerationModule } from '../moderation/moderation.module';
   controllers: [AiChatController, MindmapController, ChatQuizController],
   providers: [
     GeminiService,
+    AssemblyAiService,
     GoogleTtsService,
+    RemotionRenderService,
     CohereService,
     LlamaParseService,
     MarkdownChunkerService,
@@ -86,6 +90,7 @@ import { ModerationModule } from '../moderation/moderation.module';
     VectorStoreService,
     GeminiService,
     GoogleTtsService,
+    RemotionRenderService,
     MarkdownChunkerService,
     LlamaParseService,
     QuizGenerationService,

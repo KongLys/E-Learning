@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, ChevronDown, FileText, Headphones, History, Loader2, Mic, Plus, RotateCw, Sparkles, X } from 'lucide-react';
+import { CheckCircle2, ChevronDown, FileText, History, Loader2, Plus, RotateCw, Sparkles, X } from 'lucide-react';
 import {
   aiChatApi,
   myReviewQuizApi,
@@ -33,27 +33,21 @@ interface PendingMessage {
 
 interface AiChatPanelProps {
   courseId: string;
-  /** Có => bật nút Quiz/Podcast theo bài và đặt phạm vi mặc định theo bài. */
+  /** Có => bật nút Quiz theo bài và đặt phạm vi mặc định theo bài. */
   currentLessonId?: string;
   currentLessonType?: 'video' | 'document' | 'quiz';
-  /** Tiêu đề bài hiện tại — để mở podcast ở cột nội dung. */
-  currentLessonTitle?: string;
   /** Truyền vào khi dùng như panel để hiện nút đóng. */
   onClose?: () => void;
   /** Mở quiz ở cột nội dung bài học (thay vì modal nội bộ). */
   onOpenQuiz?: (quiz: any, kind: 'review' | 'ai') => void;
-  /** Mở/nghe podcast ở cột nội dung bài học. */
-  onOpenPodcast?: (lessonId: string, lessonTitle: string) => void;
 }
 
 export function AiChatPanel({
   courseId,
   currentLessonId,
   currentLessonType,
-  currentLessonTitle,
   onClose,
   onOpenQuiz,
-  onOpenPodcast,
 }: AiChatPanelProps) {
   const qc = useQueryClient();
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -125,28 +119,6 @@ export function AiChatPanel({
       qc.invalidateQueries({ queryKey: ['review-quiz', currentLessonId] });
       qc.invalidateQueries({ queryKey: ['review-quizzes', courseId] });
       onOpenQuiz?.(data, 'review');
-    },
-  });
-
-  // ----- Podcast (AI) cho bài tài liệu hiện tại -----
-  const podcastEnabled = !!currentLessonId && currentLessonType === 'document';
-  const podcastQuery = useQuery({
-    queryKey: ['podcast', currentLessonId],
-    queryFn: () => learnApi.getPodcast(currentLessonId!),
-    enabled: podcastEnabled,
-    refetchInterval: (q) => {
-      const s = (q.state.data as any)?.data?.status;
-      return s === 'pending' || s === 'processing' ? 5000 : false;
-    },
-  });
-  const podcast = podcastQuery.data?.data ?? null;
-  // Hộp xác nhận trước khi tạo lại (podcast cũ vẫn dùng được — chỉ nên tạo lại khi nội dung bài đã đổi).
-  const [confirmRegen, setConfirmRegen] = useState(false);
-  const generatePodcast = useMutation({
-    mutationFn: () => learnApi.generatePodcast(currentLessonId!),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['podcast', currentLessonId] });
-      qc.invalidateQueries({ queryKey: ['podcasts', courseId] });
     },
   });
 
@@ -382,34 +354,6 @@ export function AiChatPanel({
                   </button>
                 )
               )}
-              {podcastEnabled && (
-                podcast?.status === 'pending' || podcast?.status === 'processing' ? (
-                  <button
-                    disabled
-                    className="inline-flex items-center gap-1 rounded-lg bg-berry px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
-                  >
-                    <Loader2 size={13} className="animate-spin" /> Đang tạo podcast…
-                  </button>
-                ) : podcast?.status === 'ready' ? (
-                  <SplitActionButton
-                    mainIcon={<Headphones size={13} />}
-                    mainLabel="Nghe podcast"
-                    onMain={() => onOpenPodcast?.(currentLessonId!, currentLessonTitle ?? 'Podcast')}
-                    regenIcon={<RotateCw size={13} />}
-                    regenLabel="Tạo lại podcast"
-                    regenTitle="Tạo lại podcast, đè lên bản cũ (dùng khi bài học đã cập nhật)"
-                    onRegen={() => setConfirmRegen(true)}
-                  />
-                ) : (
-                  <button
-                    onClick={() => generatePodcast.mutate()}
-                    disabled={generatePodcast.isPending}
-                    className="inline-flex items-center gap-1 rounded-lg bg-berry px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-60"
-                  >
-                    <Mic size={13} /> Tạo podcast
-                  </button>
-                )
-              )}
             </div>
             {generateReviewQuiz.isError && (
               <p className="text-xs text-semantic-error">
@@ -417,47 +361,6 @@ export function AiChatPanel({
                   'Không tạo được quiz ôn tập, vui lòng thử lại.'}
               </p>
             )}
-            {podcastEnabled && podcast?.status === 'failed' && (
-              <p className="text-xs text-semantic-error">
-                {podcast.errorMsg ?? 'Không tạo được podcast, vui lòng thử lại.'}
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Xác nhận tạo lại podcast (ghi đè bản hiện tại). */}
-        {confirmRegen && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-            onClick={() => setConfirmRegen(false)}
-          >
-            <div
-              className="w-full max-w-sm rounded-2xl bg-surface-card p-5 shadow-xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 className="text-base font-bold text-ink">Tạo lại podcast?</h3>
-              <p className="mt-2 text-sm text-muted leading-relaxed">
-                Bài học đã có podcast. Chỉ nên tạo lại nếu nội dung bài đã thay đổi — podcast hiện tại sẽ
-                bị thay thế.
-              </p>
-              <div className="mt-4 flex justify-end gap-2">
-                <button
-                  onClick={() => setConfirmRegen(false)}
-                  className="rounded-lg px-3 py-1.5 text-sm font-medium text-ink-mute hover:bg-surface-strong"
-                >
-                  Hủy
-                </button>
-                <button
-                  onClick={() => {
-                    generatePodcast.mutate();
-                    setConfirmRegen(false);
-                  }}
-                  className="rounded-lg bg-berry px-3 py-1.5 text-sm font-medium text-white hover:opacity-90"
-                >
-                  Tạo lại
-                </button>
-              </div>
-            </div>
           </div>
         )}
 

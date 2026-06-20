@@ -8,6 +8,7 @@ import {
 import { randomUUID } from 'crypto';
 import type { Express } from 'express';
 import slugify from 'slugify';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { ModerationService } from '../moderation/moderation.service';
@@ -23,6 +24,7 @@ export class CourseService {
     private prisma: PrismaService,
     private storage: StorageService,
     private moderation: ModerationService,
+    private events: EventEmitter2,
   ) {}
 
   async createCourse(instructorId: string, dto: CreateCourseDto) {
@@ -313,10 +315,13 @@ export class CourseService {
         'Only pending courses can be approved',
       );
     }
-    return this.prisma.course.update({
+    const updated = await this.prisma.course.update({
       where: { id: courseId },
       data: { status: 'published', publishedAt: new Date() },
     });
+    // Tự sinh giọng đọc (TTS) + video ngắn (AI) cho các bài đọc — chạy nền qua listener.
+    this.events.emit('course.published', { courseId });
+    return updated;
   }
 
   async rejectCourse(courseId: string, reason: string) {

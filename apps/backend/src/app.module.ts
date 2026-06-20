@@ -20,7 +20,8 @@ import { ProgressModule } from './progress/progress.module';
 import { QuizAttemptModule } from './quiz-attempt/quiz-attempt.module';
 import { ReviewQuizModule } from './review-quiz/review-quiz.module';
 import { ReferenceMaterialModule } from './reference-material/reference-material.module';
-import { PodcastModule } from './podcast/podcast.module';
+import { NarrationModule } from './narration/narration.module';
+import { LessonVideoModule } from './lesson-video/lesson-video.module';
 import { OrderModule } from './order/order.module';
 import { PaymentModule } from './payment/payment.module';
 import { NoteModule } from './note/note.module';
@@ -68,6 +69,9 @@ import { RolesGuard } from './auth/guards/roles.guard';
         GOOGLE_TTS_API_KEY: Joi.string().allow('').default(''),
         GOOGLE_TTS_VOICE: Joi.string().default('vi-VN-Wavenet-A'),
         GOOGLE_TTS_LANGUAGE: Joi.string().default('vi-VN'),
+        AI_VIDEO_ENABLED: Joi.string().valid('true', 'false').default('false'),
+        AI_VIDEO_TARGET_SEC: Joi.number().default(150),
+        AI_VIDEO_MODEL: Joi.string().allow('').default(''),
         COHERE_API_KEY: Joi.string().allow('').default(''),
         COHERE_RERANK_MODEL: Joi.string().default('rerank-multilingual-v3.0'),
         LLAMA_CLOUD_API_KEY: Joi.string().allow('').default(''),
@@ -109,7 +113,8 @@ import { RolesGuard } from './auth/guards/roles.guard';
     QuizAttemptModule,
     ReviewQuizModule,
     ReferenceMaterialModule,
-    PodcastModule,
+    NarrationModule,
+    LessonVideoModule,
     OrderModule,
     PaymentModule,
     NoteModule,

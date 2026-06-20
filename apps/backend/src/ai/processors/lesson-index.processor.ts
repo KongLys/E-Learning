@@ -154,7 +154,10 @@ export class LessonIndexProcessor extends WorkerHost {
           sampled: sampled.length,
           ofTotal: rows.length,
         });
-        const outcome = await this.moderation.evaluate(sampled);
+        const outcome = await this.moderation.evaluate(
+          sampled,
+          `bài học "${lesson.title}" (id=${lessonId}, ${sampled.length}/${rows.length} đoạn)`,
+        );
         if (outcome.status !== 'approved') {
           await this.prisma.lesson.update({
             where: { id: lessonId },

@@ -256,7 +256,8 @@ model Lesson {
   documentAsset  DocumentAsset?
   quizLesson     QuizLesson?
   reviewQuiz     ReviewQuiz?
-  podcastAsset   PodcastAsset?
+  narrationAsset NarrationAsset?
+  aiVideoAsset   LessonVideoAsset?
   lessonProgress LessonProgress[]
   notes          Note[]
   quickQuestions QuickQuestion[]
@@ -318,10 +319,10 @@ model DocumentAsset {
   @@map("document_assets")
 }
 
-// Podcast (audio) tự sinh bằng AI từ nội dung bài đọc (document):
-// LLM viết kịch bản lời dẫn → Google Cloud TTS đọc thành MP3 → lưu R2.
-// Chạy nền (BullMQ); không chặn việc đọc bài. Hiển thị khi status='ready'.
-model PodcastAsset {
+// Giọng đọc (TTS) tự sinh khi khóa được duyệt xuất bản: đọc TRUNG THỰC nội dung
+// bài đọc (tiêu đề + mô tả + thân RichText), trừ tài liệu đính kèm. Google Cloud
+// TTS → MP3 → R2. Chạy nền (BullMQ); hiển thị dưới tiêu đề & tự phát khi status='ready'.
+model NarrationAsset {
   id          String   @id @default(uuid())
   lessonId    String   @unique @map("lesson_id")
   status      String   @default("pending") // pending|processing|ready|failed
@@ -334,7 +335,28 @@ model PodcastAsset {
 
   lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
 
-  @@map("podcast_assets")
+  @@map("narration_assets")
+}
+
+// Video ngắn (~2–3 phút) do AI tạo khi khóa được duyệt xuất bản: LLM (Ollama) tóm
+// tắt bài thành các section → TTS đọc từng section → Remotion render MP4 có timeline
+// các section → R2. Chạy nền (BullMQ); hiển thị cuối bài, người học tùy chọn xem.
+model LessonVideoAsset {
+  id           String   @id @default(uuid())
+  lessonId     String   @unique @map("lesson_id")
+  status       String   @default("pending") // pending|processing|ready|failed
+  videoUrl     String?  @map("video_url")
+  thumbnailUrl String?  @map("thumbnail_url")
+  durationSec  Int      @default(0) @map("duration_sec")
+  sectionsJson Json     @default("[]") @map("sections_json") // [{ title, startSec, endSec }]
+  model        String?
+  errorMsg     String?  @map("error_msg")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@map("lesson_video_assets")
 }
 
 model QuizLesson {

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, type ReactNode } from 'react';
-import { AlertTriangle, Check, ChevronDown, Film, FileText, Loader2, Mic, Paperclip, Play, X } from 'lucide-react';
+import { Check, ChevronDown, Film, FileText, Paperclip, Play, X } from 'lucide-react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { myReviewQuizApi } from '@/lib/api/ai.api';
@@ -40,23 +40,11 @@ interface LearnSidebarProps {
   onOpenReviewQuiz?: (lessonId: string) => void;
   /** Quiz đang mở ở cột nội dung — để tô sáng trong mục lục ('ai:<id>' | 'review:<lessonId>'). */
   activeQuizKey?: string;
-  /** Mở/nghe 1 podcast (theo bài) đã tạo — phát ở cột nội dung. */
-  onOpenPodcast?: (lessonId: string, lessonTitle: string) => void;
-  /** Podcast đang mở ở cột nội dung — để tô sáng trong mục lục ('podcast:<lessonId>'). */
-  activePodcastKey?: string;
-}
-
-/** mm:ss từ số giây (podcast ngắn). */
-function podcastDuration(durationSec: number): string {
-  const total = Math.max(0, Math.round(durationSec || 0));
-  const mm = Math.floor(total / 60);
-  const ss = total % 60;
-  return `${mm}:${String(ss).padStart(2, '0')}`;
 }
 
 type Viewer = { title: string; kind: MaterialKind; url: string };
 
-export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections, lessonProgress, progressPercent, isOpen, collapsed, onClose, onNavigate, onOpenMyQuiz, onOpenReviewQuiz, activeQuizKey, onOpenPodcast, activePodcastKey }: LearnSidebarProps) {
+export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections, lessonProgress, progressPercent, isOpen, collapsed, onClose, onNavigate, onOpenMyQuiz, onOpenReviewQuiz, activeQuizKey }: LearnSidebarProps) {
   const completedIds = new Set(lessonProgress.filter((lp: any) => lp.completed).map((lp: any) => lp.lessonId));
   const [viewer, setViewer] = useState<Viewer | null>(null);
 
@@ -74,14 +62,6 @@ export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections,
     enabled: !!onOpenReviewQuiz,
   });
   const reviewQuizzes = reviewQuizzesQuery.data ?? [];
-
-  // Podcast theo bài (tạo bằng nút "Tạo podcast") — dùng chung mỗi bài.
-  const podcastsQuery = useQuery({
-    queryKey: ['podcasts', courseId],
-    queryFn: async () => (await learnApi.listPodcasts(courseId)).data,
-    enabled: !!onOpenPodcast,
-  });
-  const podcasts = podcastsQuery.data ?? [];
 
   const showQuizSection = !!onOpenMyQuiz || !!onOpenReviewQuiz;
   const quizCount = myQuizzes.length + reviewQuizzes.length;
@@ -229,59 +209,6 @@ export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections,
                         </span>
                       </button>
                     </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </details>
-          )}
-
-          {/* ── Podcast của khóa học (tạo theo bài bằng nút "Tạo podcast") ── */}
-          {onOpenPodcast && (
-            <details className="group border-b border-gray-100" open={podcasts.length > 0}>
-              <summary className="px-5 py-3.5 cursor-pointer hover:bg-gray-50 list-none flex items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-gray-900">Podcast{podcasts.length > 0 ? ` (${podcasts.length})` : ''}</p>
-                <ChevronDown size={16} className="text-gray-400 transition-transform group-open:rotate-180" />
-              </summary>
-              {podcastsQuery.isLoading ? (
-                <p className="px-5 py-3 text-xs text-gray-400">Đang tải…</p>
-              ) : podcasts.length === 0 ? (
-                <p className="px-5 py-3 text-xs text-gray-500 leading-relaxed">
-                  Chưa có podcast. Mở một bài tài liệu rồi bấm “Tạo podcast” trong khung chat (Hỏi AI) để tạo.
-                </p>
-              ) : (
-                <ul className="pb-1">
-                  {podcasts.map((p) => {
-                    const active = activePodcastKey === `podcast:${p.lessonId}`;
-                    if (p.status === 'ready') {
-                      return (
-                        <li key={`pc-${p.lessonId}`}>
-                          <button
-                            onClick={() => onOpenPodcast(p.lessonId, p.lessonTitle)}
-                            className={`w-full text-left flex items-start gap-3 px-5 py-3 border-l-[3px] transition-colors ${active ? 'bg-blue-50 border-blue-500' : 'border-transparent hover:bg-gray-50'}`}
-                          >
-                            <Mic size={16} className="mt-0.5 shrink-0" />
-                            <span className="min-w-0">
-                              <span className={`block text-sm leading-snug truncate ${active ? 'text-blue-700 font-semibold' : 'text-gray-800'}`}>{p.lessonTitle}</span>
-                              <span className="block text-xs text-gray-400 mt-0.5">Theo bài · {podcastDuration(p.durationSec)} · {new Date(p.updatedAt).toLocaleDateString('vi-VN')}</span>
-                            </span>
-                          </button>
-                        </li>
-                      );
-                    }
-                    const isBusy = p.status === 'pending' || p.status === 'processing';
-                    return (
-                      <li key={`pc-${p.lessonId}`}>
-                        <div className="flex items-start gap-3 px-5 py-3 border-l-[3px] border-transparent">
-                          <span className="mt-0.5 shrink-0">{isBusy ? <Loader2 size={16} className="animate-spin" /> : <AlertTriangle size={16} />}</span>
-                          <span className="min-w-0">
-                            <span className="block text-sm leading-snug truncate text-gray-800">{p.lessonTitle}</span>
-                            <span className={`block text-xs mt-0.5 ${isBusy ? 'text-gray-400' : 'text-red-500'}`}>
-                              {isBusy ? 'Đang tạo…' : 'Tạo thất bại'}
-                            </span>
-                          </span>
-                        </div>
-                      </li>
                     );
                   })}
                 </ul>

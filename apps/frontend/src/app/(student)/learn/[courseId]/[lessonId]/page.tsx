@@ -15,7 +15,7 @@ import { LearnSidebar } from '@/components/learn/LearnSidebar';
 import { AiChatPanel } from '@/components/learn/AiChatPanel';
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { Check, ChevronDown, ChevronLeft, Clock, FileText, Headphones, Loader2, Menu, MessageSquare, Sparkles } from 'lucide-react';
+import { Check, ChevronDown, ChevronLeft, Clock, FileText, Film, Headphones, Loader2, Menu, MessageSquare, Sparkles } from 'lucide-react';
 
 export default function LearnPage() {
   const { courseId, lessonId } = useParams<{ courseId: string; lessonId: string }>();
@@ -102,36 +102,38 @@ export default function LearnPage() {
     onSuccess: (res) => openQuiz(res.data, 'review'),
   });
 
-  // Podcast đang nghe — phát ở cột nội dung (giống quiz ôn tập), có thể là bài khác bài đang xem.
-  const [activePodcast, setActivePodcast] = useState<{
-    lessonId: string;
-    lessonTitle: string;
-    audioUrl: string;
-    durationSec: number;
-  } | null>(null);
-  const openPodcast = useMutation({
-    mutationFn: async ({ lid, title }: { lid: string; title: string }) => {
-      const res = await learnApi.getPodcast(lid);
-      return { lessonId: lid, lessonTitle: title, data: res.data };
-    },
-    onSuccess: ({ lessonId: lid, lessonTitle, data }) => {
-      if (data?.status !== 'ready' || !data?.audioUrl) return;
-      setActiveQuiz(null); // hai chế độ loại trừ nhau
-      setActivePodcast({ lessonId: lid, lessonTitle, audioUrl: data.audioUrl, durationSec: data.durationSec ?? 0 });
-      setSidebarOpen(false);
+  // Giọng đọc (TTS) tự sinh khi khóa được duyệt — hiển thị dưới tiêu đề & tự phát.
+  // Poll khi đang tạo để hiện ngay khi job hoàn tất.
+  const { data: narrationData } = useQuery({
+    queryKey: ['narration', lessonId],
+    queryFn: async () => (await learnApi.getNarration(lessonId)).data,
+    enabled: lessonData?.data?.type === 'document',
+    refetchInterval: (q) => {
+      const s = (q.state.data as any)?.status;
+      return s === 'pending' || s === 'processing' ? 8000 : false;
     },
   });
+  const narration = narrationData ?? null;
+
+  // Video ngắn do AI tạo — hiển thị cuối bài, người học tùy chọn xem.
+  const { data: aiVideoData } = useQuery({
+    queryKey: ['ai-video', lessonId],
+    queryFn: async () => (await learnApi.getAiVideo(lessonId)).data,
+    enabled: lessonData?.data?.type === 'document',
+    refetchInterval: (q) => {
+      const s = (q.state.data as any)?.status;
+      return s === 'pending' || s === 'processing' ? 15000 : false;
+    },
+  });
+  const aiVideo = aiVideoData ?? null;
 
   // Mở quiz ở cột nội dung, GIỮ mục lục khung chương trình để điều hướng dễ.
   // Quiz ôn tập gắn với bài của chính nó (quiz.lessonId), không nhất thiết là bài đang xem.
   const openQuiz = (quiz: any, kind: 'review' | 'ai') => {
     const scope = kind === 'review' ? { lessonId: quiz.lessonId ?? lessonId } : undefined;
-    setActivePodcast(null); // hai chế độ loại trừ nhau
     setActiveQuiz({ quiz, kind, scope });
     setSidebarOpen(false); // đóng overlay mục lục trên mobile; mục lục desktop vẫn hiện
   };
-
-  const activePodcastKey = activePodcast ? `podcast:${activePodcast.lessonId}` : undefined;
 
   // Khoá quiz đang mở (để tô sáng trong mục lục): 'ai:<id>' hoặc 'review:<lessonId>'.
   const activeQuizKey = activeQuiz
@@ -171,7 +173,7 @@ export default function LearnPage() {
   useEffect(() => { completedRef.current = false; }, [lessonId]);
 
   // Đổi bài học thì thoát quiz đang mở để hiện nội dung bài (điều hướng qua lại mượt).
-  useEffect(() => { setActiveQuiz(null); setActivePodcast(null); setDocScrolled(false); }, [lessonId]);
+  useEffect(() => { setActiveQuiz(null); setDocScrolled(false); }, [lessonId]);
 
   // Kéo để mở rộng/thu nhỏ khung chat AI (cột phải)
   useEffect(() => {
@@ -294,8 +296,6 @@ export default function LearnPage() {
           onOpenMyQuiz={(id) => openMyQuiz.mutate(id)}
           onOpenReviewQuiz={(lid) => openReviewQuiz.mutate(lid)}
           activeQuizKey={activeQuizKey}
-          onOpenPodcast={(lid, title) => openPodcast.mutate({ lid, title })}
-          activePodcastKey={activePodcastKey}
         />
 
         {/* Main content */}
@@ -330,23 +330,6 @@ export default function LearnPage() {
                 }
                 onClose={() => setActiveQuiz(null)}
               />
-            </div>
-          ) : activePodcast ? (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="flex items-center gap-1.5 text-lg font-bold truncate"><Headphones size={18} className="shrink-0" /> {activePodcast.lessonTitle}</h2>
-                <button
-                  onClick={() => setActivePodcast(null)}
-                  className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-800"
-                >
-                  <ChevronLeft size={16} /> Quay lại bài học
-                </button>
-              </div>
-              <div className="rounded-2xl bg-slate-50 p-5">
-                <audio controls autoPlay preload="auto" src={activePodcast.audioUrl} className="w-full">
-                  Trình duyệt của bạn không hỗ trợ phát audio.
-                </audio>
-              </div>
             </div>
           ) : (
           <>
@@ -400,6 +383,22 @@ export default function LearnPage() {
                 </div>
               </div>
 
+              {/* Giọng đọc do AI tạo — ngay dưới tiêu đề, tự phát khi mở bài. */}
+              {narration?.status === 'ready' && narration.audioUrl ? (
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-gray-500">
+                    <Headphones size={14} /> Giọng đọc do AI tạo
+                  </div>
+                  <audio controls autoPlay preload="auto" src={narration.audioUrl} className="w-full">
+                    Trình duyệt của bạn không hỗ trợ phát audio.
+                  </audio>
+                </div>
+              ) : narration?.status === 'pending' || narration?.status === 'processing' ? (
+                <div className="flex items-center gap-2 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-gray-500">
+                  <Loader2 size={14} className="animate-spin" /> Đang tạo giọng đọc…
+                </div>
+              ) : null}
+
               {/* Chỉ tên file + nút tải về — KHÔNG hiển thị nội dung tài liệu */}
               {docUrlData?.data?.url ? (
                 <div className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 p-5">
@@ -441,6 +440,26 @@ export default function LearnPage() {
                   </div>
                 )}
               </div>
+
+              {/* Video ngắn do AI tạo — cuối bài, người học tùy chọn xem. */}
+              {aiVideo?.status === 'ready' && aiVideo.videoUrl ? (
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <div className="mb-2 flex items-center gap-1.5">
+                    <Film size={16} className="text-gray-500" />
+                    <span className="text-sm font-semibold text-gray-800">Video ngắn do AI tạo</span>
+                  </div>
+                  <video controls preload="none" src={aiVideo.videoUrl} className="w-full rounded-xl bg-black">
+                    Trình duyệt của bạn không hỗ trợ phát video.
+                  </video>
+                  <p className="mt-2 text-xs text-gray-400">
+                    Video do AI tạo tự động từ nội dung bài học, nội dung có thể chưa hoàn toàn chính xác.
+                  </p>
+                </div>
+              ) : aiVideo?.status === 'pending' || aiVideo?.status === 'processing' ? (
+                <div className="flex items-center gap-2 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-gray-500">
+                  <Loader2 size={14} className="animate-spin" /> Đang tạo video ngắn…
+                </div>
+              ) : null}
             </div>
           )}
 
@@ -566,10 +585,8 @@ export default function LearnPage() {
                 courseId={courseId}
                 currentLessonId={lessonId}
                 currentLessonType={lesson.type}
-                currentLessonTitle={lesson.title}
                 onClose={() => setAiPanelOpen(false)}
                 onOpenQuiz={openQuiz}
-                onOpenPodcast={(lid, title) => openPodcast.mutate({ lid, title })}
               />
             </aside>
           </>

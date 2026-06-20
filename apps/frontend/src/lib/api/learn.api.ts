@@ -19,12 +19,23 @@ export interface ReviewQuizSummary {
   updatedAt: string;
 }
 
-/** Tóm tắt podcast (theo bài) đã tạo trong khoá. */
-export interface PodcastSummary {
-  lessonId: string;
-  lessonTitle: string;
-  status: 'pending' | 'processing' | 'ready' | 'failed';
+export type AiAssetStatus = 'pending' | 'processing' | 'ready' | 'failed';
+
+/** Giọng đọc (TTS) tự sinh của bài đọc. */
+export interface NarrationData {
+  status: AiAssetStatus;
+  audioUrl: string | null;
   durationSec: number;
+  errorMsg?: string | null;
+  updatedAt: string;
+}
+
+/** Video ngắn do AI tạo cho bài đọc. */
+export interface AiVideoData {
+  status: AiAssetStatus;
+  videoUrl: string | null;
+  durationSec: number;
+  sections: { title: string; startSec: number; endSec: number }[];
   errorMsg?: string | null;
   updatedAt: string;
 }
@@ -53,12 +64,12 @@ export const learnApi = {
     apiClient.get<ReviewQuizSummary[]>(`/courses/${courseId}/review-quizzes`),
   submitReviewQuiz: (lessonId: string, answers: { questionId: string; optionIds: string[] }[]) =>
     apiClient.post(`/lessons/${lessonId}/review-quiz/attempts`, { answers }),
-  // Podcast (AI) — sinh audio lời dẫn từ nội dung bài đọc, tạo theo yêu cầu (chạy nền)
-  getPodcast: (lessonId: string) => apiClient.get(`/lessons/${lessonId}/podcast`),
-  generatePodcast: (lessonId: string) => apiClient.post(`/lessons/${lessonId}/podcast`),
-  // Danh sách podcast (theo bài) đã tạo trong khoá — để xem/nghe lại trong sidebar
-  listPodcasts: (courseId: string) =>
-    apiClient.get<PodcastSummary[]>(`/courses/${courseId}/podcasts`),
+  // Giọng đọc (TTS) tự sinh khi khóa được duyệt — đọc trung thực nội dung bài đọc
+  getNarration: (lessonId: string) =>
+    apiClient.get<NarrationData | null>(`/lessons/${lessonId}/narration`),
+  // Video ngắn do AI tạo (tự sinh khi khóa được duyệt) — tùy chọn xem
+  getAiVideo: (lessonId: string) =>
+    apiClient.get<AiVideoData | null>(`/lessons/${lessonId}/ai-video`),
   // Tài liệu tham khảo + tài liệu toàn khóa (sidebar khung chương trình)
   getReferenceMaterials: (courseId: string) =>
     apiClient.get(`/courses/${courseId}/reference-materials`),

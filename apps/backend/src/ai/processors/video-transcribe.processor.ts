@@ -2,13 +2,10 @@ import { Logger } from '@nestjs/common';
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { Prisma } from '@prisma/client';
-import { randomUUID } from 'crypto';
-import { unlink } from 'fs/promises';
-import { tmpdir } from 'os';
-import { join } from 'path';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../storage/storage.service';
-import { GeminiService, TranscriptCue } from '../gemini.service';
+import { AssemblyAiService } from '../assemblyai.service';
+import { TranscriptCue } from '../gemini.service';
 
 export const VIDEO_TRANSCRIBE_QUEUE = 'video-transcription';
 
@@ -20,8 +17,8 @@ export interface TranscribeVideoJob {
  * Sau khi giảng viên upload video, job này chạy nền để:
  *  - tạo phụ đề có timestamp (cues, lưu kèm bản WebVTT vào transcript)
  *  - phân tích nội dung theo khung thời gian (segments/chapters)
- * Dùng Gemini File API. Không chặn playback — video xem được ngay,
- * phụ đề/nội dung xuất hiện khi transcriptStatus='ready'.
+ * Dùng AssemblyAI (nhận dạng giọng nói) + LLM cục bộ (phân chương). Không chặn
+ * playback — video xem được ngay, phụ đề/nội dung xuất hiện khi transcriptStatus='ready'.
  */
 @Processor(VIDEO_TRANSCRIBE_QUEUE, { concurrency: 1 })
 export class VideoTranscribeProcessor extends WorkerHost {
@@ -30,7 +27,7 @@ export class VideoTranscribeProcessor extends WorkerHost {
   constructor(
     private prisma: PrismaService,
     private storage: StorageService,
-    private gemini: GeminiService,
+    private assemblyai: AssemblyAiService,
   ) {
     super();
   }
@@ -47,9 +44,6 @@ export class VideoTranscribeProcessor extends WorkerHost {
     }
 
     const key = this.storage.extractKeyFromUrl(asset.videoUrl);
-    const mimeType = key.endsWith('.webm') ? 'video/webm' : 'video/mp4';
-    const ext = key.endsWith('.webm') ? 'webm' : 'mp4';
-    const tmpPath = join(tmpdir(), `transcribe-${lessonId}-${randomUUID()}.${ext}`);
 
     await this.prisma.videoAsset.update({
       where: { lessonId },
@@ -57,8 +51,9 @@ export class VideoTranscribeProcessor extends WorkerHost {
     });
 
     try {
-      await this.storage.downloadToFile(key, tmpPath);
-      const result = await this.gemini.transcribeMedia(tmpPath, mimeType);
+      // AssemblyAI tự tải media về từ URL — cấp presigned URL (1h) cho object riêng tư.
+      const mediaUrl = await this.storage.getSignedUrl(key, 60 * 60);
+      const result = await this.assemblyai.transcribeMedia(mediaUrl);
 
       await this.prisma.videoAsset.update({
         where: { lessonId },
@@ -101,8 +96,6 @@ export class VideoTranscribeProcessor extends WorkerHost {
         })
         .catch(() => undefined);
       throw err;
-    } finally {
-      await unlink(tmpPath).catch(() => undefined);
     }
   }
 
