@@ -1,11 +1,12 @@
 import { Logger } from '@nestjs/common';
-import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Job } from 'bullmq';
+import { Processor, WorkerHost, InjectQueue } from '@nestjs/bullmq';
+import { Job, Queue } from 'bullmq';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../storage/storage.service';
 import { AssemblyAiService } from '../assemblyai.service';
 import { TranscriptCue } from '../gemini.service';
+import { LESSON_INDEX_QUEUE, IndexLessonJob } from './lesson-index.processor';
 
 export const VIDEO_TRANSCRIBE_QUEUE = 'video-transcription';
 
@@ -28,6 +29,8 @@ export class VideoTranscribeProcessor extends WorkerHost {
     private prisma: PrismaService,
     private storage: StorageService,
     private assemblyai: AssemblyAiService,
+    @InjectQueue(LESSON_INDEX_QUEUE)
+    private lessonIndexQueue: Queue<IndexLessonJob>,
   ) {
     super();
   }
@@ -78,6 +81,18 @@ export class VideoTranscribeProcessor extends WorkerHost {
           data: { durationSec: result.durationSec },
         });
         await this.updateCourseStats(asset.lesson.sectionId);
+      }
+
+      try {
+        await this.lessonIndexQueue.add(
+          'index',
+          { lessonId },
+          { removeOnComplete: true, removeOnFail: 50 },
+        );
+      } catch (err) {
+        this.logger.warn(
+          `Enqueue lesson-index after transcript failed for ${lessonId}: ${(err as Error).message}`,
+        );
       }
 
       this.logger.log(

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 
-export type ChunkSourceType = 'lesson_content' | 'lesson_file';
+export type ChunkSourceType = 'lesson_content' | 'lesson_file' | 'lesson_video';
 
 export interface ChunkRow {
   courseId: string;

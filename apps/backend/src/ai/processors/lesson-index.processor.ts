@@ -36,11 +36,15 @@ const DOCX_MIME =
  * Vector hóa toàn bộ tri thức của một bài học vào course_chunks:
  *  - nội dung soạn tay (description + contentHtml → markdown giữ heading) → 'lesson_content'
  *  - file tài liệu PDF/DOCX đính kèm (LlamaParse → markdown, cache MinIO)   → 'lesson_file'
+ *  - script video giảng viên đăng tải (chương + transcript đã có sẵn)       → 'lesson_video'
  *
  * Trước khi chunk, nội dung được phân vùng dạng TOC: mỗi chunk mang đường dẫn
  * "Tên phần > Tên bài > Đề mục..." (cột sectionTitle) + sectionId/lessonId để
  * truy vấn theo từng phần và dựng mind map toàn khóa; mục lục gộp lưu vào
  * DocumentAsset.tocJson. Nội dung phải qua kiểm duyệt AI trước khi index.
+ *
+ * Nguồn video chỉ lấy từ VideoAsset do giảng viên upload (có videoUrl +
+ * transcriptStatus='ready') — KHÔNG dùng video AI tự sinh (LessonVideoAsset).
  */
 @Processor(LESSON_INDEX_QUEUE, { concurrency: 2 })
 export class LessonIndexProcessor extends WorkerHost {
@@ -68,6 +72,7 @@ export class LessonIndexProcessor extends WorkerHost {
           include: { course: { select: { id: true, instructorId: true } } },
         },
         documentAsset: true,
+        videoAsset: true,
       },
     });
     if (!lesson) {
@@ -130,6 +135,10 @@ export class LessonIndexProcessor extends WorkerHost {
       };
       if (contentMd) pushChunks(contentMd, 'lesson_content');
       if (fileMd) pushChunks(fileMd, 'lesson_file');
+
+      // ── Nguồn 3: script video giảng viên đăng tải (chương + transcript)
+      const videoMd = this.buildVideoMarkdown(lesson.videoAsset, lesson.title);
+      if (videoMd) pushChunks(videoMd, 'lesson_video');
 
       if (rows.length === 0) {
         if (asset) {
@@ -259,6 +268,86 @@ export class LessonIndexProcessor extends WorkerHost {
       }
       throw err;
     }
+  }
+
+  /**
+   * Dựng markdown từ script video do giảng viên đăng tải để vector hóa.
+   * Chỉ áp dụng cho VideoAsset có file upload (videoUrl) đã transcribe xong
+   * (transcriptStatus='ready'); bỏ qua bài chưa transcribe / video AI tự sinh.
+   *
+   * Mỗi chương (segmentsJson) thành một heading "## tên chương" + dòng tóm tắt
+   * sẵn có, kèm phần transcript (cuesJson) rơi trong khung thời gian của chương.
+   * Không có chương thì fallback dùng heading bài + toàn bộ lời thoại.
+   */
+  private buildVideoMarkdown(
+    video:
+      | {
+          videoUrl: string | null;
+          transcriptStatus: string;
+          segmentsJson: unknown;
+          cuesJson: unknown;
+        }
+      | null
+      | undefined,
+    lessonTitle: string,
+  ): string {
+    if (!video?.videoUrl || video.transcriptStatus !== 'ready') return '';
+
+    const chapters = Array.isArray(video.segmentsJson)
+      ? (video.segmentsJson as Array<{
+          startSec?: number;
+          endSec?: number;
+          title?: string;
+          summary?: string;
+        }>)
+      : [];
+    const cues = Array.isArray(video.cuesJson)
+      ? (video.cuesJson as Array<{
+          startSec?: number;
+          endSec?: number;
+          text?: string;
+        }>)
+      : [];
+
+    const cueTextInRange = (start: number, end: number): string =>
+      cues
+        .filter((c) => {
+          const s = typeof c.startSec === 'number' ? c.startSec : -1;
+          return s >= start && s < end && c.text;
+        })
+        .map((c) => c.text!.trim())
+        .join(' ')
+        .trim();
+
+    const blocks: string[] = [];
+    if (chapters.length > 0) {
+      for (const ch of chapters) {
+        const title = ch.title?.trim();
+        if (!title) continue;
+        const start = typeof ch.startSec === 'number' ? ch.startSec : 0;
+        const end =
+          typeof ch.endSec === 'number' ? ch.endSec : Number.MAX_SAFE_INTEGER;
+        const parts = [`## ${title}`];
+        const summary = ch.summary?.trim();
+        if (summary) parts.push(summary);
+        const transcript = cueTextInRange(start, end);
+        if (transcript) parts.push(transcript);
+        blocks.push(parts.join('\n\n'));
+      }
+    }
+
+    // Không có chương dùng được nhưng vẫn có lời thoại → gộp toàn bộ transcript.
+    if (blocks.length === 0) {
+      const full = cues
+        .map((c) => c.text?.trim())
+        .filter((t): t is string => !!t)
+        .join(' ')
+        .trim();
+      if (!full) return '';
+      blocks.push(`## ${lessonTitle}\n\n${full}`);
+    }
+
+    return blocks.join('\n\n').trim();
   }
 
   /**

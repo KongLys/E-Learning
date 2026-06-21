@@ -1,6 +1,6 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { MessageSquare, Network } from 'lucide-react';
@@ -12,7 +12,10 @@ import { AiChatPanel } from '@/components/learn/AiChatPanel';
 
 export default function CourseAiChatPage() {
   const { courseId } = useParams<{ courseId: string }>();
-  const [tab, setTab] = useState<'chat' | 'mindmap'>('chat');
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState<'chat' | 'mindmap'>(
+    searchParams.get('tab') === 'mindmap' ? 'mindmap' : 'chat',
+  );
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">

@@ -69,8 +69,9 @@ export class LessonService {
 
   /**
    * Re-index toàn bộ bài học có nội dung vector hóa được (loại bài quiz; chỉ bài
-   * có tài liệu hoặc mô tả). Dùng để áp lại chunker mới cho dữ liệu cũ — mỗi job
-   * tự dọn chunk cũ (deleteByLesson) nên idempotent. Chạy nền qua BullMQ.
+   * có tài liệu, mô tả, hoặc video giảng viên đã transcribe). Dùng để áp lại
+   * chunker mới cho dữ liệu cũ — mỗi job tự dọn chunk cũ (deleteByLesson) nên
+   * idempotent. Chạy nền qua BullMQ.
    */
   async reindexAllLessons(): Promise<{ enqueued: number }> {
     const lessons = await this.prisma.lesson.findMany({
@@ -79,6 +80,12 @@ export class LessonService {
         OR: [
           { documentAsset: { isNot: null } },
           { description: { not: null } },
+          // Video giảng viên đăng tải đã có script (loại video AI tự sinh).
+          {
+            videoAsset: {
+              is: { videoUrl: { not: null }, transcriptStatus: 'ready' },
+            },
+          },
         ],
       },
       select: { id: true },

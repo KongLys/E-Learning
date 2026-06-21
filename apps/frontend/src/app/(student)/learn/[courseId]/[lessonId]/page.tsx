@@ -13,9 +13,10 @@ import { QuizUI } from '@/components/learn/QuizUI';
 import { ReviewQuizUI } from '@/components/learn/ReviewQuizUI';
 import { LearnSidebar } from '@/components/learn/LearnSidebar';
 import { AiChatPanel } from '@/components/learn/AiChatPanel';
+import { SafeHtml } from '@/components/common/SafeHtml';
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { Check, ChevronDown, ChevronLeft, Clock, FileText, Film, Headphones, Loader2, Menu, MessageSquare, Sparkles } from 'lucide-react';
+import { Check, ChevronDown, ChevronLeft, Clock, FileText, Film, Headphones, Loader2, Menu, MessageSquare, Network, Sparkles } from 'lucide-react';
 
 export default function LearnPage() {
   const { courseId, lessonId } = useParams<{ courseId: string; lessonId: string }>();
@@ -266,6 +267,13 @@ export default function LearnPage() {
           <ChevronLeft size={16} className="shrink-0" />
           <span className="truncate">{courseTitle ?? 'Khóa học của tôi'}</span>
         </Link>
+        <Link
+          href={`/learn/${courseId}/ai?tab=mindmap`}
+          className="text-sm px-3 py-1.5 rounded bg-sky-100 text-sky-700 hover:bg-sky-200"
+          title="Xem sơ đồ tư duy toàn khóa"
+        >
+          <span className="inline-flex items-center gap-1"><Network size={14} /> Sơ đồ tư duy</span>
+        </Link>
         {lesson.type !== 'quiz' && (
           <button
             onClick={() => (aiPanelOpen ? setAiPanelOpen(false) : openAiPanel())}
@@ -399,8 +407,18 @@ export default function LearnPage() {
                 </div>
               ) : null}
 
-              {/* Chỉ tên file + nút tải về — KHÔNG hiển thị nội dung tài liệu */}
-              {docUrlData?.data?.url ? (
+              {/* Nội dung do giảng viên soạn — luôn hiển thị (bài đọc bắt buộc có). */}
+              {lesson.documentAsset?.contentHtml ? (
+                <SafeHtml
+                  html={lesson.documentAsset.contentHtml}
+                  className="prose prose-slate max-w-none prose-img:rounded-xl"
+                />
+              ) : (
+                <div className="rounded-2xl bg-slate-50 py-10 text-center text-gray-400">Nội dung bài đọc chưa được soạn</div>
+              )}
+
+              {/* Tài liệu đính kèm (tùy chọn) — chỉ tên file + nút tải về khi có. */}
+              {docUrlData?.data?.url && (
                 <div className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 p-5">
                   <div className="flex min-w-0 items-center gap-3">
                     <FileText size={28} className="shrink-0 text-gray-500" />
@@ -421,8 +439,6 @@ export default function LearnPage() {
                     Tải về để đọc
                   </a>
                 </div>
-              ) : (
-                <div className="rounded-2xl bg-slate-50 py-10 text-center text-gray-400">Tài liệu chưa được tải lên</div>
               )}
 
               {/* Hỏi đáp (mặc định đóng) */}
