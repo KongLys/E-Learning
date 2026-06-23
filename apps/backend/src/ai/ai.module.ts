@@ -15,6 +15,7 @@ import { GuardrailService } from './guard/guardrail.service';
 import { AiChatService } from './ai-chat.service';
 import { AiChatController } from './ai-chat.controller';
 import { QuizGenerationService } from './quiz-generation.service';
+import { CourseContentService } from './course-content.service';
 import { ChatQuizService } from './chat-quiz.service';
 import { ChatQuizController } from './chat-quiz.controller';
 import {
@@ -76,6 +77,7 @@ import { ModerationModule } from '../moderation/moderation.module';
     GuardrailService,
     AiChatService,
     QuizGenerationService,
+    CourseContentService,
     ChatQuizService,
     ChatSummaryService,
     RaptorService,
@@ -94,6 +96,7 @@ import { ModerationModule } from '../moderation/moderation.module';
     MarkdownChunkerService,
     LlamaParseService,
     QuizGenerationService,
+    CourseContentService,
     RaptorService,
   ],
 })

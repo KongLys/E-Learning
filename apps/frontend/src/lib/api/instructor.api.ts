@@ -14,6 +14,9 @@ export const instructorApi = {
   unpublishCourse: (id: string) => apiClient.post(`/courses/${id}/unpublish`),
   deleteCourse: (id: string) => apiClient.delete(`/courses/${id}`),
   getCourseById: (id: string) => apiClient.get(`/courses/${id}/manage`),
+  // Bật/tắt bài kiểm tra cuối khóa (mặc định bật)
+  toggleFinalQuiz: (id: string, enabled: boolean) =>
+    apiClient.patch(`/courses/${id}/final-quiz`, { enabled }),
 
   // Sections
   getSections: (courseId: string) => apiClient.get(`/courses/${courseId}/sections`),

@@ -12,6 +12,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { ModerationService } from '../moderation/moderation.service';
+import { FinalQuizService } from '../final-quiz/final-quiz.service';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
 import { assertCourseEditable } from '../common/course-editable.util';
@@ -24,6 +25,7 @@ export class CourseService {
     private prisma: PrismaService,
     private storage: StorageService,
     private moderation: ModerationService,
+    private finalQuiz: FinalQuizService,
     private events: EventEmitter2,
   ) {}
 
@@ -431,6 +433,7 @@ export class CourseService {
                 type: true,
                 durationSec: true,
                 isPreview: true,
+                isFinalQuiz: true,
                 orderIndex: true,
               },
             },
@@ -442,10 +445,21 @@ export class CourseService {
     const totalReviews = await this.prisma.review.count({
       where: { courseId: course.id, isHidden: false },
     });
-    return { ...course, totalReviews };
+    // Ẩn bài kiểm tra cuối khóa khỏi xem trước khi tính năng đang tắt.
+    const sections = course.finalQuizEnabled
+      ? course.sections
+      : course.sections
+          .map((s) => ({ ...s, lessons: s.lessons.filter((l) => !l.isFinalQuiz) }))
+          .filter((s) => s.lessons.length > 0);
+    return { ...course, sections, totalReviews };
   }
 
   async getCourseForManage(courseId: string, userId: string, userRole: string) {
+    // Đảm bảo slot quiz cuối khóa tồn tại để giảng viên có thể tự soạn (nếu bật).
+    const base = await this.findOrFail(courseId);
+    this.assertOwnerOrAdmin(base, userId, userRole);
+    await this.finalQuiz.ensureFinalQuiz(courseId);
+
     const course = await this.prisma.course.findUnique({
       where: { id: courseId },
       include: {
@@ -465,10 +479,21 @@ export class CourseService {
                 type: true,
                 durationSec: true,
                 isPreview: true,
+                isFinalQuiz: true,
                 orderIndex: true,
                 moderationStatus: true,
                 moderationLabel: true,
                 moderationReason: true,
+                quizLesson: {
+                  select: {
+                    id: true,
+                    passingScore: true,
+                    aiGenerated: true,
+                    generationStatus: true,
+                    errorMsg: true,
+                    _count: { select: { questions: true } },
+                  },
+                },
                 videoAsset: {
                   select: {
                     fileName: true,

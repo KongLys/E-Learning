@@ -35,6 +35,26 @@ export class QuizAttemptService {
     if (!enrollment)
       throw new ForbiddenException('Not enrolled in this course');
 
+    // Bài kiểm tra cuối khóa chỉ mở khi đã hoàn thành tất cả bài học nội dung (90%).
+    if (quiz.lesson.isFinalQuiz) {
+      const courseId = quiz.lesson.section.courseId;
+      const totalContent = await this.prisma.lesson.count({
+        where: { section: { courseId }, isFinalQuiz: false },
+      });
+      const completedContent = await this.prisma.lessonProgress.count({
+        where: {
+          enrollmentId: enrollment.id,
+          completed: true,
+          lesson: { isFinalQuiz: false },
+        },
+      });
+      if (totalContent > 0 && completedContent < totalContent) {
+        throw new UnprocessableEntityException(
+          'Hãy hoàn thành các bài học trước khi làm bài kiểm tra cuối khóa',
+        );
+      }
+    }
+
     if (quiz.maxAttempts > 0) {
       const attemptCount = await this.prisma.quizAttempt.count({
         where: { quizLessonId, studentId },

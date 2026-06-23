@@ -22,6 +22,7 @@ import { ReviewQuizModule } from './review-quiz/review-quiz.module';
 import { ReferenceMaterialModule } from './reference-material/reference-material.module';
 import { NarrationModule } from './narration/narration.module';
 import { LessonVideoModule } from './lesson-video/lesson-video.module';
+import { FinalQuizModule } from './final-quiz/final-quiz.module';
 import { OrderModule } from './order/order.module';
 import { PaymentModule } from './payment/payment.module';
 import { NoteModule } from './note/note.module';
@@ -115,6 +116,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
     ReferenceMaterialModule,
     NarrationModule,
     LessonVideoModule,
+    FinalQuizModule,
     OrderModule,
     PaymentModule,
     NoteModule,

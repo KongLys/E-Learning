@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, type ReactNode } from 'react';
-import { Check, ChevronDown, Film, FileText, Paperclip, Play, X } from 'lucide-react';
+import { Check, ChevronDown, Film, FileText, Lock, Paperclip, Play, X } from 'lucide-react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { myReviewQuizApi } from '@/lib/api/ai.api';
@@ -47,6 +47,15 @@ type Viewer = { title: string; kind: MaterialKind; url: string };
 export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections, lessonProgress, progressPercent, isOpen, collapsed, onClose, onNavigate, onOpenMyQuiz, onOpenReviewQuiz, activeQuizKey }: LearnSidebarProps) {
   const completedIds = new Set(lessonProgress.filter((lp: any) => lp.completed).map((lp: any) => lp.lessonId));
   const [viewer, setViewer] = useState<Viewer | null>(null);
+
+  // Bài kiểm tra cuối khóa chỉ mở khi đã hoàn thành tất cả bài học nội dung.
+  const contentLessonIds = sections
+    .flatMap((s: any) => s.lessons ?? [])
+    .filter((l: any) => !l.isFinalQuiz)
+    .map((l: any) => l.id);
+  const contentComplete =
+    contentLessonIds.length > 0 &&
+    contentLessonIds.every((id: string) => completedIds.has(id));
 
   const myQuizzesQuery = useQuery({
     queryKey: ['my-review-quizzes', courseId],
@@ -137,24 +146,49 @@ export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections,
                   // chỉ tô sáng mục quiz ôn tập (tránh 2 mục cùng active).
                   const isCurrent = lesson.id === currentLessonId && !activeQuizKey;
                   const isCompleted = completedIds.has(lesson.id);
+                  // Khóa bài kiểm tra cuối khóa đến khi hoàn thành các bài nội dung.
+                  const locked = lesson.isFinalQuiz && !contentComplete && !isCompleted;
+
+                  const inner = (
+                    <>
+                      {/* Status circle */}
+                      {isCompleted ? (
+                        <span className="mt-0.5 w-5 h-5 shrink-0 rounded-full bg-green-500 text-white flex items-center justify-center"><Check size={12} /></span>
+                      ) : locked ? (
+                        <span className="mt-0.5 w-5 h-5 shrink-0 rounded-full border-2 border-gray-300 text-gray-400 flex items-center justify-center"><Lock size={11} /></span>
+                      ) : (
+                        <span className={`mt-0.5 w-5 h-5 shrink-0 rounded-full border-2 ${isCurrent ? 'border-blue-500' : 'border-gray-300'}`} />
+                      )}
+                      <span className="min-w-0">
+                        <span className={`block text-sm leading-snug ${isCurrent ? 'text-blue-700 font-semibold' : locked ? 'text-gray-400' : 'text-gray-800'}`}>
+                          {lesson.title}
+                          {lesson.isFinalQuiz && <span className="ml-1.5 align-middle text-[10px] font-semibold uppercase tracking-wide text-amber-600">Cuối khóa</span>}
+                        </span>
+                        <span className="block text-xs text-gray-400 mt-0.5">
+                          {locked ? 'Hoàn thành các bài học để mở' : durationLabel(lesson.type, lesson.durationSec)}
+                        </span>
+                      </span>
+                    </>
+                  );
+
                   return (
                     <li key={lesson.id}>
-                      <Link
-                        href={`/learn/${courseId}/${lesson.id}`}
-                        onClick={onNavigate ?? onClose}
-                        className={`flex items-start gap-3 px-5 py-3 border-l-[3px] transition-colors ${isCurrent ? 'bg-blue-50 border-blue-500' : 'border-transparent hover:bg-gray-50'}`}
-                      >
-                        {/* Status circle */}
-                        {isCompleted ? (
-                          <span className="mt-0.5 w-5 h-5 shrink-0 rounded-full bg-green-500 text-white flex items-center justify-center"><Check size={12} /></span>
-                        ) : (
-                          <span className={`mt-0.5 w-5 h-5 shrink-0 rounded-full border-2 ${isCurrent ? 'border-blue-500' : 'border-gray-300'}`} />
-                        )}
-                        <span className="min-w-0">
-                          <span className={`block text-sm leading-snug ${isCurrent ? 'text-blue-700 font-semibold' : 'text-gray-800'}`}>{lesson.title}</span>
-                          <span className="block text-xs text-gray-400 mt-0.5">{durationLabel(lesson.type, lesson.durationSec)}</span>
-                        </span>
-                      </Link>
+                      {locked ? (
+                        <div
+                          className="flex items-start gap-3 px-5 py-3 border-l-[3px] border-transparent cursor-not-allowed select-none"
+                          title="Hoàn thành các bài học trước để mở bài kiểm tra cuối khóa"
+                        >
+                          {inner}
+                        </div>
+                      ) : (
+                        <Link
+                          href={`/learn/${courseId}/${lesson.id}`}
+                          onClick={onNavigate ?? onClose}
+                          className={`flex items-start gap-3 px-5 py-3 border-l-[3px] transition-colors ${isCurrent ? 'bg-blue-50 border-blue-500' : 'border-transparent hover:bg-gray-50'}`}
+                        >
+                          {inner}
+                        </Link>
+                      )}
                     </li>
                   );
                 })}

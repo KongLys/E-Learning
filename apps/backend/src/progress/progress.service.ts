@@ -101,6 +101,16 @@ export class ProgressService {
           );
         }
       }
+    } else if (lesson.type === 'quiz') {
+      // Bài kiểm tra chỉ hoàn thành khi học viên đã có lần làm ĐẠT.
+      const passed = await this.prisma.quizAttempt.count({
+        where: { studentId, isPassed: true, quizLesson: { lessonId } },
+      });
+      if (passed === 0) {
+        throw new UnprocessableEntityException(
+          'Bạn cần vượt qua bài kiểm tra trước khi hoàn thành',
+        );
+      }
     }
 
     await this.prisma.lessonProgress.upsert({
@@ -124,16 +134,37 @@ export class ProgressService {
   }
 
   async recalculateProgress(enrollmentId: string, courseId: string) {
-    const totalLessons = await this.prisma.lesson.count({
-      where: { section: { courseId } },
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
+      select: { finalQuizEnabled: true },
     });
 
-    const completedCount = await this.prisma.lessonProgress.count({
-      where: { enrollmentId, completed: true },
+    // Bài học nội dung (loại trừ bài kiểm tra cuối khóa).
+    const totalContent = await this.prisma.lesson.count({
+      where: { section: { courseId }, isFinalQuiz: false },
+    });
+    const completedContent = await this.prisma.lessonProgress.count({
+      where: { enrollmentId, completed: true, lesson: { isFinalQuiz: false } },
     });
 
-    const progressPercent =
-      totalLessons > 0 ? (completedCount / totalLessons) * 100 : 0;
+    // Bài kiểm tra cuối khóa (nếu có & đang bật) chiếm 10%, nội dung 90%.
+    const finalQuizLesson = await this.prisma.lesson.findFirst({
+      where: { section: { courseId }, isFinalQuiz: true },
+      select: { id: true },
+    });
+    const hasFinalQuiz = !!finalQuizLesson && course?.finalQuizEnabled !== false;
+
+    let progressPercent: number;
+    if (hasFinalQuiz) {
+      const contentRatio = totalContent > 0 ? completedContent / totalContent : 1;
+      const finalQuizPassed = await this.prisma.lessonProgress.count({
+        where: { enrollmentId, lessonId: finalQuizLesson!.id, completed: true },
+      });
+      progressPercent = contentRatio * 90 + (finalQuizPassed > 0 ? 10 : 0);
+    } else {
+      progressPercent =
+        totalContent > 0 ? (completedContent / totalContent) * 100 : 0;
+    }
     const status = progressPercent >= 100 ? 'completed' : 'active';
 
     const previous = await this.prisma.enrollment.findUnique({

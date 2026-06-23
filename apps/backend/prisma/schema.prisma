@@ -172,6 +172,7 @@ model Course {
   level            CourseLevel  @default(beginner)
   language         String       @default("vi")
   status           CourseStatus @default(draft)
+  finalQuizEnabled Boolean      @default(true) @map("final_quiz_enabled")
   rejectionReason  String?      @map("rejection_reason")
   avgRating        Float        @default(0) @map("avg_rating")
   totalStudents    Int          @default(0) @map("total_students")
@@ -240,6 +241,7 @@ model Lesson {
   orderIndex  Int        @map("order_index")
   durationSec Int        @default(0) @map("duration_sec")
   isPreview   Boolean    @default(false) @map("is_preview")
+  isFinalQuiz Boolean    @default(false) @map("is_final_quiz")
   createdAt   DateTime   @default(now()) @map("created_at")
 
   // Kiểm duyệt AI cho nội dung bài học (description + contentHtml + file tài liệu)
@@ -365,6 +367,14 @@ model QuizLesson {
   passingScore Int    @default(70) @map("passing_score")
   timeLimit    Int?   @map("time_limit")
   maxAttempts  Int    @default(0) @map("max_attempts")
+
+  // Dùng cho quiz cuối khóa (isFinalQuiz): aiGenerated=true ⇒ AI sinh, được phép
+  // ghi đè khi regen; false ⇒ giảng viên tự soạn, KHÔNG ghi đè. sourceHash chặn
+  // sinh lại thừa khi nội dung không đổi.
+  aiGenerated     Boolean @default(false) @map("ai_generated")
+  generationStatus String? @map("generation_status") // pending|generating|ready|failed
+  sourceHash      String? @map("source_hash")
+  errorMsg        String? @map("error_msg")
 
   lesson    Lesson         @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   questions QuizQuestion[]

@@ -71,6 +71,7 @@ export class QuizService {
       include: { options: true },
     });
 
+    await this.markInstructorAuthoredIfFinalQuiz(lesson, quiz.id);
     return question;
   }
 
@@ -94,7 +95,7 @@ export class QuizService {
     this.validateOptions(dto);
 
     await this.prisma.quizOption.deleteMany({ where: { questionId } });
-    return this.prisma.quizQuestion.update({
+    const updated = await this.prisma.quizQuestion.update({
       where: { id: questionId },
       data: {
         content: dto.content,
@@ -112,6 +113,11 @@ export class QuizService {
       },
       include: { options: true },
     });
+    await this.markInstructorAuthoredIfFinalQuiz(
+      lesson,
+      question.quizLessonId,
+    );
+    return updated;
   }
 
   async deleteQuestion(questionId: string, userId: string, userRole: string) {
@@ -127,7 +133,23 @@ export class QuizService {
     );
     assertCourseEditable(lesson.section.course.status);
     await this.prisma.quizQuestion.delete({ where: { id: questionId } });
+    await this.markInstructorAuthoredIfFinalQuiz(lesson, question.quizLessonId);
     return { message: 'Question deleted' };
+  }
+
+  /**
+   * Khi giảng viên tự sửa câu hỏi của bài kiểm tra cuối khóa → đánh dấu
+   * `aiGenerated=false` để AI KHÔNG ghi đè bộ câu hỏi do giảng viên soạn.
+   */
+  private async markInstructorAuthoredIfFinalQuiz(
+    lesson: { isFinalQuiz: boolean },
+    quizLessonId: string,
+  ) {
+    if (!lesson.isFinalQuiz) return;
+    await this.prisma.quizLesson.update({
+      where: { id: quizLessonId },
+      data: { aiGenerated: false, generationStatus: 'ready', errorMsg: null },
+    });
   }
 
   async getQuiz(lessonId: string, userId: string, userRole: string) {

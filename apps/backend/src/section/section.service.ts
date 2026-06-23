@@ -95,7 +95,11 @@ export class SectionService {
   }
 
   async getSections(courseId: string) {
-    return this.prisma.section.findMany({
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
+      select: { finalQuizEnabled: true },
+    });
+    const sections = await this.prisma.section.findMany({
       where: { courseId },
       orderBy: { orderIndex: 'asc' },
       include: {
@@ -107,6 +111,7 @@ export class SectionService {
             type: true,
             durationSec: true,
             isPreview: true,
+            isFinalQuiz: true,
             orderIndex: true,
             videoAsset: { select: { videoUrl: true, fileName: true } },
             documentAsset: { select: { fileUrl: true, fileName: true, fileType: true } },
@@ -114,6 +119,17 @@ export class SectionService {
         },
       },
     });
+
+    // Khi tắt quiz cuối khóa: ẩn bài kiểm tra cuối khóa khỏi chương trình học.
+    if (course?.finalQuizEnabled === false) {
+      return sections
+        .map((s) => ({
+          ...s,
+          lessons: s.lessons.filter((l) => !l.isFinalQuiz),
+        }))
+        .filter((s) => s.lessons.length > 0);
+    }
+    return sections;
   }
 
   private async assertCourseOwner(

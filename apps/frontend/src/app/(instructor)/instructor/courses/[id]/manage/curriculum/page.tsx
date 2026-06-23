@@ -10,7 +10,7 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { AddLessonModal } from '@/components/instructor/AddLessonModal';
 import { LessonTypeIcon, type LessonType } from '@/components/instructor/lessonTypeMeta';
 import Link from 'next/link';
-import { Check, ChevronDown, FileText, GripVertical, Pencil, Plus, Trash2, Video, X } from 'lucide-react';
+import { Check, ChevronDown, FileText, GraduationCap, GripVertical, Pencil, Plus, Sparkles, Trash2, Video, X } from 'lucide-react';
 import {
   DndContext,
   KeyboardSensor,
@@ -42,6 +42,7 @@ interface Lesson {
   id: string;
   title: string;
   type: LessonType;
+  isFinalQuiz?: boolean;
   videoAsset?: LessonAsset | null;
   documentAsset?: LessonAsset | null;
 }
@@ -282,13 +283,48 @@ export default function CourseCurriculumPage() {
     queryFn: () => instructorApi.getSections(id),
   });
 
-  const sections: Section[] = data?.data ?? [];
+  // Dữ liệu quản lý (đảm bảo slot quiz cuối khóa tồn tại + cờ bật/tắt + trạng thái AI).
+  const manageQuery = useQuery({
+    queryKey: ['course-manage', id],
+    queryFn: () => instructorApi.getCourseById(id),
+  });
+  const manage = manageQuery.data?.data as
+    | { finalQuizEnabled?: boolean; sections?: Section[] }
+    | undefined;
+  const finalQuizEnabled = manage?.finalQuizEnabled ?? true;
+  const finalQuizLesson = (manage?.sections ?? [])
+    .flatMap((s) => s.lessons ?? [])
+    .find((l) => l.isFinalQuiz) as
+    | (Lesson & {
+        quizLesson?: {
+          generationStatus?: string | null;
+          aiGenerated?: boolean;
+          _count?: { questions: number };
+        } | null;
+      })
+    | undefined;
+
+  // Loại trừ phần "Kiểm tra cuối khóa" khỏi danh sách kéo-thả (được quản lý riêng).
+  const allSections: Section[] = data?.data ?? [];
+  const sections: Section[] = allSections.filter(
+    (s) => !(s.lessons ?? []).some((l) => l.isFinalQuiz),
+  );
   const totalLessons = sections.reduce((sum, s) => sum + (s.lessons?.length ?? 0), 0);
   const allCollapsed = sections.length > 0 && sections.every((s) => collapsed.has(s.id));
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['course-edit', id] });
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['course-edit', id] });
+    qc.invalidateQueries({ queryKey: ['course-manage', id] });
+  };
   const onErr = (err: unknown) =>
     setError((err as ApiErrorShape).response?.data?.message ?? 'Có lỗi xảy ra, vui lòng thử lại.');
+
+  const toggleFinalQuizMutation = useMutation({
+    mutationFn: (enabled: boolean) => instructorApi.toggleFinalQuiz(id, enabled),
+    onMutate: () => setError(''),
+    onSuccess: invalidate,
+    onError: onErr,
+  });
 
   // ----- Sections -----
   const addSectionMutation = useMutation({
@@ -467,6 +503,67 @@ export default function CourseCurriculumPage() {
       </header>
 
       {error && <ErrorMessage message={error} />}
+
+      {/* Bài kiểm tra cuối khóa */}
+      <div className="rounded-card border border-hairline bg-surface-card p-4">
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+            <GraduationCap size={18} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold text-ink">Bài kiểm tra cuối khóa</h2>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={finalQuizEnabled}
+                disabled={toggleFinalQuizMutation.isPending}
+                onClick={() => toggleFinalQuizMutation.mutate(!finalQuizEnabled)}
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${finalQuizEnabled ? 'bg-sky' : 'bg-hairline-strong'}`}
+              >
+                <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${finalQuizEnabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-muted">
+              Luôn nằm ở cuối khóa và chiếm <strong>10% tiến độ</strong>. Nếu bạn không tự soạn,
+              hệ thống sẽ tự tạo bằng AI (~30 câu bao quát các chương) khi khóa được duyệt xuất bản.
+            </p>
+
+            {finalQuizEnabled && finalQuizLesson && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1 rounded-full bg-canvas-soft px-2.5 py-1 text-xs text-ink-mute">
+                  {finalQuizLesson.quizLesson?._count?.questions ?? 0} câu hỏi
+                </span>
+                {finalQuizLesson.quizLesson?.aiGenerated ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2.5 py-1 text-xs text-violet-700">
+                    <Sparkles size={12} /> AI tạo
+                  </span>
+                ) : (finalQuizLesson.quizLesson?._count?.questions ?? 0) > 0 ? (
+                  <span className="inline-flex items-center rounded-full bg-leaf-soft px-2.5 py-1 text-xs text-leaf">
+                    Giảng viên soạn
+                  </span>
+                ) : null}
+                {finalQuizLesson.quizLesson?.generationStatus === 'generating' && (
+                  <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs text-amber-700">
+                    Đang tạo bằng AI…
+                  </span>
+                )}
+                {finalQuizLesson.quizLesson?.generationStatus === 'failed' && (
+                  <span className="inline-flex items-center rounded-full bg-coral-soft px-2.5 py-1 text-xs text-coral">
+                    Tạo thất bại
+                  </span>
+                )}
+                <Link
+                  href={`/instructor/courses/${id}/curriculum/${finalQuizLesson.id}`}
+                  className="ml-auto inline-flex items-center gap-1 rounded-full border border-hairline px-3 py-1 text-xs font-medium text-sky hover:bg-sky-soft"
+                >
+                  <Pencil size={12} /> Tự soạn câu hỏi
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* Tổng quan + thu gọn/mở rộng */}
       {sections.length > 0 && (
