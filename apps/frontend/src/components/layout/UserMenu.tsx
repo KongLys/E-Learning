@@ -86,6 +86,11 @@ export function UserMenu() {
                   Khóa học của tôi
                 </Link>
               )}
+              {user.role === 'student' && (
+                <Link href="/certificates" onClick={() => setOpen(false)} className="block px-4 py-2 text-sm text-muted hover:text-ink hover:bg-canvas transition-colors">
+                  Chứng chỉ của tôi
+                </Link>
+              )}
               {user.role === 'instructor' && (
                 <Link href="/instructor/dashboard" onClick={() => setOpen(false)} className="block px-4 py-2 text-sm text-muted hover:text-ink hover:bg-canvas transition-colors">
                   Trang giảng viên

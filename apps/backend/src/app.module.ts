@@ -23,6 +23,7 @@ import { ReferenceMaterialModule } from './reference-material/reference-material
 import { NarrationModule } from './narration/narration.module';
 import { LessonVideoModule } from './lesson-video/lesson-video.module';
 import { FinalQuizModule } from './final-quiz/final-quiz.module';
+import { CertificateModule } from './certificate/certificate.module';
 import { OrderModule } from './order/order.module';
 import { PaymentModule } from './payment/payment.module';
 import { NoteModule } from './note/note.module';
@@ -117,6 +118,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
     NarrationModule,
     LessonVideoModule,
     FinalQuizModule,
+    CertificateModule,
     OrderModule,
     PaymentModule,
     NoteModule,

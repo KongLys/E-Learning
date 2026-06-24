@@ -8,7 +8,7 @@ import { ProgressBar } from '@/components/ui/ProgressBar';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowRight, BookOpen, Check, MessageSquare, Users } from 'lucide-react';
+import { Award, ArrowRight, BookOpen, Check, MessageSquare, Users } from 'lucide-react';
 
 export default function MyCoursesPage() {
   const router = useRouter();
@@ -32,7 +32,16 @@ export default function MyCoursesPage() {
   return (
     <div className="min-h-screen bg-canvas">
       <div className="max-w-300 mx-auto px-6 py-10">
-        <h1 className="font-display text-4xl text-ink mb-8">Khóa học của tôi</h1>
+        <div className="flex items-center justify-between gap-4 mb-8">
+          <h1 className="font-display text-4xl text-ink">Khóa học của tôi</h1>
+          <Link
+            href="/certificates"
+            className="inline-flex h-9 items-center gap-1.5 px-4 rounded-pill border border-hairline-strong text-ink text-sm font-medium hover:bg-surface-strong transition-colors shrink-0"
+          >
+            <Award size={15} />
+            Chứng chỉ của tôi
+          </Link>
+        </div>
 
         {enrollments.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
@@ -98,6 +107,15 @@ export default function MyCoursesPage() {
                     >
                       {hasStarted ? 'Tiếp tục học' : 'Bắt đầu học'}
                     </Link>
+                    {isCompleted && (
+                      <Link
+                        href={`/certificates?courseId=${enrollment.courseId}`}
+                        className="w-full inline-flex h-9 items-center justify-center gap-1.5 mt-2 rounded-pill bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 transition-colors"
+                      >
+                        <Award size={14} />
+                        Xem chứng chỉ
+                      </Link>
+                    )}
                     {course?.instructor?.id && (
                       <button
                         onClick={() =>

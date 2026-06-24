@@ -16,7 +16,7 @@ import { AiChatPanel } from '@/components/learn/AiChatPanel';
 import { SafeHtml } from '@/components/common/SafeHtml';
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { Check, ChevronDown, ChevronLeft, Clock, FileText, Film, Headphones, Loader2, Menu, MessageSquare, Network, Sparkles } from 'lucide-react';
+import { Award, Check, ChevronDown, ChevronLeft, Clock, FileText, Film, Headphones, Loader2, Menu, MessageSquare, Network, Sparkles } from 'lucide-react';
 
 export default function LearnPage() {
   const { courseId, lessonId } = useParams<{ courseId: string; lessonId: string }>();
@@ -267,6 +267,15 @@ export default function LearnPage() {
           <ChevronLeft size={16} className="shrink-0" />
           <span className="truncate">{courseTitle ?? 'Khóa học của tôi'}</span>
         </Link>
+        {(progress?.status === 'completed' || (progress?.progressPercent ?? 0) >= 100) && (
+          <Link
+            href={`/certificates?courseId=${courseId}`}
+            className="text-sm px-3 py-1.5 rounded bg-amber-100 text-amber-700 hover:bg-amber-200"
+            title="Xem chứng chỉ hoàn thành khóa học"
+          >
+            <span className="inline-flex items-center gap-1"><Award size={14} /> Chứng chỉ</span>
+          </Link>
+        )}
         <Link
           href={`/learn/${courseId}/ai?tab=mindmap`}
           className="text-sm px-3 py-1.5 rounded bg-sky-100 text-sky-700 hover:bg-sky-200"

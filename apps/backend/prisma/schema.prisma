@@ -122,6 +122,7 @@ model User {
 
   courses              Course[]
   enrollments          Enrollment[]
+  certificates         Certificate[]
   orders               Order[]
   notes                Note[]
   quickQuestions       QuickQuestion[]
@@ -199,6 +200,7 @@ model Course {
   category           Category?           @relation(fields: [categoryId], references: [id])
   sections           Section[]
   enrollments        Enrollment[]
+  certificates       Certificate[]
   orderItems         OrderItem[]
   reviews            Review[]
   communityPosts     CommunityPost[]
@@ -542,6 +544,21 @@ model Enrollment {
   @@index([studentId])
   @@index([courseId])
   @@map("enrollments")
+}
+
+model Certificate {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  studentId String   @map("student_id")
+  courseId  String   @map("course_id")
+  issuedAt  DateTime @default(now()) @map("issued_at")
+
+  student User   @relation(fields: [studentId], references: [id])
+  course  Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, courseId])
+  @@index([studentId])
+  @@map("certificates")
 }
 
 model LessonProgress {
