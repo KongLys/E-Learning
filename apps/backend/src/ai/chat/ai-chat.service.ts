@@ -142,7 +142,7 @@ export class AiChatService {
       );
     }
     if (guard.verdict === 'block') {
-      function* refusalStream(): Generator<string> {
+      async function* refusalStream(): AsyncGenerator<string> {
         yield REFUSAL_MESSAGE;
       }
       return {
@@ -225,6 +225,124 @@ export class AiChatService {
       conversationId: conv.id,
       persist: (fullText: string) =>
         persistAssistant(fullText, result.citations)(),
+      getQuiz: (): CreatedQuizInfo | null => null,
+    };
+  }
+
+  /**
+   * Giải thích đáp án một câu quiz ôn tập (do AI sinh). Tra câu hỏi authoritative
+   * từ DB (đáp án đúng + chunk nguồn đã lưu), uỷ quyền sinh cho `rag.explainQuizAnswer`,
+   * rồi lưu cặp hỏi/đáp vào hội thoại để hiện trong panel chat.
+   */
+  async explainQuizAnswer(
+    conversationId: string,
+    userId: string,
+    body: { questionId: string; pickedOptionIds: string[] },
+  ) {
+    const conv = await this.loadConversation(conversationId, userId);
+
+    const question = await this.prisma.reviewQuizQuestion.findUnique({
+      where: { id: body.questionId },
+      include: {
+        options: { orderBy: { orderIndex: 'asc' } },
+        reviewQuiz: {
+          select: {
+            userId: true,
+            courseId: true,
+            lessonId: true,
+            sourceChunkIds: true,
+            lesson: { select: { section: { select: { courseId: true } } } },
+          },
+        },
+      },
+    });
+    if (!question) throw new NotFoundException('Quiz question not found');
+
+    const rq = question.reviewQuiz;
+    const questionCourseId = rq.lesson?.section?.courseId ?? rq.courseId ?? null;
+    if (!questionCourseId || questionCourseId !== conv.courseId) {
+      throw new ForbiddenException('Quiz question does not belong to this course');
+    }
+    if (rq.userId && rq.userId !== userId) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    // Nhãn A/B/C/D theo thứ tự lựa chọn; server là nguồn tin cậy cho đúng/sai.
+    const labelFor = (i: number) => String.fromCharCode(65 + i);
+    const pickedSet = new Set(body.pickedOptionIds);
+    const optionsLabeled = question.options.map((o, i) => ({
+      label: labelFor(i),
+      content: o.content,
+    }));
+    const correctLabels: string[] = [];
+    const pickedLabels: string[] = [];
+    const correctIds: string[] = [];
+    question.options.forEach((o, i) => {
+      if (o.isCorrect) {
+        correctLabels.push(labelFor(i));
+        correctIds.push(o.id);
+      }
+      if (pickedSet.has(o.id)) pickedLabels.push(labelFor(i));
+    });
+    const isCorrect =
+      correctIds.length === body.pickedOptionIds.length &&
+      correctIds.every((id) => pickedSet.has(id));
+    const verdict =
+      body.pickedOptionIds.length === 0
+        ? 'không chọn'
+        : isCorrect
+          ? 'đúng'
+          : 'sai';
+
+    const scope = rq.lessonId ? { lessonId: rq.lessonId } : undefined;
+
+    const userMessage = `Giải thích câu hỏi ôn tập: "${question.content}". Đáp án đúng: ${correctLabels.join(', ') || '(không xác định)'}. Lựa chọn của tôi: ${pickedLabels.join(', ') || '(không chọn)'} (${verdict}). Vì sao?`;
+
+    await this.prisma.aiMessage.create({
+      data: { conversationId: conv.id, role: 'user', content: userMessage },
+    });
+
+    const { stream, citations } = await this.rag.explainQuizAnswer({
+      courseId: conv.courseId,
+      scope,
+      questionText: question.content,
+      optionsLabeled,
+      correctLabels,
+      pickedLabels,
+      verdict,
+      storedExplanation: question.explanation,
+      chunkIds: rq.sourceChunkIds ?? [],
+    });
+
+    const persist = async (fullText: string) => {
+      await this.prisma.aiMessage.create({
+        data: {
+          conversationId: conv.id,
+          role: 'assistant',
+          content: fullText,
+          citations: citations as unknown as Prisma.InputJsonValue,
+        },
+      });
+      await this.prisma.aiConversation.update({
+        where: { id: conv.id },
+        data: {
+          updatedAt: new Date(),
+          ...(conv.title ? {} : { title: userMessage.slice(0, 80) }),
+        },
+      });
+    };
+
+    async function* scrubbedStream(
+      src: AsyncIterable<string>,
+    ): AsyncGenerator<string> {
+      for await (const piece of src) yield scrubOutput(piece);
+    }
+
+    return {
+      stream: scrubbedStream(stream),
+      citations,
+      conversationId: conv.id,
+      persist,
       getQuiz: (): CreatedQuizInfo | null => null,
     };
   }

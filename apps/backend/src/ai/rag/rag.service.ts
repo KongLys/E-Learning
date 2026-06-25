@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../../prisma/prisma.service';
 import { GeminiService } from '../providers/gemini.service';
 import { CohereService } from '../providers/cohere.service';
 import {
@@ -10,9 +11,11 @@ import {
 import {
   SYSTEM_INSTRUCTION,
   NO_CONTEXT_MESSAGE,
+  QUIZ_EXPLAIN_SYSTEM_INSTRUCTION,
   buildAnswerPrompt,
   buildCompressionPrompt,
   buildQueryAnalysisPrompt,
+  buildQuizExplainPrompt,
   QueryAnalysis,
 } from './prompts';
 
@@ -40,6 +43,7 @@ export class RagService {
   private readonly rerankMinScore: number;
 
   constructor(
+    private prisma: PrismaService,
     private gemini: GeminiService,
     private cohere: CohereService,
     private vector: VectorStoreService,
@@ -142,6 +146,110 @@ export class RagService {
     });
 
     return { stream, citations, contextChunks: topK };
+  }
+
+  /**
+   * Giải thích đáp án một câu quiz ôn tập. Khác `ask`: bằng chứng là các CourseChunk
+   * THẬT (nạp theo ID đã lưu lúc sinh quiz, fallback hybridSearch nếu trống) → rerank
+   * chọn vài đoạn liên quan nhất → sinh giải thích bám đáp án đúng. Không từ chối kiểu
+   * "chưa đề cập".
+   */
+  async explainQuizAnswer(input: {
+    courseId: string;
+    scope?: ChunkScope;
+    questionText: string;
+    optionsLabeled: { label: string; content: string }[];
+    correctLabels: string[];
+    pickedLabels: string[];
+    verdict: string;
+    storedExplanation?: string | null;
+    chunkIds: string[];
+  }): Promise<{ stream: AsyncIterable<string>; citations: Citation[] }> {
+    const TOP_K = 3;
+
+    // 1. Nạp chunk nguồn thật theo ID đã lưu; fallback hybridSearch theo scope.
+    let candidates: RetrievedChunk[] = [];
+    if (input.chunkIds.length > 0) {
+      const rows = await this.prisma.courseChunk.findMany({
+        where: { id: { in: input.chunkIds } },
+        select: {
+          id: true,
+          content: true,
+          sectionTitle: true,
+          pageNumber: true,
+          sectionId: true,
+          lessonId: true,
+        },
+      });
+      candidates = rows.map((r) => ({
+        id: r.id,
+        content: r.content,
+        sectionTitle: r.sectionTitle,
+        pageNumber: r.pageNumber,
+        sectionId: r.sectionId,
+        lessonId: r.lessonId,
+        sourceType: '',
+        score: 0,
+      }));
+    }
+    if (candidates.length === 0) {
+      try {
+        const embedding = await this.gemini.embedQuery(input.questionText);
+        candidates = await this.vector.hybridSearch(
+          input.courseId,
+          embedding,
+          input.questionText,
+          this.retrieveTop,
+          input.scope,
+        );
+      } catch (err) {
+        this.logger.warn(
+          `Quiz explain: fallback retrieval failed: ${(err as Error).message}`,
+        );
+        candidates = [];
+      }
+    }
+
+    // 2. Rerank chọn TOP_K đoạn sát câu hỏi nhất.
+    let selected = candidates.slice(0, TOP_K);
+    if (candidates.length > TOP_K) {
+      const reranked = await this.cohere.rerank(
+        input.questionText,
+        candidates.map((c) => c.content),
+        TOP_K,
+      );
+      selected = reranked.map((r) => candidates[r.index]);
+    }
+
+    // 3. Citations + prompt giải thích.
+    const citations: Citation[] = selected.map((c) => ({
+      chunkId: c.id,
+      sectionTitle: c.sectionTitle,
+      pageNumber: c.pageNumber,
+      sectionId: c.sectionId,
+      lessonId: c.lessonId,
+      excerpt: truncateExcerpt(c.content),
+    }));
+    const prompt = buildQuizExplainPrompt({
+      questionContent: input.questionText,
+      optionsLabeled: input.optionsLabeled,
+      correctLabels: input.correctLabels,
+      pickedLabels: input.pickedLabels,
+      verdict: input.verdict,
+      storedExplanation: input.storedExplanation,
+      evidenceChunks: selected.map((c) => c.content),
+      citations: selected.map((c, i) => ({
+        index: i,
+        sectionTitle: c.sectionTitle,
+        pageNumber: c.pageNumber,
+      })),
+    });
+    const stream = this.gemini.generateStream(prompt, {
+      systemInstruction: QUIZ_EXPLAIN_SYSTEM_INSTRUCTION,
+      temperature: 0.3,
+    });
+
+    return { stream, citations };
   }
 
   private async analyzeQuery(

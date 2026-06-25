@@ -84,13 +84,13 @@ export class ReviewQuizService {
     const lesson = await this.assertLessonAccess(lessonId, userId, userRole);
     const courseId = lesson.section.course.id;
     const source = await this.collectLessonContent(courseId, lessonId, lesson);
-    if (source.length < MIN_SOURCE_CHARS) {
+    if (source.text.length < MIN_SOURCE_CHARS) {
       throw new UnprocessableEntityException(
         'Bài học chưa có đủ nội dung để tạo quiz ôn tập',
       );
     }
 
-    const questions = await this.quizGen.generate(source, {
+    const questions = await this.quizGen.generate(source.text, {
       count: QUESTION_COUNT,
     });
 
@@ -101,6 +101,7 @@ export class ReviewQuizService {
         data: {
           lessonId,
           model: this.quizGen.usedModel,
+          sourceChunkIds: source.chunkIds,
           questions: {
             create: questions.map((q, qi) => ({
               content: q.content,
@@ -237,7 +238,7 @@ export class ReviewQuizService {
       videoAsset: { transcript: string | null } | null;
       documentAsset: { contentHtml: string | null } | null;
     },
-  ): Promise<string> {
+  ): Promise<{ text: string; chunkIds: string[] }> {
     // 1. Đảm bảo RAPTOR sẵn sàng (trigger + poll nếu chưa build).
     await this.ensureRaptorReady(courseId);
 
@@ -261,8 +262,9 @@ export class ReviewQuizService {
     const chunks = await this.prisma.courseChunk.findMany({
       where: { lessonId },
       orderBy: { chunkIndex: 'asc' },
-      select: { content: true },
+      select: { id: true, content: true },
     });
+    const chunkIds = chunks.map((c) => c.id);
     for (const c of chunks) detailParts.push(c.content);
 
     if (lesson.videoAsset?.transcript) detailParts.push(lesson.videoAsset.transcript);
@@ -280,13 +282,14 @@ export class ReviewQuizService {
       .join('\n\n')
       .slice(0, chunkLimit);
 
-    if (summarySection && chunkSection) {
-      return `${summarySection}\n\n=== NỘI DUNG CHI TIẾT ===\n${chunkSection}`.slice(
-        0,
-        MAX_SOURCE_CHARS,
-      );
-    }
-    return (summarySection || chunkSection).slice(0, MAX_SOURCE_CHARS);
+    const text =
+      summarySection && chunkSection
+        ? `${summarySection}\n\n=== NỘI DUNG CHI TIẾT ===\n${chunkSection}`.slice(
+            0,
+            MAX_SOURCE_CHARS,
+          )
+        : (summarySection || chunkSection).slice(0, MAX_SOURCE_CHARS);
+    return { text, chunkIds };
   }
 
   /**

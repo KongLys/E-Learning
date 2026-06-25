@@ -39,12 +39,16 @@ export class CourseContentService {
     private raptor: RaptorService,
   ) {}
 
-  /** Gom nội dung (RAPTOR summary + hybrid search) theo scope; trả về source text. */
+  /**
+   * Gom nội dung (RAPTOR summary + hybrid search) theo scope.
+   * Trả về `text` (source cho LLM) kèm `chunkIds` — ID các CourseChunk đã thực sự
+   * được đưa vào phần chi tiết, để lưu lại làm nguồn giải thích đáp án sau này.
+   */
   async collect(
     courseId: string,
     query: string,
     scope?: ChunkScope,
-  ): Promise<string> {
+  ): Promise<{ text: string; chunkIds: string[] }> {
     // 1. Đảm bảo RAPTOR sẵn sàng (trigger + poll nếu chưa build).
     await this.ensureRaptorReady(courseId);
 
@@ -61,7 +65,7 @@ export class CourseContentService {
     }
 
     // 3. Hybrid search trên chunk gốc → phần "nội dung chi tiết".
-    let chunks: { content: string }[] = [];
+    let chunks: { id?: string; content: string }[] = [];
     try {
       const embedding = await this.gemini.embedQuery(query);
       chunks = await this.vector.hybridSearch(
@@ -83,7 +87,7 @@ export class CourseContentService {
         },
         orderBy: { chunkIndex: 'asc' },
         take: RETRIEVE_K,
-        select: { content: true },
+        select: { id: true, content: true },
       });
     }
 
@@ -94,24 +98,27 @@ export class CourseContentService {
 
     const seen = new Set<string>();
     const parts: string[] = [];
+    const chunkIds: string[] = [];
     let total = 0;
     for (const c of chunks) {
       const t = (c.content ?? '').trim();
       if (!t || seen.has(t)) continue;
       seen.add(t);
       parts.push(t);
+      if (c.id) chunkIds.push(c.id);
       total += t.length;
       if (total >= chunkLimit) break;
     }
     const chunkSection = parts.join('\n\n');
 
-    if (summarySection && chunkSection) {
-      return `${summarySection}\n\n=== NỘI DUNG CHI TIẾT ===\n${chunkSection}`.slice(
-        0,
-        MAX_SOURCE_CHARS,
-      );
-    }
-    return (summarySection || chunkSection).slice(0, MAX_SOURCE_CHARS);
+    const text =
+      summarySection && chunkSection
+        ? `${summarySection}\n\n=== NỘI DUNG CHI TIẾT ===\n${chunkSection}`.slice(
+            0,
+            MAX_SOURCE_CHARS,
+          )
+        : (summarySection || chunkSection).slice(0, MAX_SOURCE_CHARS);
+    return { text, chunkIds };
   }
 
   /**

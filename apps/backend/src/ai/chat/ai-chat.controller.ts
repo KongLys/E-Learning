@@ -2,6 +2,8 @@ import { Body, Controller, Get, Param, Post, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { AiChatService } from './ai-chat.service';
+import { Citation } from '../rag/rag.service';
+import { CreatedQuizInfo } from '../quiz/chat-quiz.service';
 
 interface AskBody {
   query: string;
@@ -10,8 +12,21 @@ interface AskBody {
   lessonId?: string;
 }
 
+interface ExplainQuizBody {
+  questionId: string;
+  pickedOptionIds: string[];
+}
+
 interface CreateConversationBody {
   title?: string;
+}
+
+/** Kết quả streaming dùng chung cho `ask` và `explain-quiz`. */
+interface StreamResult {
+  stream: AsyncIterable<string>;
+  citations: Citation[];
+  persist: (full: string) => Promise<void>;
+  getQuiz?: () => CreatedQuizInfo | null;
 }
 
 @Controller()
@@ -54,13 +69,23 @@ export class AiChatController {
       body.sectionId || body.lessonId
         ? { sectionId: body.sectionId, lessonId: body.lessonId }
         : undefined;
-    const { stream, citations, persist, getQuiz } = await this.chat.ask(
-      id,
-      user.userId,
-      body.query,
-      scope,
-    );
+    const result = await this.chat.ask(id, user.userId, body.query, scope);
+    await this.streamSse(res, result);
+  }
 
+  @Post('ai/conversations/:id/explain-quiz')
+  async explainQuiz(
+    @CurrentUser() user: { userId: string },
+    @Param('id') id: string,
+    @Body() body: ExplainQuizBody,
+    @Res() res: Response,
+  ) {
+    const result = await this.chat.explainQuizAnswer(id, user.userId, body);
+    await this.streamSse(res, result);
+  }
+
+  /** Đẩy kết quả LLM (citations → token → quiz → done) qua SSE, persist khi xong. */
+  private async streamSse(res: Response, result: StreamResult) {
     res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
@@ -68,17 +93,17 @@ export class AiChatController {
     res.flushHeaders();
 
     res.write(
-      `event: citations\ndata: ${JSON.stringify(this.chat.serializeCitations(citations))}\n\n`,
+      `event: citations\ndata: ${JSON.stringify(this.chat.serializeCitations(result.citations))}\n\n`,
     );
 
     let full = '';
     try {
-      for await (const piece of stream) {
+      for await (const piece of result.stream) {
         full += piece;
         res.write(`event: token\ndata: ${JSON.stringify(piece)}\n\n`);
       }
-      await persist(full);
-      const quiz = getQuiz?.();
+      await result.persist(full);
+      const quiz = result.getQuiz?.();
       if (quiz) {
         res.write(`event: quiz\ndata: ${JSON.stringify(quiz)}\n\n`);
       }

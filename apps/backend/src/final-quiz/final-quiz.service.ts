@@ -285,8 +285,8 @@ export class FinalQuizService {
           `Tổng hợp kiến thức trọng tâm của phần: ${s.title}`,
           { sectionId: s.id },
         );
-        if (source.length < MIN_SOURCE_CHARS) continue;
-        const qs = await this.quizGen.generate(source, { count: perSection });
+        if (source.text.length < MIN_SOURCE_CHARS) continue;
+        const qs = await this.quizGen.generate(source.text, { count: perSection });
         if (qs.length > 0) bySection.push(qs);
       } catch (err) {
         this.logger.warn(

@@ -28,21 +28,17 @@ export function ReviewQuizUI({ quiz, submit, onClose, askScope }: ReviewQuizUIPr
 
   const questions: any[] = quiz.questions ?? [];
 
-  /** Gửi prompt vào panel "Hỏi AI" để giải thích chi tiết một câu (RAG theo askScope). */
+  /**
+   * Mở panel "Hỏi AI" để giải thích một câu. Chỉ gửi questionId + lựa chọn; server
+   * tự tra đáp án đúng + chunk nguồn đã lưu để giải thích bám tài liệu (tránh bịa).
+   */
   const explainQuestion = (q: any, r: any) => {
-    const labelOf = (id: string) =>
-      q.options?.find((o: any) => o.id === id)?.content ?? id;
-    const correct: string = (r?.correctOptionIds ?? []).map(labelOf).join('; ');
-    const pickedIds: string[] = answers[q.id] ?? [];
-    const picked = pickedIds.length ? pickedIds.map(labelOf).join('; ') : '(không chọn)';
     const verdict = r?.isCorrect ? 'đúng' : 'chưa chính xác';
-    const prompt =
-      `Dựa trên tài liệu khóa học, hãy giải thích chi tiết câu hỏi ôn tập sau.\n` +
-      `Câu hỏi: ${q.content}\n` +
-      `Đáp án đúng: ${correct}\n` +
-      `Lựa chọn của tôi: ${picked}\n` +
-      `Vì sao đáp án đúng là chính xác, và vì sao lựa chọn của tôi ${verdict}?`;
-    askAi(prompt.slice(0, 2000), askScope);
+    const displayText = `Vì sao câu "${q.content}" — lựa chọn của tôi ${verdict}?`;
+    askAi(displayText.slice(0, 500), askScope, {
+      questionId: q.id,
+      pickedOptionIds: answers[q.id] ?? [],
+    });
   };
 
   const submitMutation = useMutation({

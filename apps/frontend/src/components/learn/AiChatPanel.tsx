@@ -7,9 +7,11 @@ import {
   aiChatApi,
   myReviewQuizApi,
   streamAsk,
+  streamExplainQuiz,
   type AiConversation,
   type AiMessage,
   type AskScope,
+  type AskStreamHandlers,
   type CreatedQuizInfo,
 } from '@/lib/api/ai.api';
 import { learnApi } from '@/lib/api/learn.api';
@@ -132,7 +134,11 @@ export function AiChatPanel({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [pending, messagesQuery.data]);
 
-  const handleAsk = async (override?: { query?: string; scope?: AskScope }) => {
+  const handleAsk = async (override?: {
+    query?: string;
+    scope?: AskScope;
+    explain?: { questionId: string; pickedOptionIds: string[] };
+  }) => {
     const q = (override?.query ?? input).trim();
     if (!q || streaming) return;
     let convId = activeId;
@@ -162,32 +168,35 @@ export function AiChatPanel({
           ? { lessonId: scopeKey.slice(2) }
           : undefined);
 
-    await streamAsk(
-      convId,
-      q,
-      {
-        onCitations: (cs) => {
-          citations = (cs ?? []) as Citation[];
-          setPending((p) =>
-            p.map((m, i) => (i === p.length - 1 ? { ...m, citations } : m)),
-          );
-        },
-        onToken: (text) => {
-          buffer += text;
-          setPending((p) =>
-            p.map((m, i) =>
-              i === p.length - 1 ? { ...m, content: buffer, citations } : m,
-            ),
-          );
-        },
-        onQuiz: (quiz) => {
-          setCreatedQuiz(quiz);
-          qc.invalidateQueries({ queryKey: ['my-review-quizzes', courseId] });
-        },
-        onError: (msg) => setStreamError(msg),
+    const handlers: AskStreamHandlers = {
+      onCitations: (cs) => {
+        citations = (cs ?? []) as Citation[];
+        setPending((p) =>
+          p.map((m, i) => (i === p.length - 1 ? { ...m, citations } : m)),
+        );
       },
-      scope,
-    );
+      onToken: (text) => {
+        buffer += text;
+        setPending((p) =>
+          p.map((m, i) =>
+            i === p.length - 1 ? { ...m, content: buffer, citations } : m,
+          ),
+        );
+      },
+      onQuiz: (quiz) => {
+        setCreatedQuiz(quiz);
+        qc.invalidateQueries({ queryKey: ['my-review-quizzes', courseId] });
+      },
+      onError: (msg) => setStreamError(msg),
+    };
+
+    // Có payload `explain` → dùng endpoint giải thích quiz (grounding theo chunk
+    // nguồn); ngược lại dùng RAG chung theo scope.
+    if (override?.explain) {
+      await streamExplainQuiz(convId, override.explain, handlers);
+    } else {
+      await streamAsk(convId, q, handlers, scope);
+    }
 
     setStreaming(false);
     setPending([]);
@@ -204,7 +213,7 @@ export function AiChatPanel({
     if (!p) return;
     if (p.scope?.lessonId) setScopeKey(`l:${p.scope.lessonId}`);
     else if (p.scope?.sectionId) setScopeKey(`s:${p.scope.sectionId}`);
-    void handleAsk({ query: p.text, scope: p.scope });
+    void handleAsk({ query: p.text, scope: p.scope, explain: p.explain });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingAsk, streaming]);
 

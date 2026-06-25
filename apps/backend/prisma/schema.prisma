@@ -346,7 +346,6 @@ model DocumentAsset {
   parseStatus     MaterialStatus @default(uploaded) @map("parse_status")
   errorMsg        String?        @map("error_msg")
   chunkCount      Int            @default(0) @map("chunk_count")
-  tocJson         Json           @default("[]") @map("toc_json") // cây TOC [{title, level, children[]}]
   updatedAt       DateTime       @default(now()) @updatedAt @map("updated_at")
 
   lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
@@ -488,6 +487,9 @@ model ReviewQuiz {
   courseId  String?  @map("course_id") // set cho quiz qua chat (phạm vi khoá)
   title     String? // tiêu đề quiz qua chat
   model     String? // model AI đã dùng để sinh (hiển thị/debug)
+  // ID các CourseChunk đã dùng làm nguồn sinh quiz — để giải thích đáp án bám
+  // đúng nội dung gốc (nạp lại chunk thật từ DB, không để LLM bịa đoạn trích).
+  sourceChunkIds String[] @default([]) @map("source_chunk_ids")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 

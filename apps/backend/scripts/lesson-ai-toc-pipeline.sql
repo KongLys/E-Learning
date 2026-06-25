@@ -31,12 +31,11 @@ ALTER TABLE "lessons"
   ADD COLUMN IF NOT EXISTS "moderated_at" TIMESTAMP(3);
 CREATE INDEX IF NOT EXISTS "lessons_moderation_status_idx" ON "lessons"("moderation_status");
 
--- 5. document_assets: trạng thái chuyển đổi file + TOC
+-- 5. document_assets: trạng thái chuyển đổi file
 ALTER TABLE "document_assets"
   ADD COLUMN IF NOT EXISTS "markdown_url" TEXT,
   ADD COLUMN IF NOT EXISTS "llama_parse_job_id" TEXT,
   ADD COLUMN IF NOT EXISTS "parse_status" "MaterialStatus" NOT NULL DEFAULT 'uploaded',
   ADD COLUMN IF NOT EXISTS "error_msg" TEXT,
   ADD COLUMN IF NOT EXISTS "chunk_count" INTEGER NOT NULL DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS "toc_json" JSONB NOT NULL DEFAULT '[]',
   ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;

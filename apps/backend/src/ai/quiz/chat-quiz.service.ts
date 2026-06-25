@@ -42,7 +42,7 @@ export class ChatQuizService {
     requestedCount?: number,
   ): Promise<CreatedQuizInfo> {
     const source = await this.courseContent.collect(courseId, query, scope);
-    if (source.length < MIN_SOURCE_CHARS) {
+    if (source.text.length < MIN_SOURCE_CHARS) {
       throw new UnprocessableEntityException(
         'Khoá học chưa có đủ nội dung để tạo quiz',
       );
@@ -51,7 +51,7 @@ export class ChatQuizService {
       MAX_QUESTIONS,
       Math.max(MIN_QUESTIONS, requestedCount ?? MIN_QUESTIONS),
     );
-    const questions = await this.quizGen.generate(source, { count });
+    const questions = await this.quizGen.generate(source.text, { count });
 
     const title = this.buildTitle(query);
     const quiz = await this.prisma.reviewQuiz.create({
@@ -61,6 +61,7 @@ export class ChatQuizService {
         courseId,
         title,
         model: this.quizGen.usedModel,
+        sourceChunkIds: source.chunkIds,
         questions: {
           create: questions.map((q, qi) => ({
             content: q.content,

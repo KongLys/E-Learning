@@ -2,13 +2,11 @@ import { Logger } from '@nestjs/common';
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Job } from 'bullmq';
-import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../storage/storage.service';
 import { LlamaParseService } from '../chunking/llama-parse.service';
 import { MarkdownChunkerService } from '../chunking/markdown-chunker.service';
 import { htmlToMarkdown } from '../chunking/html-to-markdown.util';
-import { buildToc } from '../chunking/toc.util';
 import { GeminiService } from '../providers/gemini.service';
 import {
   VectorStoreService,
@@ -38,10 +36,10 @@ const DOCX_MIME =
  *  - file tài liệu PDF/DOCX đính kèm (LlamaParse → markdown, cache MinIO)   → 'lesson_file'
  *  - script video giảng viên đăng tải (chương + transcript đã có sẵn)       → 'lesson_video'
  *
- * Trước khi chunk, nội dung được phân vùng dạng TOC: mỗi chunk mang đường dẫn
+ * Trước khi chunk, nội dung được phân vùng theo đề mục: mỗi chunk mang đường dẫn
  * "Tên phần > Tên bài > Đề mục..." (cột sectionTitle) + sectionId/lessonId để
- * truy vấn theo từng phần và dựng mind map toàn khóa; mục lục gộp lưu vào
- * DocumentAsset.tocJson. Nội dung phải qua kiểm duyệt AI trước khi index.
+ * truy vấn theo từng phần và dựng mind map toàn khóa. Nội dung phải qua kiểm
+ * duyệt AI trước khi index.
  *
  * Nguồn video chỉ lấy từ VideoAsset do giảng viên upload (có videoUrl +
  * transcriptStatus='ready') — KHÔNG dùng video AI tự sinh (LessonVideoAsset).
@@ -106,15 +104,6 @@ export class LessonIndexProcessor extends WorkerHost {
           lesson.title,
           lessonId,
         );
-      }
-
-      // ── Phân vùng TOC trước khi chunk: lưu mục lục gộp của bài
-      if (asset) {
-        const toc = buildToc([contentMd, fileMd].filter(Boolean).join('\n\n'));
-        await this.prisma.documentAsset.update({
-          where: { id: asset.id },
-          data: { tocJson: toc as unknown as Prisma.InputJsonValue },
-        });
       }
 
       // ── Chunk từng nguồn, prefix đường dẫn "Phần > Bài > [đề mục trong tài liệu]"

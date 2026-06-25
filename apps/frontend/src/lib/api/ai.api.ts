@@ -164,7 +164,12 @@ export async function streamAsk(
     return;
   }
 
-  const reader = res.body.getReader();
+  await consumeSse(res, handlers);
+}
+
+/** Đọc & phân giải luồng SSE (citations → token → quiz → done/error). */
+async function consumeSse(res: Response, handlers: AskStreamHandlers): Promise<void> {
+  const reader = res.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
   while (true) {
@@ -195,4 +200,32 @@ export async function streamAsk(
       }
     }
   }
+}
+
+/** Giải thích đáp án một câu quiz ôn tập (stream SSE như streamAsk). */
+export async function streamExplainQuiz(
+  conversationId: string,
+  body: { questionId: string; pickedOptionIds: string[] },
+  handlers: AskStreamHandlers,
+): Promise<void> {
+  const baseURL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+  const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+  const res = await fetch(
+    `${baseURL}/ai/conversations/${conversationId}/explain-quiz`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(body),
+    },
+  );
+  if (!res.ok || !res.body) {
+    const text = await res.text().catch(() => '');
+    handlers.onError?.(text || `HTTP ${res.status}`);
+    return;
+  }
+  await consumeSse(res, handlers);
 }
