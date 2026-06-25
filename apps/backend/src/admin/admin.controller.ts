@@ -25,6 +25,7 @@ export class AdminController {
       pendingReports,
       pendingModerationCourses,
       pendingModerationLessons,
+      pendingInstructorApplications,
     ] = await Promise.all([
       this.prisma.user.count(),
       this.prisma.course.count({ where: { status: 'published' } }),
@@ -45,6 +46,9 @@ export class AdminController {
           moderatedAt: { not: null },
         },
       }),
+      this.prisma.instructorApplication.count({
+        where: { status: 'pending' },
+      }),
     ]);
 
     return {
@@ -56,6 +60,7 @@ export class AdminController {
       lockedUsers,
       pendingReports,
       pendingModeration: pendingModerationCourses + pendingModerationLessons,
+      pendingInstructorApplications,
     };
   }
 }

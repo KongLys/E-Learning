@@ -16,7 +16,14 @@ import { AiChatPanel } from '@/components/learn/AiChatPanel';
 import { SafeHtml } from '@/components/common/SafeHtml';
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { Award, Check, ChevronDown, ChevronLeft, Clock, FileText, Film, Headphones, Loader2, Menu, MessageSquare, Network, Sparkles } from 'lucide-react';
+
+// Popup chúc mừng + chứng chỉ — chỉ tải khi cần (kéo theo trình tạo PDF).
+const CourseCompletionCelebration = dynamic(
+  () => import('@/components/certificates/CourseCompletionCelebration'),
+  { ssr: false },
+);
 
 export default function LearnPage() {
   const { courseId, lessonId } = useParams<{ courseId: string; lessonId: string }>();
@@ -34,6 +41,9 @@ export default function LearnPage() {
   const videoTimeRef = useRef(0);
   const completedRef = useRef(false);
   const aiResizingRef = useRef(false);
+  // Theo dõi trạng thái khóa để tự bật popup chúc mừng khi vừa hoàn thành.
+  const prevStatusRef = useRef<string | undefined>(undefined);
+  const [showCelebration, setShowCelebration] = useState(false);
 
   const { data: lessonData, isLoading: lessonLoading } = useQuery({
     queryKey: ['lesson', lessonId],
@@ -173,6 +183,20 @@ export default function LearnPage() {
   // Reset cờ hoàn thành khi đổi bài
   useEffect(() => { completedRef.current = false; }, [lessonId]);
 
+  // Tự bật popup chúc mừng khi tiến độ vừa chuyển sang 'completed' trong phiên
+  // này (chỉ khóa trả phí mới có chứng chỉ). Lần đầu có dữ liệu chỉ ghi nhận
+  // trạng thái → không bật lại với khóa đã hoàn thành từ trước.
+  useEffect(() => {
+    const p = progressData?.data;
+    const status: string | undefined = p?.status;
+    if (!status) return;
+    const prev = prevStatusRef.current;
+    prevStatusRef.current = status;
+    if (prev && prev !== 'completed' && status === 'completed' && p?.certificateEligible) {
+      setShowCelebration(true);
+    }
+  }, [progressData?.data?.status, progressData?.data?.certificateEligible]);
+
   // Đổi bài học thì thoát quiz đang mở để hiện nội dung bài (điều hướng qua lại mượt).
   useEffect(() => { setActiveQuiz(null); setDocScrolled(false); }, [lessonId]);
 
@@ -267,7 +291,8 @@ export default function LearnPage() {
           <ChevronLeft size={16} className="shrink-0" />
           <span className="truncate">{courseTitle ?? 'Khóa học của tôi'}</span>
         </Link>
-        {(progress?.status === 'completed' || (progress?.progressPercent ?? 0) >= 100) && (
+        {progress?.certificateEligible &&
+          (progress?.status === 'completed' || (progress?.progressPercent ?? 0) >= 100) && (
           <Link
             href={`/certificates?courseId=${courseId}`}
             className="text-sm px-3 py-1.5 rounded bg-amber-100 text-amber-700 hover:bg-amber-200"
@@ -278,7 +303,7 @@ export default function LearnPage() {
         )}
         <Link
           href={`/learn/${courseId}/ai?tab=mindmap`}
-          className="text-sm px-3 py-1.5 rounded bg-sky-100 text-sky-700 hover:bg-sky-200"
+          className="text-sm px-3 py-1.5 rounded bg-sky-soft text-sky-deep hover:bg-sky/20"
           title="Xem sơ đồ tư duy toàn khóa"
         >
           <span className="inline-flex items-center gap-1"><Network size={14} /> Sơ đồ tư duy</span>
@@ -288,8 +313,8 @@ export default function LearnPage() {
             onClick={() => (aiPanelOpen ? setAiPanelOpen(false) : openAiPanel())}
             className={`text-sm px-3 py-1.5 rounded ${
               aiPanelOpen
-                ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
-                : 'bg-purple-600 text-white hover:bg-purple-700'
+                ? 'bg-sky-soft text-sky-deep hover:bg-sky/20'
+                : 'bg-sky text-white hover:bg-sky-deep'
             }`}
           >
             <span className="inline-flex items-center gap-1"><Sparkles size={14} /> Hỏi AI</span>
@@ -317,13 +342,13 @@ export default function LearnPage() {
 
         {/* Main content */}
         <main
-          className="flex-1 overflow-y-auto p-4 lg:p-6"
+          className="flex-1 overflow-y-auto"
           onScroll={(e) => {
             const next = e.currentTarget.scrollTop > 24;
             setDocScrolled((prev) => (prev === next ? prev : next));
           }}
         >
-          <div className="max-w-4xl mx-auto space-y-5">
+          <div className="max-w-4xl mx-auto space-y-5 p-4 lg:p-6">
           {activeQuiz ? (
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-3">
@@ -373,7 +398,7 @@ export default function LearnPage() {
             <div className="space-y-4">
               {/* Thanh tiêu đề + hành động — dính trên cùng, nội dung cuộn bên dưới.
                   Nút/đồng hồ canh phải thẳng mép phải nội dung; cuộn xuống trượt sang phải (motion). */}
-              <div className="sticky top-0 z-10 -mt-2 flex items-start justify-between gap-4 bg-canvas pt-2 pb-2">
+              <div className="sticky top-0 z-10 -mt-4 flex items-start justify-between gap-4 bg-canvas pt-4 pb-2 lg:-mt-6 lg:pt-6">
                 <div className="min-w-0">
                   <h2 className="text-xl lg:text-2xl font-bold text-gray-900 leading-snug">{lesson.title}</h2>
                   {lesson.description && <p className="mt-1 text-sm text-gray-600">{lesson.description}</p>}
@@ -604,7 +629,7 @@ export default function LearnPage() {
                 onMouseDown={startAiResize}
                 onDoubleClick={() => setAiPanelWidth(400)}
                 title="Kéo để thay đổi độ rộng · nhấp đúp để đặt lại"
-                className="absolute left-0 top-0 hidden h-full w-1.5 -translate-x-1/2 cursor-col-resize hover:bg-purple-300 lg:block"
+                className="absolute left-0 top-0 hidden h-full w-1.5 -translate-x-1/2 cursor-col-resize hover:bg-sky-bright lg:block"
               />
               <AiChatPanel
                 courseId={courseId}
@@ -617,6 +642,14 @@ export default function LearnPage() {
           </>
         )}
       </div>
+
+      {showCelebration && (
+        <CourseCompletionCelebration
+          courseId={courseId}
+          courseTitle={courseTitle}
+          onClose={() => setShowCelebration(false)}
+        />
+      )}
     </div>
   );
 }

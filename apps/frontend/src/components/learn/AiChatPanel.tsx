@@ -221,7 +221,7 @@ export function AiChatPanel({
       {/* Header */}
       <div className="relative flex shrink-0 items-center gap-2 border-b border-hairline px-3 py-2.5">
         <div className="flex items-center gap-1.5 text-sm font-semibold text-ink">
-          <Sparkles size={16} className="text-berry" /> Hỏi AI
+          <Sparkles size={16} className="text-sky" /> Hỏi AI
         </div>
         <div className="ml-auto flex items-center gap-1">
           <button
@@ -304,20 +304,20 @@ export function AiChatPanel({
       {/* Khu nhập liệu */}
       <div className="shrink-0 space-y-2 border-t border-hairline p-3">
         {createdQuiz && (
-          <div className="flex items-center gap-2 rounded-lg border border-berry/20 bg-berry/5 px-3 py-2 text-sm">
-            <span className="flex flex-1 items-center gap-1 truncate text-berry">
+          <div className="flex items-center gap-2 rounded-lg border border-sky/20 bg-sky/5 px-3 py-2 text-sm">
+            <span className="flex flex-1 items-center gap-1 truncate text-sky-deep">
               <CheckCircle2 size={14} className="shrink-0" /> Đã tạo quiz &ldquo;{createdQuiz.title}&rdquo; ({createdQuiz.questionCount} câu)
             </span>
             <button
               onClick={() => openQuizMut.mutate(createdQuiz.id)}
               disabled={openQuizMut.isPending}
-              className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-berry px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
+              className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-sky px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-deep disabled:opacity-50"
             >
               {openQuizMut.isPending ? 'Đang mở…' : <><FileText size={13} /> Làm bài ôn tập</>}
             </button>
             <button
               onClick={() => setCreatedQuiz(null)}
-              className="shrink-0 text-berry/50 hover:text-berry"
+              className="shrink-0 text-sky/50 hover:text-sky-deep"
               aria-label="Đóng"
             >
               <X size={16} />
@@ -348,7 +348,7 @@ export function AiChatPanel({
                   <button
                     onClick={() => generateReviewQuiz.mutate()}
                     disabled={generateReviewQuiz.isPending}
-                    className="inline-flex items-center gap-1 rounded-lg bg-berry px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-60"
+                    className="inline-flex items-center gap-1 rounded-lg bg-sky px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-deep disabled:opacity-60"
                   >
                     {generateReviewQuiz.isPending ? <><Loader2 size={13} className="animate-spin" /> Đang tạo quiz…</> : <><Sparkles size={13} /> Tạo quiz ôn tập</>}
                   </button>
@@ -447,7 +447,7 @@ function SplitActionButton({
     return (
       <button
         disabled
-        className="inline-flex items-center gap-1 rounded-lg bg-berry px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+        className="inline-flex items-center gap-1 rounded-lg bg-sky px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
       >
         <Loader2 size={13} className="animate-spin" /> {pendingLabel ?? 'Đang xử lý…'}
       </button>
@@ -458,7 +458,7 @@ function SplitActionButton({
     <div className="relative inline-flex">
       <button
         onClick={onMain}
-        className="inline-flex items-center gap-1 rounded-l-lg bg-berry px-3 py-1.5 text-xs font-medium text-white hover:opacity-90"
+        className="inline-flex items-center gap-1 rounded-l-lg bg-sky px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-deep"
       >
         {mainIcon} {mainLabel}
       </button>
@@ -468,7 +468,7 @@ function SplitActionButton({
         aria-label="Tùy chọn khác"
         aria-haspopup="menu"
         aria-expanded={open}
-        className="inline-flex items-center rounded-r-lg border-l border-berry/50 bg-berry px-1.5 py-1.5 text-white hover:opacity-90"
+        className="inline-flex items-center rounded-r-lg border-l border-sky-deep/50 bg-sky px-1.5 py-1.5 text-white hover:bg-sky-deep"
       >
         <ChevronDown size={14} />
       </button>

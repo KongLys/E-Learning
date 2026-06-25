@@ -7,6 +7,8 @@ import { AvatarUpload } from '@/components/profile/AvatarUpload';
 import { ProfileForm } from '@/components/profile/ProfileForm';
 import { PasswordChangeForm } from '@/components/profile/PasswordChangeForm';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import Link from 'next/link';
+import { GraduationCap, ChevronRight } from 'lucide-react';
 
 export default function ProfileSettingsPage() {
   const { user, refreshUser } = useAuthStore();
@@ -67,6 +69,25 @@ export default function ProfileSettingsPage() {
             <h2 className="text-base font-semibold mb-4 text-ink">Đổi mật khẩu</h2>
             <PasswordChangeForm />
           </div>
+
+          {/* Đăng ký làm giảng viên — chỉ học viên */}
+          {user?.role === 'student' && (
+            <Link
+              href="/settings/become-instructor"
+              className="bg-surface-card border border-hairline rounded-card p-6 flex items-center gap-4 hover:border-sky transition-colors group"
+            >
+              <div className="size-10 rounded-lg bg-sky/10 flex items-center justify-center shrink-0">
+                <GraduationCap className="text-sky" size={20} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-base font-semibold text-ink">Trở thành giảng viên</h2>
+                <p className="text-sm text-ink-subtle">
+                  Đăng ký để tạo và bán khóa học của riêng bạn.
+                </p>
+              </div>
+              <ChevronRight className="text-ink-subtle group-hover:text-sky shrink-0" size={20} />
+            </Link>
+          )}
         </div>
       </div>
     </div>

@@ -8,13 +8,14 @@ import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api/admin.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import Link from 'next/link';
-import { LayoutDashboard, Users, BookOpen, ShoppingCart, ShieldCheck, Flag } from 'lucide-react';
+import { LayoutDashboard, Users, BookOpen, ShoppingCart, ShieldCheck, Flag, UserPlus } from 'lucide-react';
 
-function AdminSidebar({ pendingCourses, pendingReports, pendingModeration }: { pendingCourses: number; pendingReports: number; pendingModeration: number }) {
+function AdminSidebar({ pendingCourses, pendingReports, pendingModeration, pendingInstructorApplications }: { pendingCourses: number; pendingReports: number; pendingModeration: number; pendingInstructorApplications: number }) {
   const pathname = usePathname();
   const nav = [
     { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/admin/users', label: 'Người dùng', icon: Users },
+    { href: '/admin/instructor-applications', label: 'Đơn giảng viên', icon: UserPlus, badge: pendingInstructorApplications },
     { href: '/admin/courses', label: 'Khóa học', icon: BookOpen, badge: pendingCourses },
     { href: '/admin/moderation', label: 'Kiểm duyệt', icon: ShieldCheck, badge: pendingModeration },
     { href: '/admin/reports', label: 'Báo cáo', icon: Flag, badge: pendingReports },
@@ -81,6 +82,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         pendingCourses={statsData?.data?.pendingCourses ?? 0}
         pendingReports={statsData?.data?.pendingReports ?? 0}
         pendingModeration={statsData?.data?.pendingModeration ?? 0}
+        pendingInstructorApplications={statsData?.data?.pendingInstructorApplications ?? 0}
       />
       <div className="flex-1 flex flex-col">
         <header className="h-12 bg-surface-card border-b border-hairline flex items-center px-6">

@@ -32,4 +32,11 @@ export const adminApi = {
     apiClient.get('/admin/review-reports', { params }),
   resolveReviewReport: (id: string, action: 'delete' | 'dismiss') =>
     apiClient.post(`/admin/review-reports/${id}/resolve`, { action }),
+
+  getInstructorApplications: (params?: { status?: 'pending' | 'approved' | 'rejected' }) =>
+    apiClient.get('/admin/instructor-applications', { params }),
+  approveInstructorApplication: (id: string) =>
+    apiClient.post(`/admin/instructor-applications/${id}/approve`),
+  rejectInstructorApplication: (id: string, reason?: string) =>
+    apiClient.post(`/admin/instructor-applications/${id}/reject`, { reason }),
 };

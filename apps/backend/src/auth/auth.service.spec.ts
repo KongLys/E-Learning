@@ -4,6 +4,7 @@ import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { MailService } from '../mail/mail.service';
 import * as bcrypt from 'bcrypt';
 
 const mockRedis = {
@@ -17,6 +18,7 @@ const mockPrisma = {
 };
 const mockJwt = { sign: jest.fn().mockReturnValue('token'), verify: jest.fn() };
 const mockConfig = { get: jest.fn().mockReturnValue('15m') };
+const mockMail = { sendOtpEmail: jest.fn().mockResolvedValue(undefined) };
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -28,6 +30,7 @@ describe('AuthService', () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: JwtService, useValue: mockJwt },
         { provide: ConfigService, useValue: mockConfig },
+        { provide: MailService, useValue: mockMail },
         {
           provide: 'default_IORedisModuleConnectionToken',
           useValue: mockRedis,

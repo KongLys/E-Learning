@@ -36,6 +36,7 @@ import { InstructorStatsModule } from './instructor-stats/instructor-stats.modul
 import { AiModule } from './ai/ai.module';
 import { ModerationModule } from './moderation/moderation.module';
 import { CouponModule } from './coupon/coupon.module';
+import { InstructorApplicationModule } from './instructor-application/instructor-application.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 
@@ -53,6 +54,13 @@ import { RolesGuard } from './auth/guards/roles.guard';
         JWT_SECRET: Joi.string().default('change-me-in-production'),
         JWT_ACCESS_EXPIRES: Joi.string().default('15m'),
         JWT_REFRESH_EXPIRES: Joi.string().default('7d'),
+        SMTP_HOST: Joi.string().default('smtp.gmail.com'),
+        SMTP_PORT: Joi.number().default(465),
+        SMTP_USER: Joi.string().allow('').default(''),
+        SMTP_PASS: Joi.string().allow('').default(''),
+        MAIL_FROM: Joi.string().allow('').default(''),
+        OTP_TTL_SECONDS: Joi.number().default(600),
+        GOOGLE_CLIENT_ID: Joi.string().allow('').default(''),
         R2_ENDPOINT: Joi.string().required(),
         R2_REGION: Joi.string().default('auto'),
         R2_ACCESS_KEY_ID: Joi.string().required(),
@@ -132,6 +140,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
     AiModule,
     ModerationModule,
     CouponModule,
+    InstructorApplicationModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

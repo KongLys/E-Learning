@@ -7,6 +7,7 @@ import { useAuthStore } from '@/store/auth.store';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useState } from 'react';
+import { GoogleLoginButton } from '@/components/auth/GoogleLoginButton';
 
 const schema = z.object({
   email: z.email('Email không hợp lệ'),
@@ -91,6 +92,8 @@ export default function LoginPage() {
             </button>
           </div>
         </form>
+
+        <GoogleLoginButton onError={setError} />
       </div>
 
       <p className="mt-6 text-center text-sm text-muted">

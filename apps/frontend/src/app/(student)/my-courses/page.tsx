@@ -64,6 +64,8 @@ export default function MyCoursesPage() {
               const progress = Math.round(enrollment.progressPercent ?? 0);
               const isCompleted = enrollment.status === 'completed';
               const hasStarted = progress > 0;
+              // Chỉ khóa trả phí mới có chứng chỉ.
+              const hasCertificate = isCompleted && Number(course?.price) > 0;
 
               return (
                 <div
@@ -107,7 +109,7 @@ export default function MyCoursesPage() {
                     >
                       {hasStarted ? 'Tiếp tục học' : 'Bắt đầu học'}
                     </Link>
-                    {isCompleted && (
+                    {hasCertificate && (
                       <Link
                         href={`/certificates?courseId=${enrollment.courseId}`}
                         className="w-full inline-flex h-9 items-center justify-center gap-1.5 mt-2 rounded-pill bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 transition-colors"

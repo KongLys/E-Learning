@@ -81,7 +81,6 @@ const styles = StyleSheet.create({
   },
   disclaimer: {
     fontSize: 9.5,
-    fontStyle: 'italic',
     color: MUTED,
     textAlign: 'center',
     marginTop: 16,

@@ -105,6 +105,12 @@ enum MindmapStatus {
   failed // sinh lỗi
 }
 
+enum InstructorApplicationStatus {
+  pending // đã gửi, chờ admin duyệt
+  approved // admin duyệt, role đã nâng lên instructor
+  rejected // admin từ chối, học viên được nộp lại
+}
+
 // ─── Models ──────────────────────────────────────────────────────────────────
 
 model User {
@@ -143,7 +149,32 @@ model User {
   reviewQuizzes        ReviewQuiz[]
   coupons              Coupon[]
 
+  instructorApplications InstructorApplication[] @relation("UserApplications")
+
   @@map("users")
+}
+
+// Đơn học viên đăng ký làm giảng viên. Admin duyệt/từ chối; khi duyệt thì
+// User.role được nâng lên instructor. Bị từ chối thì học viên xem được lý do
+// và nộp lại đơn mới (chỉ chặn khi đang có đơn pending).
+model InstructorApplication {
+  id           String                      @id @default(uuid())
+  userId       String                      @map("user_id")
+  status       InstructorApplicationStatus @default(pending)
+  expertise    String                      @db.Text // lĩnh vực giảng dạy
+  experience   String                      @db.Text // kinh nghiệm / bằng cấp
+  motivation   String                      @db.Text // lý do muốn làm giảng viên
+  rejectReason String?                     @map("reject_reason") @db.Text // admin nhập khi từ chối
+  reviewedById String?                     @map("reviewed_by_id")
+  reviewedAt   DateTime?                   @map("reviewed_at")
+  createdAt    DateTime                    @default(now()) @map("created_at")
+  updatedAt    DateTime                    @updatedAt @map("updated_at")
+
+  user User @relation("UserApplications", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([userId])
+  @@map("instructor_applications")
 }
 
 model Category {

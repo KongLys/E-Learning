@@ -85,6 +85,7 @@ export class EnrollmentService {
             id: true,
             title: true,
             slug: true,
+            price: true,
             thumbnailUrl: true,
             totalLessons: true,
             totalDurationSec: true,
@@ -110,7 +111,10 @@ export class EnrollmentService {
   async getEnrollmentProgress(studentId: string, courseId: string) {
     const enrollment = await this.prisma.enrollment.findFirst({
       where: { studentId, courseId },
-      include: { lessonProgress: true },
+      include: {
+        lessonProgress: true,
+        course: { select: { price: true } },
+      },
     });
     if (!enrollment) throw new NotFoundException('Enrollment not found');
 
@@ -118,6 +122,9 @@ export class EnrollmentService {
       progressPercent: enrollment.progressPercent,
       lastLessonId: enrollment.lastLessonId,
       status: enrollment.status,
+      // Chỉ khóa trả phí mới có chứng chỉ → frontend dùng cờ này để hiện
+      // popup chúc mừng & nút "Chứng chỉ".
+      certificateEligible: Number(enrollment.course.price) > 0,
       lessonProgress: enrollment.lessonProgress.map((lp) => ({
         lessonId: lp.lessonId,
         completed: lp.completed,

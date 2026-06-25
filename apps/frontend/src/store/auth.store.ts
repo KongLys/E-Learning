@@ -21,6 +21,7 @@ interface AuthState {
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   setTokens: (accessToken: string, refreshToken: string) => void;
+  setSession: (user: AuthUser, accessToken: string, refreshToken: string) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -35,6 +36,11 @@ export const useAuthStore = create<AuthState>()(
         localStorage.setItem('refreshToken', refreshToken);
         Cookies.set('accessToken', accessToken, { path: '/', sameSite: 'lax' });
         set({ accessToken });
+      },
+
+      setSession: (user, accessToken, refreshToken) => {
+        get().setTokens(accessToken, refreshToken);
+        set({ user });
       },
 
       login: async (email, password) => {

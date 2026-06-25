@@ -30,14 +30,30 @@ export class CertificateService {
   }
 
   /**
+   * Chỉ khóa TRẢ PHÍ mới được cấp chứng chỉ. Vì khóa miễn phí ghi danh trực
+   * tiếp còn khóa trả phí chỉ ghi danh sau khi thanh toán, `price > 0` đồng
+   * nghĩa với "học viên đã mua khóa này".
+   */
+  private async isPaidCourse(courseId: string): Promise<boolean> {
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
+      select: { price: true },
+    });
+    return !!course && Number(course.price) > 0;
+  }
+
+  /**
    * Cấp chứng chỉ khi học viên hoàn thành khóa. Idempotent nhờ unique
    * (studentId, courseId): gọi lại nhiều lần cũng chỉ giữ một bản ghi.
+   * Bỏ qua (không cấp) với khóa miễn phí — chỉ khóa trả phí có chứng chỉ.
    */
   async issueForCompletion(studentId: string, courseId: string) {
     const existing = await this.prisma.certificate.findUnique({
       where: { studentId_courseId: { studentId, courseId } },
     });
     if (existing) return existing;
+
+    if (!(await this.isPaidCourse(courseId))) return null;
 
     // Vòng lặp phòng trường hợp trùng `code` (xác suất cực thấp).
     for (let attempt = 0; attempt < 5; attempt++) {
@@ -122,6 +138,9 @@ export class CertificateService {
       });
       if (enrollment?.status !== 'completed') {
         throw new NotFoundException('Bạn chưa hoàn thành khóa học này');
+      }
+      if (!(await this.isPaidCourse(courseId))) {
+        throw new NotFoundException('Khóa học miễn phí không có chứng chỉ');
       }
       await this.issueForCompletion(userId, courseId);
       cert = await this.prisma.certificate.findUnique({
