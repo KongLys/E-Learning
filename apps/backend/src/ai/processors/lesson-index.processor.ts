@@ -9,7 +9,7 @@ import { LlamaParseService } from '../chunking/llama-parse.service';
 import { MarkdownChunkerService } from '../chunking/markdown-chunker.service';
 import { htmlToMarkdown } from '../chunking/html-to-markdown.util';
 import { buildToc } from '../chunking/toc.util';
-import { GeminiService } from '../gemini.service';
+import { GeminiService } from '../providers/gemini.service';
 import {
   VectorStoreService,
   ChunkSourceType,

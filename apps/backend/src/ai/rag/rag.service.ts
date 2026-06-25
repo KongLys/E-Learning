@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GeminiService } from '../gemini.service';
-import { CohereService } from '../cohere.service';
+import { GeminiService } from '../providers/gemini.service';
+import { CohereService } from '../providers/cohere.service';
 import {
   VectorStoreService,
   RetrievedChunk,

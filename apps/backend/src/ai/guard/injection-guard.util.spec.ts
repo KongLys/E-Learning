@@ -4,7 +4,7 @@ import {
   stripInjection,
   scrubOutput,
 } from './injection-guard.util';
-import { OPEN_MARKER, CLOSE_MARKER } from '../prompt-safety.util';
+import { OPEN_MARKER, CLOSE_MARKER } from './prompt-safety.util';
 
 describe('injection-guard.util', () => {
   describe('detectInjection - block', () => {

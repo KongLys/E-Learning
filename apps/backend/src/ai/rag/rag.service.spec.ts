@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { RagService } from './rag.service';
-import { GeminiService } from '../gemini.service';
-import { CohereService } from '../cohere.service';
+import { GeminiService } from '../providers/gemini.service';
+import { CohereService } from '../providers/cohere.service';
 import { VectorStoreService } from '../vector/vector-store.service';
 import { NO_CONTEXT_MESSAGE } from './prompts';
 

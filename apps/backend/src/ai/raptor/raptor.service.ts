@@ -4,9 +4,9 @@ import { Queue } from 'bullmq';
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
-import { GeminiService } from '../gemini.service';
+import { GeminiService } from '../providers/gemini.service';
 import { ChunkScope } from '../vector/vector-store.service';
-import { kmeans } from '../clustering.util';
+import { kmeans } from '../common/clustering.util';
 import { RAPTOR_BUILD_QUEUE, BuildRaptorJob } from './raptor.queue';
 import { RAPTOR_SUMMARY_SYSTEM, buildNodeSummaryPrompt } from './raptor.prompts';
 

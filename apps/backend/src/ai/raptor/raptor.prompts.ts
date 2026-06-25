@@ -2,7 +2,7 @@ import {
   wrapUntrusted,
   neutralizeInline,
   UNTRUSTED_DATA_RULE,
-} from '../prompt-safety.util';
+} from '../guard/prompt-safety.util';
 
 /** System instruction cho bước tóm tắt từng node của cây RAPTOR. */
 export const RAPTOR_SUMMARY_SYSTEM =

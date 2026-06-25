@@ -9,12 +9,12 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
-import { GeminiService } from '../ai/gemini.service';
+import { GeminiService } from '../ai/providers/gemini.service';
 import {
   wrapUntrusted,
   neutralizeInline,
   UNTRUSTED_DATA_RULE,
-} from '../ai/prompt-safety.util';
+} from '../ai/guard/prompt-safety.util';
 import { stripHtml } from '../common/sanitize-html.util';
 import {
   LESSON_VIDEO_QUEUE,

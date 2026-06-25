@@ -4,8 +4,8 @@ import { Job, Queue } from 'bullmq';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../storage/storage.service';
-import { AssemblyAiService } from '../assemblyai.service';
-import { TranscriptCue } from '../gemini.service';
+import { AssemblyAiService } from '../media/assemblyai.service';
+import { TranscriptCue } from '../providers/gemini.service';
 import { LESSON_INDEX_QUEUE, IndexLessonJob } from './lesson-index.processor';
 
 export const VIDEO_TRANSCRIBE_QUEUE = 'video-transcription';

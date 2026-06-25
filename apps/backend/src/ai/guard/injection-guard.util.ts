@@ -10,7 +10,7 @@
  * Đây là tầng heuristic (regex) — thuần hàm, dễ test. Tầng LLM nằm ở GuardrailService.
  */
 
-import { OPEN_MARKER, CLOSE_MARKER } from '../prompt-safety.util';
+import { OPEN_MARKER, CLOSE_MARKER } from './prompt-safety.util';
 
 export type GuardVerdict = 'clean' | 'strip' | 'block';
 

@@ -9,12 +9,12 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-import { GeminiService } from '../gemini.service';
+import { GeminiService } from '../providers/gemini.service';
 import {
   wrapUntrusted,
   neutralizeInline,
   UNTRUSTED_DATA_RULE,
-} from '../prompt-safety.util';
+} from '../guard/prompt-safety.util';
 import {
   buildTree,
   ChunkInput,
@@ -27,7 +27,7 @@ import {
   toXmind,
 } from './mindmap-builder';
 import { MINDMAP_QUEUE, GenerateMindmapJob } from './mindmap.queue';
-import { kmeans } from '../clustering.util';
+import { kmeans } from '../common/clustering.util';
 
 /** Cap on summarised leaves → bounds LLM calls & keeps the map readable. */
 const MAX_GROUPS = 80;

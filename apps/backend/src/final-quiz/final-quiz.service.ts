@@ -7,8 +7,8 @@ import { ProgressService } from '../progress/progress.service';
 import {
   QuizGenerationService,
   GeneratedQuestion,
-} from '../ai/quiz-generation.service';
-import { CourseContentService } from '../ai/course-content.service';
+} from '../ai/quiz/quiz-generation.service';
+import { CourseContentService } from '../ai/quiz/course-content.service';
 import { FINAL_QUIZ_QUEUE, GenerateFinalQuizJob } from './final-quiz.queue';
 
 const FINAL_QUIZ_SECTION_TITLE = 'Kiểm tra cuối khóa';

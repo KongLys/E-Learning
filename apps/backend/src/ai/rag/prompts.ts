@@ -1,4 +1,4 @@
-import { wrapUntrusted, neutralizeInline } from '../prompt-safety.util';
+import { wrapUntrusted, neutralizeInline } from '../guard/prompt-safety.util';
 
 /** Standard response when the course material has no relevant information. */
 export const NO_CONTEXT_MESSAGE =

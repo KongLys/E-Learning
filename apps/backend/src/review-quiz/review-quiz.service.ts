@@ -6,7 +6,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { QuizGenerationService } from '../ai/quiz-generation.service';
+import { QuizGenerationService } from '../ai/quiz/quiz-generation.service';
 import { RaptorService } from '../ai/raptor/raptor.service';
 import { SubmitReviewAttemptDto } from './dto/submit-review-attempt.dto';
 

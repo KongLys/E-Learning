@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GeminiService } from '../gemini.service';
+import { GeminiService } from '../providers/gemini.service';
 import {
   detectInjection,
   hasMetaSignal,

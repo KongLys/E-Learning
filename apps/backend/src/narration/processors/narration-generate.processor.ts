@@ -4,7 +4,7 @@ import { Job } from 'bullmq';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../storage/storage.service';
-import { GoogleTtsService } from '../../ai/google-tts.service';
+import { GoogleTtsService } from '../../ai/media/google-tts.service';
 import { NarrationService } from '../narration.service';
 import { NARRATION_QUEUE, GenerateNarrationJob } from '../narration.queue';
 

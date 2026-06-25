@@ -5,11 +5,11 @@ import { createReadStream } from 'fs';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../storage/storage.service';
-import { GoogleTtsService } from '../../ai/google-tts.service';
+import { GoogleTtsService } from '../../ai/media/google-tts.service';
 import {
   RemotionRenderService,
   VideoSectionInput,
-} from '../../ai/remotion-render.service';
+} from '../../ai/media/remotion-render.service';
 import { LessonVideoService } from '../lesson-video.service';
 import {
   LESSON_VIDEO_QUEUE,

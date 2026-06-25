@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { GuardrailService } from './guardrail.service';
-import { GeminiService } from '../gemini.service';
+import { GeminiService } from '../providers/gemini.service';
 
 const mockGemini = { generate: jest.fn() };
 const mockConfig = {
