@@ -4,15 +4,25 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api/admin.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { FileText, ImageIcon } from 'lucide-react';
 import { notify, showPrompt } from '@/store/dialog.store';
 
 type StatusFilter = 'pending' | 'approved' | 'rejected';
+
+interface CredentialFile {
+  url: string;
+  name: string;
+  type: string;
+  size: number;
+}
 
 interface ApplicationItem {
   id: string;
   status: StatusFilter;
   expertise: string;
   experience: string;
+  qualifications: string | null;
+  credentialFiles: CredentialFile[];
   motivation: string;
   rejectReason: string | null;
   createdAt: string;
@@ -116,8 +126,14 @@ export default function AdminInstructorApplicationsPage() {
                   <dl className="space-y-1.5 text-sm">
                     <Detail label="Chuyên môn" value={item.expertise} />
                     <Detail label="Kinh nghiệm" value={item.experience} />
+                    {item.qualifications && (
+                      <Detail label="Bằng cấp" value={item.qualifications} />
+                    )}
                     <Detail label="Lý do" value={item.motivation} />
                   </dl>
+                  {item.credentialFiles?.length > 0 && (
+                    <CredentialFiles files={item.credentialFiles} />
+                  )}
                   {item.rejectReason && (
                     <p className="text-xs text-red-600 mt-2">
                       Lý do từ chối: {item.rejectReason}
@@ -161,6 +177,32 @@ function Detail({ label, value }: { label: string; value: string }) {
     <div className="flex gap-2">
       <dt className="text-gray-400 shrink-0 w-20">{label}:</dt>
       <dd className="text-gray-700 whitespace-pre-wrap">{value}</dd>
+    </div>
+  );
+}
+
+function CredentialFiles({ files }: { files: CredentialFile[] }) {
+  return (
+    <div className="mt-3">
+      <p className="text-xs text-gray-400 mb-1.5">Bằng cấp đính kèm:</p>
+      <div className="flex flex-wrap gap-2">
+        {files.map((file) => (
+          <a
+            key={file.url}
+            href={file.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 border rounded-lg px-2.5 py-1.5 text-xs text-gray-700 hover:border-sky hover:text-sky transition-colors"
+          >
+            {file.type === 'application/pdf' ? (
+              <FileText size={14} className="text-red-500" />
+            ) : (
+              <ImageIcon size={14} className="text-sky" />
+            )}
+            <span className="max-w-40 truncate">{file.name}</span>
+          </a>
+        ))}
+      </div>
     </div>
   );
 }

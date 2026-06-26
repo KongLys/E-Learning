@@ -57,6 +57,8 @@ const PART_CAP = 4000;
 const TOTAL_CAP = 12000;
 /** Fallback khi không có TOC: số cụm tạo bằng k-means. */
 const FALLBACK_CLUSTERS = 12;
+/** Trần số batch map cho một bài cực dài (chặn chi phí); vượt thì chấp nhận lược bớt. */
+const MAX_MAP_BATCHES = 8; // ~8 × 12000 = 96000 ký tự được bao phủ
 
 /**
  * Dựng và truy vấn cây RAPTOR (tóm tắt phân cấp) cho một khóa học.
@@ -168,10 +170,8 @@ export class RaptorService {
     // ── Tầng 1: tóm tắt từng bài học ──
     const level1: BuiltNode[] = [];
     for (const g of groups) {
-      const parts = boundedParts(g.contents);
-      const { title, content, tokens } = await this.summarizeNode(
+      const { title, content, tokens } = await this.summarizeGroup(
         g.pathLabel,
-        parts,
         g.contents,
       );
       tokenUsage += tokens;
@@ -213,9 +213,8 @@ export class RaptorService {
         title = nodes[0].title;
         content = nodes[0].content;
       } else {
-        const res = await this.summarizeNode(
+        const res = await this.summarizeGroup(
           label,
-          boundedParts(nodes.map((n) => n.content)),
           nodes.map((n) => n.content),
         );
         title = res.title;
@@ -246,9 +245,8 @@ export class RaptorService {
       if (rootChildren.length === 1) {
         content = rootChildren[0].content;
       } else {
-        const res = await this.summarizeNode(
+        const res = await this.summarizeGroup(
           course.title,
-          boundedParts(rootChildren.map((n) => n.content)),
           rootChildren.map((n) => n.content),
         );
         title = res.title ?? course.title;
@@ -482,6 +480,48 @@ export class RaptorService {
     });
   }
 
+  /**
+   * Tóm tắt một nhóm nội dung bằng map-reduce. Nhóm vừa một batch → 1 call như cũ;
+   * nhóm dài → tóm tắt từng batch (map) rồi tóm tắt-của-tóm-tắt (reduce, đệ quy).
+   * Nhờ vậy bài/phần dài không bị cắt mất phần đuôi.
+   */
+  private async summarizeGroup(
+    pathLabel: string,
+    contents: string[],
+  ): Promise<{ title: string | null; content: string; tokens: number }> {
+    const batches = chunkBatches(contents);
+
+    // Trường hợp thường: vừa 1 batch → hành vi & chi phí y như hiện tại.
+    if (batches.length <= 1) {
+      return this.summarizeNode(pathLabel, batches[0], batches[0]);
+    }
+
+    // Van an toàn: bài dài bất thường → giới hạn số batch để chặn chi phí runaway.
+    const capped = batches.slice(0, MAX_MAP_BATCHES);
+
+    // MAP: tóm tắt từng batch độc lập.
+    let tokens = 0;
+    const partials: string[] = [];
+    for (let i = 0; i < capped.length; i++) {
+      const res = await this.summarizeNode(
+        `${pathLabel} (phần ${i + 1}/${capped.length})`,
+        capped[i],
+        capped[i],
+      );
+      tokens += res.tokens;
+      partials.push(res.content);
+    }
+
+    // REDUCE: tóm tắt các bản tóm tắt phần. Đệ quy — partials ngắn nên gần như
+    // luôn gom về 1 batch ở vòng kế tiếp; MAX_MAP_BATCHES chặn trần tuyệt đối.
+    const reduced = await this.summarizeGroup(pathLabel, partials);
+    return {
+      title: reduced.title,
+      content: reduced.content,
+      tokens: tokens + reduced.tokens,
+    };
+  }
+
   /** Tóm tắt một node bằng LLM; lỗi/parse hỏng thì fallback ghép nội dung. */
   private async summarizeNode(
     pathLabel: string,
@@ -558,17 +598,27 @@ function sqlTextArray(ids: string[]): Prisma.Sql {
   return Prisma.sql`ARRAY[${Prisma.join(ids)}]::text[]`;
 }
 
-/** Cắt mỗi đoạn theo PART_CAP và dừng khi tổng vượt TOTAL_CAP. */
-function boundedParts(contents: string[]): string[] {
-  const out: string[] = [];
+/**
+ * Cắt mỗi đoạn theo PART_CAP và gom thành nhiều batch, mỗi batch ≤ TOTAL_CAP.
+ * Khác bản cũ (dừng khi đủ ngưỡng) — ở đây giữ lại TẤT CẢ nội dung để map-reduce.
+ * Vì PART_CAP < TOTAL_CAP nên mỗi đoạn luôn lọt một batch (không lặp vô hạn).
+ */
+export function chunkBatches(contents: string[]): string[][] {
+  const batches: string[][] = [];
+  let cur: string[] = [];
   let total = 0;
   for (const c of contents) {
     const piece = c.slice(0, PART_CAP);
-    out.push(piece);
+    if (total + piece.length > TOTAL_CAP && cur.length > 0) {
+      batches.push(cur);
+      cur = [];
+      total = 0;
+    }
+    cur.push(piece);
     total += piece.length;
-    if (total >= TOTAL_CAP) break;
   }
-  return out.length > 0 ? out : [''];
+  if (cur.length > 0) batches.push(cur);
+  return batches.length > 0 ? batches : [['']];
 }
 
 function fallbackText(contents: string[]): string {

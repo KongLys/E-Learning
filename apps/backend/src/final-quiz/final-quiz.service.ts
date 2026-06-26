@@ -200,40 +200,45 @@ export class FinalQuizService {
       if (questions.length === 0) {
         throw new Error('AI không tạo được câu hỏi cho quiz cuối khóa');
       }
-      await this.prisma.$transaction(async (tx) => {
-        await tx.quizQuestion.deleteMany({
-          where: { quizLessonId: slot.quizLessonId },
-        });
-        for (let qi = 0; qi < questions.length; qi++) {
-          const q = questions[qi];
-          await tx.quizQuestion.create({
-            data: {
-              quizLessonId: slot.quizLessonId,
-              content: q.content,
-              questionType: 'single',
-              orderIndex: qi,
-              points: 1,
-              explanation: q.explanation ?? null,
-              options: {
-                create: q.options.map((o, oi) => ({
-                  content: o.content,
-                  isCorrect: o.isCorrect,
-                  orderIndex: oi,
-                })),
+      await this.prisma.$transaction(
+        async (tx) => {
+          await tx.quizQuestion.deleteMany({
+            where: { quizLessonId: slot.quizLessonId },
+          });
+          for (let qi = 0; qi < questions.length; qi++) {
+            const q = questions[qi];
+            await tx.quizQuestion.create({
+              data: {
+                quizLessonId: slot.quizLessonId,
+                content: q.content,
+                questionType: 'single',
+                orderIndex: qi,
+                points: 1,
+                explanation: q.explanation ?? null,
+                options: {
+                  create: q.options.map((o, oi) => ({
+                    content: o.content,
+                    isCorrect: o.isCorrect,
+                    orderIndex: oi,
+                  })),
+                },
               },
+            });
+          }
+          await tx.quizLesson.update({
+            where: { id: slot.quizLessonId },
+            data: {
+              aiGenerated: true,
+              generationStatus: 'ready',
+              sourceHash: hash,
+              errorMsg: null,
             },
           });
-        }
-        await tx.quizLesson.update({
-          where: { id: slot.quizLessonId },
-          data: {
-            aiGenerated: true,
-            generationStatus: 'ready',
-            sourceHash: hash,
-            errorMsg: null,
-          },
-        });
-      });
+        },
+        // Sinh nhiều câu hỏi tuần tự (kèm options) trên DB Supabase từ xa có thể
+        // vượt mức timeout mặc định 5s của Prisma → nâng giới hạn cho transaction.
+        { timeout: 30_000, maxWait: 10_000 },
+      );
       this.logger.log(
         `Đã sinh quiz cuối khóa cho ${courseId}: ${questions.length} câu`,
       );

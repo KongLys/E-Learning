@@ -7,6 +7,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { SepayService } from './sepay/sepay.service';
 import { InitiatePaymentDto } from './dto/initiate-payment.dto';
@@ -23,6 +24,7 @@ export class PaymentService {
     private sepayService: SepayService,
     private eventEmitter: EventEmitter2,
     private couponService: CouponService,
+    private config: ConfigService,
   ) {}
 
   async initiatePayment(userId: string, dto: InitiatePaymentDto) {
@@ -51,6 +53,22 @@ export class PaymentService {
 
     const qrUrl = this.sepayService.buildQrUrl(amount, transferCode);
     const account = this.sepayService.getAccountInfo();
+
+    // TODO(dev): tạm thời tự động đánh dấu thanh toán thành công sau 5s vì
+    // SePay không gọi webhook tới được máy local. Tắt bằng cách bỏ
+    // PAYMENT_MOCK_AUTO_SUCCESS trong .env trước khi lên production.
+    if (this.config.get<string>('PAYMENT_MOCK_AUTO_SUCCESS') === 'true') {
+      this.logger.warn(
+        `PAYMENT_MOCK_AUTO_SUCCESS bật: đơn ${order.id} sẽ tự thành công sau 5s`,
+      );
+      setTimeout(() => {
+        this.markPaymentSuccessByTransferCode(transferCode).catch((err) =>
+          this.logger.error(
+            `Auto-success thất bại cho ${transferCode}: ${err}`,
+          ),
+        );
+      }, 5_000);
+    }
 
     return {
       orderId: order.id,
@@ -111,12 +129,38 @@ export class PaymentService {
       return { success: false };
     }
 
+    await this.finalizeOrderPaid(
+      payment.id,
+      order,
+      payload.referenceCode ?? String(payload.id),
+      payload,
+    );
+
+    return { success: true };
+  }
+
+  /**
+   * Chốt một đơn sang trạng thái đã thanh toán: cập nhật payment/order,
+   * ghi nhận lượt dùng coupon và phát sự kiện order.paid để kích hoạt ghi danh.
+   * Idempotent: bỏ qua nếu payment đã ở trạng thái success.
+   */
+  private async finalizeOrderPaid(
+    paymentId: string,
+    order: {
+      id: string;
+      userId: string;
+      discountCode: string | null;
+      items: { courseId: string }[];
+    },
+    gatewayTxnId: string,
+    rawResponse?: unknown,
+  ) {
     await this.prisma.payment.update({
-      where: { id: payment.id },
+      where: { id: paymentId },
       data: {
         status: 'success',
-        gatewayTxnId: payload.referenceCode ?? String(payload.id),
-        rawResponse: payload as any,
+        gatewayTxnId,
+        rawResponse: (rawResponse ?? undefined) as any,
       },
     });
     await this.prisma.order.update({
@@ -136,7 +180,23 @@ export class PaymentService {
         new OrderPaidEvent(order.userId, item.courseId),
       );
     }
+  }
 
-    return { success: true };
+  /**
+   * Chỉ dùng cho dev (PAYMENT_MOCK_AUTO_SUCCESS): giả lập SePay báo tiền vào
+   * để chốt đơn thành công mà không cần webhook thật.
+   */
+  private async markPaymentSuccessByTransferCode(transferCode: string) {
+    const payment = await this.prisma.payment.findUnique({
+      where: { transferCode },
+      include: { order: { include: { items: true } } },
+    });
+    if (!payment || payment.status === 'success') return;
+
+    await this.finalizeOrderPaid(
+      payment.id,
+      payment.order,
+      `MOCK-${transferCode}`,
+    );
   }
 }

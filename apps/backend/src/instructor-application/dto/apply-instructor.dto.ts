@@ -1,4 +1,4 @@
-import { IsString, MinLength, MaxLength } from 'class-validator';
+import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class ApplyInstructorDto {
   @IsString()
@@ -10,6 +10,11 @@ export class ApplyInstructorDto {
   @MinLength(10)
   @MaxLength(2000)
   experience: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  qualifications?: string;
 
   @IsString()
   @MinLength(10)

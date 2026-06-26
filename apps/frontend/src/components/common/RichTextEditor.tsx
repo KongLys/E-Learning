@@ -3,6 +3,7 @@
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { useEffect } from 'react';
+import { showPrompt } from '@/store/dialog.store';
 
 interface RichTextEditorProps {
   value: string;
@@ -43,6 +44,7 @@ export function RichTextEditor({ value, onChange, placeholder, readOnly }: RichT
       <div className="flex flex-wrap gap-1 border-b border-gray-200 bg-gray-50 px-2 py-1.5">
         <button type="button" onClick={() => editor.chain().focus().toggleBold().run()} className={btn(editor.isActive('bold'))}>B</button>
         <button type="button" onClick={() => editor.chain().focus().toggleItalic().run()} className={btn(editor.isActive('italic'))}><em>I</em></button>
+        <button type="button" onClick={() => editor.chain().focus().toggleUnderline().run()} className={btn(editor.isActive('underline'))}><u>U</u></button>
         <button type="button" onClick={() => editor.chain().focus().toggleStrike().run()} className={btn(editor.isActive('strike'))}>S</button>
         <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} className={btn(editor.isActive('heading', { level: 2 }))}>H2</button>
         <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} className={btn(editor.isActive('heading', { level: 3 }))}>H3</button>
@@ -50,6 +52,29 @@ export function RichTextEditor({ value, onChange, placeholder, readOnly }: RichT
         <button type="button" onClick={() => editor.chain().focus().toggleOrderedList().run()} className={btn(editor.isActive('orderedList'))}>1. List</button>
         <button type="button" onClick={() => editor.chain().focus().toggleBlockquote().run()} className={btn(editor.isActive('blockquote'))}>❝</button>
         <button type="button" onClick={() => editor.chain().focus().toggleCodeBlock().run()} className={btn(editor.isActive('codeBlock'))}>{'</>'}</button>
+        <button
+          type="button"
+          onClick={async () => {
+            if (editor.isActive('link')) {
+              editor.chain().focus().unsetLink().run();
+              return;
+            }
+            const url = await showPrompt({
+              title: 'Chèn liên kết',
+              placeholder: 'https://...',
+              defaultValue: editor.getAttributes('link').href ?? '',
+            });
+            if (url === null) return;
+            if (url === '') {
+              editor.chain().focus().unsetLink().run();
+              return;
+            }
+            editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+          }}
+          className={btn(editor.isActive('link'))}
+        >
+          🔗
+        </button>
       </div>
       )}
       {editor.isEmpty && placeholder && (

@@ -1,15 +1,16 @@
 'use client';
 
+import { useRef, useState } from 'react';
 import { useForm, type UseFormRegisterReturn } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { CheckCircle2, Clock, XCircle } from 'lucide-react';
+import { CheckCircle2, Clock, FileText, ImageIcon, Upload, X, XCircle } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import {
   instructorApplicationApi,
-  type ApplyInstructorDto,
+  type ApplyInstructorInput,
 } from '@/lib/api/instructor-application.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { notify } from '@/store/dialog.store';
@@ -17,10 +18,15 @@ import { notify } from '@/store/dialog.store';
 const schema = z.object({
   expertise: z.string().min(10, 'Tối thiểu 10 ký tự').max(2000, 'Tối đa 2000 ký tự'),
   experience: z.string().min(10, 'Tối thiểu 10 ký tự').max(2000, 'Tối đa 2000 ký tự'),
+  qualifications: z.string().max(2000, 'Tối đa 2000 ký tự').optional().or(z.literal('')),
   motivation: z.string().min(10, 'Tối thiểu 10 ký tự').max(2000, 'Tối đa 2000 ký tự'),
 });
 
 type FormData = z.infer<typeof schema>;
+
+const MAX_FILES = 5;
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
 
 const inputClass =
   'w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky focus:border-sky transition-colors resize-none';
@@ -28,6 +34,8 @@ const inputClass =
 export default function BecomeInstructorPage() {
   const { user, refreshUser } = useAuthStore();
   const qc = useQueryClient();
+  const [files, setFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['instructor-application-me'],
@@ -38,16 +46,60 @@ export default function BecomeInstructorPage() {
     useForm<FormData>({ resolver: zodResolver(schema) });
 
   const applyMutation = useMutation({
-    mutationFn: (dto: ApplyInstructorDto) => instructorApplicationApi.apply(dto),
+    mutationFn: (input: ApplyInstructorInput) => instructorApplicationApi.apply(input),
     onSuccess: async () => {
       notify.success('Đã gửi đơn đăng ký. Vui lòng chờ quản trị viên duyệt.');
       reset();
+      setFiles([]);
       await qc.invalidateQueries({ queryKey: ['instructor-application-me'] });
     },
     onError: (err: any) => {
       notify.error(err?.response?.data?.message ?? 'Gửi đơn thất bại');
     },
   });
+
+  const handleFilesSelected = (selected: FileList | null) => {
+    if (!selected) return;
+    const incoming = Array.from(selected);
+    const valid: File[] = [];
+    for (const file of incoming) {
+      if (!ACCEPTED_TYPES.includes(file.type)) {
+        notify.error(`"${file.name}" không phải ảnh hoặc PDF hợp lệ`);
+        continue;
+      }
+      if (file.size > MAX_FILE_SIZE) {
+        notify.error(`"${file.name}" vượt quá 10MB`);
+        continue;
+      }
+      valid.push(file);
+    }
+    setFiles((prev) => {
+      const merged = [...prev, ...valid];
+      if (merged.length > MAX_FILES) {
+        notify.error(`Tối đa ${MAX_FILES} tệp bằng cấp`);
+      }
+      return merged.slice(0, MAX_FILES);
+    });
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removeFile = (index: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const onSubmit = (d: FormData) => {
+    if (files.length === 0) {
+      notify.error('Vui lòng đính kèm ít nhất một ảnh hoặc tệp PDF bằng cấp / chứng chỉ');
+      return;
+    }
+    applyMutation.mutate({
+      expertise: d.expertise,
+      experience: d.experience,
+      qualifications: d.qualifications || undefined,
+      motivation: d.motivation,
+      files,
+    });
+  };
 
   if (isLoading) return <LoadingSpinner />;
 
@@ -116,10 +168,7 @@ export default function BecomeInstructorPage() {
           Chia sẻ với chúng tôi về chuyên môn và kinh nghiệm của bạn để trở thành
           giảng viên trên nền tảng.
         </p>
-        <form
-          onSubmit={handleSubmit((d) => applyMutation.mutate(d))}
-          className="space-y-4"
-        >
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <Field
             label="Lĩnh vực / chuyên môn giảng dạy *"
             placeholder="Ví dụ: Lập trình web, Thiết kế UI/UX, Marketing..."
@@ -127,11 +176,25 @@ export default function BecomeInstructorPage() {
             register={register('expertise')}
           />
           <Field
-            label="Kinh nghiệm & bằng cấp *"
-            placeholder="Mô tả kinh nghiệm làm việc, giảng dạy, chứng chỉ liên quan..."
+            label="Kinh nghiệm làm việc / giảng dạy *"
+            placeholder="Mô tả kinh nghiệm làm việc, giảng dạy liên quan đến lĩnh vực của bạn..."
             error={errors.experience?.message}
             register={register('experience')}
           />
+          <Field
+            label="Bằng cấp & chứng chỉ"
+            placeholder="Liệt kê các bằng cấp, chứng chỉ bạn có (không bắt buộc nếu đã đính kèm file)..."
+            error={errors.qualifications?.message}
+            register={register('qualifications')}
+          />
+
+          <CredentialUpload
+            files={files}
+            inputRef={fileInputRef}
+            onSelect={handleFilesSelected}
+            onRemove={removeFile}
+          />
+
           <Field
             label="Lý do muốn trở thành giảng viên *"
             placeholder="Điều gì khiến bạn muốn giảng dạy trên nền tảng này?"
@@ -182,6 +245,75 @@ function Field({
       <label className="block text-sm font-medium mb-1 text-ink">{label}</label>
       <textarea {...register} rows={3} placeholder={placeholder} className={inputClass} />
       {error && <p className="text-xs text-semantic-error mt-1">{error}</p>}
+    </div>
+  );
+}
+
+function CredentialUpload({
+  files,
+  inputRef,
+  onSelect,
+  onRemove,
+}: {
+  files: File[];
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  onSelect: (files: FileList | null) => void;
+  onRemove: (index: number) => void;
+}) {
+  return (
+    <div>
+      <label className="block text-sm font-medium mb-1 text-ink">
+        Ảnh / file bằng cấp, chứng chỉ *
+      </label>
+      <p className="text-xs text-ink-subtle mb-2">
+        Bắt buộc đính kèm ít nhất một ảnh hoặc PDF bằng cấp, chứng chỉ — tối đa 5 tệp, mỗi tệp 10MB.
+      </p>
+
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        className="w-full flex items-center justify-center gap-2 border border-dashed border-hairline-strong rounded-lg px-3 py-4 text-sm text-ink-subtle hover:border-sky hover:text-sky transition-colors"
+      >
+        <Upload size={16} />
+        Chọn tệp để tải lên
+      </button>
+      <input
+        ref={inputRef}
+        type="file"
+        multiple
+        accept="image/jpeg,image/png,image/webp,application/pdf"
+        className="hidden"
+        onChange={(e) => onSelect(e.target.files)}
+      />
+
+      {files.length > 0 && (
+        <ul className="mt-3 space-y-2">
+          {files.map((file, index) => (
+            <li
+              key={`${file.name}-${index}`}
+              className="flex items-center gap-2 border border-hairline rounded-lg px-3 py-2 text-sm"
+            >
+              {file.type === 'application/pdf' ? (
+                <FileText size={16} className="text-semantic-error shrink-0" />
+              ) : (
+                <ImageIcon size={16} className="text-sky shrink-0" />
+              )}
+              <span className="flex-1 min-w-0 truncate text-ink">{file.name}</span>
+              <span className="text-xs text-ink-subtle shrink-0">
+                {(file.size / 1024 / 1024).toFixed(1)}MB
+              </span>
+              <button
+                type="button"
+                onClick={() => onRemove(index)}
+                className="text-ink-subtle hover:text-semantic-error shrink-0"
+                aria-label="Xóa tệp"
+              >
+                <X size={16} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

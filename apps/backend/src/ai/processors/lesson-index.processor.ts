@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
-import { Processor, WorkerHost } from '@nestjs/bullmq';
+import { Processor, WorkerHost, InjectQueue } from '@nestjs/bullmq';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { Job } from 'bullmq';
+import { Job, Queue } from 'bullmq';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../storage/storage.service';
 import { LlamaParseService } from '../chunking/llama-parse.service';
@@ -13,6 +13,10 @@ import {
   ChunkSourceType,
 } from '../vector/vector-store.service';
 import { ModerationService } from '../../moderation/moderation.service';
+import {
+  GRAPH_EXTRACTION_QUEUE,
+  ExtractGraphJob,
+} from '../lightrag/graph-extraction.queue';
 
 export const LESSON_INDEX_QUEUE = 'lesson-indexing';
 
@@ -57,8 +61,36 @@ export class LessonIndexProcessor extends WorkerHost {
     private vector: VectorStoreService,
     private moderation: ModerationService,
     private events: EventEmitter2,
+    @InjectQueue(GRAPH_EXTRACTION_QUEUE)
+    private graphQueue: Queue<ExtractGraphJob>,
   ) {
     super();
+  }
+
+  /**
+   * Đẩy job dựng đồ thị tri thức (LightRAG) cho bài — chạy sau khi chunk vector đã
+   * sẵn sàng. Best-effort, tách rời: lỗi đồ thị không ảnh hưởng index vector. Gọi ở
+   * MỌI nhánh kết thúc (index xong / không có nội dung / bị từ chối) để đồ thị luôn
+   * đồng bộ với vector store — extractLesson tự dọn đóng góp cũ khi bài không còn chunk.
+   */
+  private async enqueueGraphExtraction(lessonId: string): Promise<void> {
+    try {
+      await this.graphQueue.add(
+        'extract',
+        { lessonId },
+        {
+          jobId: `graph-${lessonId}`,
+          removeOnComplete: true,
+          removeOnFail: 50,
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 8_000 },
+        },
+      );
+    } catch (err) {
+      this.logger.warn(
+        `Failed to enqueue graph extraction for lesson ${lessonId}: ${(err as Error).message}`,
+      );
+    }
   }
 
   async process(job: Job<IndexLessonJob>): Promise<void> {
@@ -139,6 +171,7 @@ export class LessonIndexProcessor extends WorkerHost {
         this.logger.log(
           `Lesson ${lessonId} has no indexable content — cleared chunks only`,
         );
+        await this.enqueueGraphExtraction(lessonId);
         return;
       }
 
@@ -185,6 +218,7 @@ export class LessonIndexProcessor extends WorkerHost {
           this.logger.warn(
             `Lesson ${lessonId} not approved (${outcome.status}/${outcome.label}) — skipping index`,
           );
+          await this.enqueueGraphExtraction(lessonId);
           return;
         }
         await this.prisma.lesson.update({
@@ -206,6 +240,7 @@ export class LessonIndexProcessor extends WorkerHost {
         this.logger.warn(
           `Lesson ${lessonId} has moderationStatus=${lesson.moderationStatus} — skipping index`,
         );
+        await this.enqueueGraphExtraction(lessonId);
         return;
       }
 
@@ -244,6 +279,7 @@ export class LessonIndexProcessor extends WorkerHost {
       this.logger.log(
         `Indexed lesson ${lessonId}: ${rows.length} chunks (${contentMd ? 'content' : ''}${contentMd && fileMd ? '+' : ''}${fileMd ? 'file' : ''})`,
       );
+      await this.enqueueGraphExtraction(lessonId);
     } catch (err) {
       const msg = (err as Error).message;
       this.logger.error(`Failed to index lesson ${lessonId}: ${msg}`);

@@ -161,9 +161,11 @@ model InstructorApplication {
   id           String                      @id @default(uuid())
   userId       String                      @map("user_id")
   status       InstructorApplicationStatus @default(pending)
-  expertise    String                      @db.Text // lĩnh vực giảng dạy
-  experience   String                      @db.Text // kinh nghiệm / bằng cấp
-  motivation   String                      @db.Text // lý do muốn làm giảng viên
+  expertise       String                   @db.Text // lĩnh vực giảng dạy
+  experience      String                   @db.Text // kinh nghiệm làm việc / giảng dạy
+  qualifications  String?                  @db.Text // bằng cấp, chứng chỉ (mô tả)
+  credentialFiles Json                     @default("[]") @map("credential_files") // [{ url, name, type, size }] ảnh/PDF bằng cấp
+  motivation      String                   @db.Text // lý do muốn làm giảng viên
   rejectReason String?                     @map("reject_reason") @db.Text // admin nhập khi từ chối
   reviewedById String?                     @map("reviewed_by_id")
   reviewedAt   DateTime?                   @map("reviewed_at")
@@ -242,6 +244,8 @@ model Course {
   mindmap            CourseMindmap?
   raptorTree         CourseRaptorTree?
   raptorNodes        RaptorNode[]
+  graphEntities      GraphEntity[]
+  graphRelations     GraphRelation[]
   coupons            Coupon[]
 
   @@index([instructorId])
@@ -1045,6 +1049,58 @@ model RaptorNode {
   @@index([lessonId])
   @@index([level])
   @@map("raptor_nodes")
+}
+
+// ─── LightRAG (đồ thị tri thức + dual-level retrieval) ───────────────────────
+
+// Thực thể (khái niệm/thuật toán/công cụ…) trích từ nội dung khóa học. Dedup theo
+// (course_id, norm_name): mỗi bài đóng góp lessonId vào lesson_ids; bài bị gỡ khỏi
+// lesson_ids khi re-index, entity rỗng lesson_ids thì xóa (incremental per-lesson).
+model GraphEntity {
+  id          String                      @id @default(uuid())
+  courseId    String                      @map("course_id")
+  name        String
+  normName    String                      @map("norm_name") // lower/trim để dedup
+  type        String                      @default("other") // concept|algorithm|tool|person|other
+  description String                      @db.Text
+  lessonIds   String[]                    @default([]) @map("lesson_ids")
+  sectionIds  String[]                    @default([]) @map("section_ids")
+  degree      Int                         @default(0) // số quan hệ chạm tới (rank low-level)
+  embedding   Unsupported("vector(768)")?
+  contentTsv  Unsupported("tsvector")?    @default(dbgenerated("to_tsvector('simple'::regconfig, COALESCE(name, ''::text) || ' ' || COALESCE(description, ''::text))")) @map("content_tsv")
+  createdAt   DateTime                    @default(now()) @map("created_at")
+  updatedAt   DateTime                    @updatedAt @map("updated_at")
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, normName])
+  @@index([courseId])
+  @@map("graph_entities")
+}
+
+// Quan hệ có hướng giữa 2 entity, gắn bài nguồn (lesson_id) để xóa incremental +
+// truy vết citation. keywords/description dùng cho truy hồi high-level.
+model GraphRelation {
+  id          String                      @id @default(uuid())
+  courseId    String                      @map("course_id")
+  srcId       String                      @map("src_id")
+  dstId       String                      @map("dst_id")
+  keywords    String                      @default("")
+  description String                      @db.Text
+  lessonId    String?                     @map("lesson_id")
+  sectionId   String?                     @map("section_id")
+  weight      Float                       @default(1)
+  embedding   Unsupported("vector(768)")?
+  contentTsv  Unsupported("tsvector")?    @default(dbgenerated("to_tsvector('simple'::regconfig, COALESCE(keywords, ''::text) || ' ' || COALESCE(description, ''::text))")) @map("content_tsv")
+  createdAt   DateTime                    @default(now()) @map("created_at")
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([courseId])
+  @@index([lessonId])
+  @@index([srcId])
+  @@index([dstId])
+  @@map("graph_relations")
 }
 
 model AiConversation {

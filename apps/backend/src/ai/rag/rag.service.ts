@@ -8,6 +8,7 @@ import {
   RetrievedChunk,
   ChunkScope,
 } from '../vector/vector-store.service';
+import { GraphRetrieverService } from '../lightrag/graph-retriever.service';
 import {
   SYSTEM_INSTRUCTION,
   NO_CONTEXT_MESSAGE,
@@ -41,17 +42,22 @@ export class RagService {
   private readonly retrieveTop: number;
   private readonly rerankTop: number;
   private readonly rerankMinScore: number;
+  private readonly lightragEnabled: boolean;
 
   constructor(
     private prisma: PrismaService,
     private gemini: GeminiService,
     private cohere: CohereService,
     private vector: VectorStoreService,
+    private graph: GraphRetrieverService,
     config: ConfigService,
   ) {
     this.retrieveTop = config.get<number>('RAG_RETRIEVE_TOP', 50);
     this.rerankTop = config.get<number>('RAG_RERANK_TOP', 5);
     this.rerankMinScore = config.get<number>('RAG_RERANK_MIN_SCORE', 0.3);
+    // Cờ tắt nhanh nguồn graph (LightRAG) để A/B với baseline thuần vector.
+    this.lightragEnabled =
+      config.get<string>('LIGHTRAG_ENABLED', 'true') !== 'false';
   }
 
   async ask(
@@ -62,29 +68,63 @@ export class RagService {
   ): Promise<AskResult> {
     // 1. Query analysis — phân tích intent + sinh biến thể
     const analysis = await this.analyzeQuery(query, conversationHistory);
-    const allQueries = unique([analysis.resolvedQuery, ...analysis.variants]).slice(0, 4);
-    this.logger.log(`[RAG] original: "${query}" | intent: ${analysis.intent} | subject: "${analysis.subject}"`);
+    const allQueries = unique([
+      analysis.resolvedQuery,
+      ...analysis.variants,
+    ]).slice(0, 4);
+    this.logger.log(
+      `[RAG] original: "${query}" | intent: ${analysis.intent} | subject: "${analysis.subject}"`,
+    );
     this.logger.log(`[RAG] resolvedQuery: "${analysis.resolvedQuery}"`);
-    this.logger.log(`[RAG] search queries:\n${allQueries.map((q, i) => `  [${i}] ${q}`).join('\n')}`);
+    this.logger.log(
+      `[RAG] search queries:\n${allQueries.map((q, i) => `  [${i}] ${q}`).join('\n')}`,
+    );
 
-    // 2. Embed song song + hybrid search song song (giới hạn theo Phần/Bài nếu có)
+    // 2. Embed + truy hồi song song: vector+BM25 (nhiều biến thể) VÀ đồ thị LightRAG
+    //    dual-level. Cả hai trả về pool ứng viên chunk → hợp nhất bằng RRF.
     const embeddings = await this.gemini.embedBatch(allQueries);
-    const pools = await Promise.all(
-      allQueries.map((q, i) =>
-        this.vector.hybridSearch(
-          courseId,
-          embeddings[i],
-          q,
-          this.retrieveTop,
-          scope,
+    const [pools, graphResult] = await Promise.all([
+      Promise.all(
+        allQueries.map((q, i) =>
+          this.vector.hybridSearch(
+            courseId,
+            embeddings[i],
+            q,
+            this.retrieveTop,
+            scope,
+          ),
         ),
       ),
+      this.lightragEnabled
+        ? this.graph
+            .retrieve(
+              courseId,
+              analysis.lowLevelKeywords,
+              analysis.highLevelKeywords,
+              scope,
+            )
+            .catch((err) => {
+              this.logger.warn(
+                `[RAG] graph retrieve failed, vector-only: ${(err as Error).message}`,
+              );
+              return null;
+            })
+        : Promise.resolve(null),
+    ]);
+
+    const graphPool = graphResult?.chunks ?? [];
+    const allPools = graphPool.length > 0 ? [...pools, graphPool] : pools;
+    const fused = reciprocalRankFusion(allPools, this.retrieveTop);
+    this.logger.log(
+      `[RAG] fused pool: ${fused.length} chunks (vector pools=${pools.length}, graph chunks=${graphPool.length})`,
     );
-    const fused = reciprocalRankFusion(pools, this.retrieveTop);
-    this.logger.log(`[RAG] fused pool: ${fused.length} chunks`);
-    fused.slice(0, 10).forEach((c, i) =>
-      this.logger.log(`  [${i}] score=${c.score.toFixed(4)} | ${c.content.slice(0, 80).replace(/\n/g, ' ')}`),
-    );
+    fused
+      .slice(0, 10)
+      .forEach((c, i) =>
+        this.logger.log(
+          `  [${i}] score=${c.score.toFixed(4)} | ${c.content.slice(0, 80).replace(/\n/g, ' ')}`,
+        ),
+      );
 
     const noContextResult = (): AskResult => ({
       stream: emptyStream(NO_CONTEXT_MESSAGE),
@@ -104,7 +144,9 @@ export class RagService {
     );
     this.logger.log(`[RAG] rerank top ${rerankResults.length}:`);
     rerankResults.forEach((r, i) =>
-      this.logger.log(`  [${i}] score=${r.relevanceScore.toFixed(4)} | ${fused[r.index].content.slice(0, 80).replace(/\n/g, ' ')}`),
+      this.logger.log(
+        `  [${i}] score=${r.relevanceScore.toFixed(4)} | ${fused[r.index].content.slice(0, 80).replace(/\n/g, ' ')}`,
+      ),
     );
     const topK = rerankResults.map((r) => fused[r.index]);
 
@@ -114,12 +156,20 @@ export class RagService {
       topK.map((c) => c.content),
     );
 
-    this.logger.log(`[RAG] compressed context (${compressed.length} chars):\n${compressed.slice(0, 300).replace(/\n/g, ' ')}`);
+    this.logger.log(
+      `[RAG] compressed context (${compressed.length} chars):\n${compressed.slice(0, 300).replace(/\n/g, ' ')}`,
+    );
     // Cổng B: compression không tìm thấy đoạn liên quan nào ⇒ "chưa đề cập".
     if (!compressed.trim()) {
       this.logger.debug('RAG gate: compression returned empty context');
       return noContextResult();
     }
+
+    // Bơm "graph context" (entity + quan hệ) lên đầu ngữ cảnh để model suy luận
+    // multi-hop. Đây là tri thức rút từ chính tài liệu khóa; citation vẫn từ chunk.
+    const finalContext = graphResult?.graphContext
+      ? `[Tri thức quan hệ rút từ tài liệu]\n${graphResult.graphContext}\n\n[Trích đoạn nguồn]\n${compressed}`
+      : compressed;
 
     // 5. Generate answer
     const citations: Citation[] = topK.map((c) => ({
@@ -132,7 +182,7 @@ export class RagService {
     }));
     const prompt = buildAnswerPrompt(
       analysis.resolvedQuery,
-      compressed,
+      finalContext,
       topK.map((c, i) => ({
         index: i,
         sectionTitle: c.sectionTitle,
@@ -261,20 +311,33 @@ export class RagService {
       subject: query,
       resolvedQuery: query,
       variants: [query, query, query],
+      lowLevelKeywords: [query],
+      highLevelKeywords: [],
     };
     try {
       const text = await this.gemini.generate(
         buildQueryAnalysisPrompt(query, history),
-        { temperature: 0.1, maxOutputTokens: 512 },
+        { temperature: 0.1, maxOutputTokens: 640 },
       );
       const json = text.replace(/```(?:json)?|```/g, '').trim();
       const parsed = JSON.parse(json) as QueryAnalysis;
-      if (!parsed.resolvedQuery || !Array.isArray(parsed.variants) || parsed.variants.length < 3) {
+      if (
+        !parsed.resolvedQuery ||
+        !Array.isArray(parsed.variants) ||
+        parsed.variants.length < 3
+      ) {
         return fallback;
       }
+      // Dual-level keywords là tùy chọn ở output model — chuẩn hóa về mảng string.
+      parsed.lowLevelKeywords = toStringArray(parsed.lowLevelKeywords, [
+        parsed.subject || query,
+      ]);
+      parsed.highLevelKeywords = toStringArray(parsed.highLevelKeywords, []);
       return parsed;
     } catch (err) {
-      this.logger.warn(`Query analysis failed, using original: ${(err as Error).message}`);
+      this.logger.warn(
+        `Query analysis failed, using original: ${(err as Error).message}`,
+      );
       return fallback;
     }
   }
@@ -319,6 +382,16 @@ function reciprocalRankFusion(
 
 function unique(arr: string[]): string[] {
   return [...new Set(arr.map((s) => s.trim()).filter(Boolean))];
+}
+
+/** Chuẩn hóa giá trị model trả về thành mảng string sạch; rỗng thì dùng fallback. */
+function toStringArray(value: unknown, fallback: string[]): string[] {
+  if (!Array.isArray(value)) return fallback;
+  const out = value
+    .map((v) => String(v ?? '').trim())
+    .filter((s) => s.length > 0)
+    .slice(0, 6);
+  return out.length > 0 ? out : fallback;
 }
 
 /**

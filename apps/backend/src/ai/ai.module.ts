@@ -34,6 +34,10 @@ import { ChatSummaryService } from './chat/chat-summary.service';
 import { RaptorService } from './raptor/raptor.service';
 import { RaptorProcessor } from './raptor/raptor.processor';
 import { RAPTOR_BUILD_QUEUE } from './raptor/raptor.queue';
+import { GraphExtractionService } from './lightrag/graph-extraction.service';
+import { GraphRetrieverService } from './lightrag/graph-retriever.service';
+import { GraphExtractionProcessor } from './lightrag/graph-extraction.processor';
+import { GRAPH_EXTRACTION_QUEUE } from './lightrag/graph-extraction.queue';
 import { ModerationModule } from '../moderation/moderation.module';
 
 @Module({
@@ -62,6 +66,7 @@ import { ModerationModule } from '../moderation/moderation.module';
     BullModule.registerQueue({ name: LESSON_INDEX_QUEUE }),
     BullModule.registerQueue({ name: VIDEO_TRANSCRIBE_QUEUE }),
     BullModule.registerQueue({ name: RAPTOR_BUILD_QUEUE }),
+    BullModule.registerQueue({ name: GRAPH_EXTRACTION_QUEUE }),
   ],
   controllers: [AiChatController, MindmapController, ChatQuizController],
   providers: [
@@ -82,6 +87,9 @@ import { ModerationModule } from '../moderation/moderation.module';
     ChatSummaryService,
     RaptorService,
     RaptorProcessor,
+    GraphExtractionService,
+    GraphRetrieverService,
+    GraphExtractionProcessor,
     LessonIndexProcessor,
     VideoTranscribeProcessor,
     MindmapService,

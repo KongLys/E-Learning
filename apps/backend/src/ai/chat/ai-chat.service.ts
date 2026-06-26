@@ -192,9 +192,11 @@ export class AiChatService {
       for await (const piece of src) yield scrubOutput(piece);
     }
 
-    // Nhánh tóm tắt: dùng cây RAPTOR (luồng riêng) thay vì RAG theo câu hỏi.
+    // Nhánh tóm tắt theo PHẠM VI (bài/phần/khóa, không nêu chủ đề cụ thể): dùng cây
+    // RAPTOR (luồng riêng). Tóm tắt một CHỦ ĐỀ cụ thể thì rơi xuống rag.ask để dùng
+    // LightRAG truy vấn có liên kết (gom khái niệm rải rác tốt hơn).
     const summaryIntent = detectSummaryIntent(effectiveQuery);
-    if (summaryIntent.isSummary) {
+    if (summaryIntent.isSummary && !summaryIntent.hasTopic) {
       const summary = await this.chatSummary.summarize(
         conv.courseId,
         effectiveQuery,
@@ -211,12 +213,17 @@ export class AiChatService {
       };
     }
 
-    // Run RAG pipeline (có thể giới hạn phạm vi theo Phần/Bài)
+    // Run RAG pipeline (có thể giới hạn phạm vi theo Phần/Bài). Với tóm tắt-chủ-đề
+    // cấp khóa, mở rộng phạm vi toàn khóa để LightRAG quét khắp tài liệu.
+    const askScope =
+      summaryIntent.isSummary && summaryIntent.level === 'course'
+        ? undefined
+        : scope;
     const result = await this.rag.ask(
       conv.courseId,
       effectiveQuery,
       formattedHistory,
-      scope,
+      askScope,
     );
 
     return {
@@ -388,6 +395,7 @@ export function detectQuizIntent(query: string): {
 export function detectSummaryIntent(query: string): {
   isSummary: boolean;
   level?: SummaryLevel;
+  hasTopic?: boolean;
 } {
   const q = query.toLowerCase();
   const isSummary =
@@ -407,5 +415,39 @@ export function detectSummaryIntent(query: string): {
   } else if (/(bài học này|bài này|bài hiện tại|bài đang học)/.test(q)) {
     level = 'lesson';
   }
-  return { isSummary: true, level };
+  return { isSummary: true, level, hasTopic: summaryHasTopic(q) };
 }
+
+/**
+ * Suy ra câu tóm tắt có nhắm tới một CHỦ ĐỀ cụ thể hay không (vd "tóm tắt về con
+ * trỏ") so với chỉ tóm tắt theo phạm vi (vd "tóm tắt bài này"). Lược bỏ cụm kích
+ * hoạt tóm tắt, cụm chỉ phạm vi, và các từ đệm/đánh dấu; còn token nội dung có
+ * nghĩa ⇒ có chủ đề. Heuristic — chấp nhận sai số nhỏ.
+ */
+function summaryHasTopic(q: string): boolean {
+  let s = q.toLowerCase();
+  // (a) cụm kích hoạt tóm tắt + marker chủ đề chung
+  s = s.replace(
+    /(tóm tắt|tóm lược|tóm gọn|sơ lược|khái quát|tổng quan|tổng hợp lại|tổng hợp|nội dung chính|các ý chính|những ý chính|nội dung|ý chính|điểm chính|khái niệm|chủ đề|kiến thức|summary|summarize|summarise|overview|recap)/g,
+    ' ',
+  );
+  // (b) cụm chỉ phạm vi (đa từ, bỏ trước token đơn)
+  s = s.replace(
+    /(toàn bộ khóa học|toàn khóa|cả khóa|toàn bộ khóa|toàn bộ môn|cả môn|khóa học|khoá học|môn học|phần này|chương này|cả phần|toàn bộ phần|bài học này|bài này|bài hiện tại|bài đang học|this lesson|this course|this section|this chapter)/g,
+    ' ',
+  );
+  const tokens = s
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((t) => t.length >= 2 && !SUMMARY_FILLER.has(t));
+  return tokens.length > 0;
+}
+
+/** Từ đệm/đánh dấu/phạm vi đơn lẻ — không tính là "chủ đề". */
+const SUMMARY_FILLER = new Set<string>([
+  'về', 'của', 'cho', 'mình', 'tôi', 'hãy', 'giúp', 'giùm', 'dùm', 'các',
+  'những', 'này', 'đó', 'kia', 'trong', 'một', 'với', 'và', 'là', 'gì', 'nhỉ',
+  'nhé', 'ạ', 'vậy', 'khóa', 'khoá', 'môn', 'học', 'phần', 'chương', 'bài',
+  'nội', 'dung', 'please', 'this', 'that', 'of', 'the', 'an', 'about',
+  'content', 'main', 'for', 'me', 'lesson', 'course', 'section', 'chapter',
+  'module',
+]);

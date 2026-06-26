@@ -36,4 +36,31 @@ describe('detectSummaryIntent', () => {
     expect(detectSummaryIntent('tóm tắt cả phần này').level).toBe('section');
     expect(detectSummaryIntent('tóm tắt giúp mình').level).toBeUndefined();
   });
+
+  it('tóm tắt theo phạm vi (không nêu chủ đề) → hasTopic=false (đi RAPTOR)', () => {
+    expect(detectSummaryIntent('tóm tắt bài học này').hasTopic).toBe(false);
+    expect(detectSummaryIntent('cho mình tổng quan khóa học').hasTopic).toBe(
+      false,
+    );
+    expect(
+      detectSummaryIntent('nội dung chính của chương là gì nhỉ').hasTopic,
+    ).toBe(false);
+    expect(detectSummaryIntent('tóm tắt giúp mình').hasTopic).toBe(false);
+    expect(detectSummaryIntent('tóm tắt toàn bộ khóa học').hasTopic).toBe(false);
+  });
+
+  it('tóm tắt một chủ đề cụ thể → isSummary && hasTopic (đi RAG/LightRAG)', () => {
+    const a = detectSummaryIntent('tóm tắt về con trỏ');
+    expect(a.isSummary).toBe(true);
+    expect(a.hasTopic).toBe(true);
+
+    const b = detectSummaryIntent('tổng hợp lại kiến thức đệ quy toàn khóa');
+    expect(b.isSummary).toBe(true);
+    expect(b.hasTopic).toBe(true);
+    expect(b.level).toBe('course');
+
+    const c = detectSummaryIntent('tóm tắt khái niệm vòng lặp trong cả khóa');
+    expect(c.isSummary).toBe(true);
+    expect(c.hasTopic).toBe(true);
+  });
 });
