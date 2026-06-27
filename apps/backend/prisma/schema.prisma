@@ -368,6 +368,9 @@ model NarrationAsset {
   durationSec Int      @default(0) @map("duration_sec")
   voice       String?
   errorMsg    String?  @map("error_msg")
+  // Hash nội dung đọc đã sinh lần gần nhất — chống sinh lại bài không đổi khi
+  // xuất bản lại (chỉ regen bài thực sự sửa nội dung).
+  sourceHash  String?  @map("source_hash")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
 
@@ -389,6 +392,8 @@ model LessonVideoAsset {
   sectionsJson Json     @default("[]") @map("sections_json") // [{ title, startSec, endSec }]
   model        String?
   errorMsg     String?  @map("error_msg")
+  // Hash nội dung đã sinh lần gần nhất — chống sinh lại video bài không đổi.
+  sourceHash   String?  @map("source_hash")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
 

@@ -16,6 +16,7 @@ import { FinalQuizService } from '../final-quiz/final-quiz.service';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
 import { assertCourseEditable } from '../common/course-editable.util';
+import { sortFinalQuizSectionsLast } from '../common/section-order.util';
 
 const SUBMIT_VALID_STATUSES = ['draft', 'rejected'];
 
@@ -445,9 +446,10 @@ export class CourseService {
     const totalReviews = await this.prisma.review.count({
       where: { courseId: course.id, isHidden: false },
     });
-    // Ẩn bài kiểm tra cuối khóa khỏi xem trước khi tính năng đang tắt.
+    // Ẩn bài kiểm tra cuối khóa khỏi xem trước khi tính năng đang tắt; nếu bật,
+    // luôn đẩy chương kiểm tra cuối khóa xuống dưới cùng.
     const sections = course.finalQuizEnabled
-      ? course.sections
+      ? sortFinalQuizSectionsLast(course.sections)
       : course.sections
           .map((s) => ({ ...s, lessons: s.lessons.filter((l) => !l.isFinalQuiz) }))
           .filter((s) => s.lessons.length > 0);
@@ -521,10 +523,11 @@ export class CourseService {
     });
     if (!course) throw new NotFoundException('Course not found');
     this.assertOwnerOrAdmin(course, userId, userRole);
-    // Serialize BigInt fileSize fields to string to avoid JSON serialization errors
+    // Serialize BigInt fileSize fields to string to avoid JSON serialization errors.
+    // Chương kiểm tra cuối khóa luôn ở dưới cùng (kể cả khi orderIndex bị drift).
     const serialized = {
       ...course,
-      sections: course.sections.map((s) => ({
+      sections: sortFinalQuizSectionsLast(course.sections).map((s) => ({
         ...s,
         lessons: s.lessons.map((l) => ({
           ...l,

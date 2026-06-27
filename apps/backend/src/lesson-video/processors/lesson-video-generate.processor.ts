@@ -69,7 +69,7 @@ export class LessonVideoGenerateProcessor extends WorkerHost {
       const timeline: { title: string; startSec: number; endSec: number }[] = [];
       let cursorSec = 0;
       for (const sec of sections) {
-        const buf = await this.tts.synthesize(sec.narration);
+        const { audio: buf } = await this.tts.synthesize(sec.narration);
         const durSec = Math.max(MIN_SECTION_SEC, await this.audioDuration(buf));
         const key = `lesson-videos/${lessonId}/sections/${randomUUID()}.mp3`;
         const audioSrc = await this.storage.uploadFile(key, buf, 'audio/mpeg');

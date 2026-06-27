@@ -53,3 +53,20 @@ export function stripHtml(html: string): string {
     .replace(/[ \t]{2,}/g, ' ')
     .trim();
 }
+
+/**
+ * Bóc HTML thành text dùng cho ĐỌC (TTS): chèn xuống dòng ở ranh giới khối
+ * (p, li, h1-6, br, blockquote, pre, tr) để mỗi đề mục/đoạn/gạch đầu dòng là một
+ * dòng riêng. Tránh các khối dính liền thành một câu dài (Google TTS từ chối câu
+ * quá dài) và tránh chữ cuối khối dính vào chữ đầu khối kế tiếp.
+ */
+export function htmlToReadableText(html: string): string {
+  const withBreaks = (html ?? '')
+    .replace(/<\/(p|div|li|h[1-6]|blockquote|pre|tr)>/gi, '$&\n')
+    .replace(/<br\s*\/?>/gi, '\n');
+  return sanitizeHtml(withBreaks, { allowedTags: [], allowedAttributes: {} })
+    .replace(/[ \t]+/g, ' ')
+    .replace(/ *\n */g, '\n')
+    .replace(/\n{2,}/g, '\n')
+    .trim();
+}

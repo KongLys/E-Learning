@@ -147,11 +147,16 @@ export class MindmapService {
       update: { status: 'pending', sourceHash, errorMsg: null },
     });
 
+    // BullMQ dedup theo jobId: job đã xong của lần trước vẫn được giữ lại
+    // (removeOnComplete/Fail count>0) nên add lại cùng jobId sẽ bị bỏ qua,
+    // khiến "Tạo lại"/"Thử lại" kẹt mãi ở 'pending'. Gỡ job cũ trước khi enqueue.
+    const jobId = `mindmap-${courseId}`;
+    await this.queue.remove(jobId).catch(() => undefined);
     await this.queue.add(
       'generate',
       { courseId },
       {
-        jobId: `mindmap-${courseId}`,
+        jobId,
         attempts: 3,
         backoff: { type: 'exponential', delay: 8_000 },
         removeOnComplete: { count: 100 },

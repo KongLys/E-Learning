@@ -59,6 +59,11 @@ const TOTAL_CAP = 12000;
 const FALLBACK_CLUSTERS = 12;
 /** Trần số batch map cho một bài cực dài (chặn chi phí); vượt thì chấp nhận lược bớt. */
 const MAX_MAP_BATCHES = 8; // ~8 × 12000 = 96000 ký tự được bao phủ
+/**
+ * Job 'generating'/'pending' không cập nhật quá ngưỡng này coi như treo (worker
+ * chết giữa chừng / process restart). Khi đó enqueue lại thay vì kẹt mãi.
+ */
+const STALE_BUILD_MS = 15 * 60 * 1000;
 
 /**
  * Dựng và truy vấn cây RAPTOR (tóm tắt phân cấp) cho một khóa học.
@@ -108,8 +113,21 @@ export class RaptorService {
     ) {
       return 'ready';
     }
-    if (!force && (existing?.status === 'generating' || existing?.status === 'pending')) {
+    // Job đang chạy còn "tươi" → để yên, tránh enqueue trùng. Nhưng nếu đã treo
+    // quá lâu (worker chết) thì coi như hỏng và dựng lại bên dưới.
+    const inProgress =
+      existing?.status === 'generating' || existing?.status === 'pending';
+    const stale =
+      inProgress &&
+      Date.now() - existing!.updatedAt.getTime() > STALE_BUILD_MS;
+    if (!force && inProgress && !stale) {
       return 'building';
+    }
+    if (stale) {
+      this.logger.warn(
+        `RAPTOR build cho course ${courseId} treo ` +
+          `${Math.round((Date.now() - existing!.updatedAt.getTime()) / 60000)} phút — enqueue lại`,
+      );
     }
 
     await this.prisma.courseRaptorTree.upsert({
@@ -117,6 +135,10 @@ export class RaptorService {
       create: { courseId, status: 'pending', sourceHash: hash },
       update: { status: 'pending', sourceHash: hash, errorMsg: null },
     });
+    // jobId cố định để chống enqueue trùng KHI đang chờ/chạy; nhưng job cũ đã
+    // xong/thất bại vẫn được giữ lại (removeOnComplete/Fail count) nên add lần
+    // sau bị dedupe âm thầm. Xóa bản ghi job cũ trước để chắc chắn add được.
+    await this.queue.remove(`raptor-${courseId}`).catch(() => undefined);
     await this.queue.add(
       'build',
       { courseId },

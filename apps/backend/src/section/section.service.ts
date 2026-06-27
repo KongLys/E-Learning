@@ -9,6 +9,7 @@ import { CreateSectionDto } from './dto/create-section.dto';
 import { UpdateSectionDto } from './dto/update-section.dto';
 import { ReorderSectionsDto } from './dto/reorder-sections.dto';
 import { assertCourseEditable } from '../common/course-editable.util';
+import { sortFinalQuizSectionsLast } from '../common/section-order.util';
 
 @Injectable()
 export class SectionService {
@@ -70,7 +71,14 @@ export class SectionService {
 
     const sections = await this.prisma.section.findMany({
       where: { courseId },
-      select: { id: true },
+      select: {
+        id: true,
+        lessons: {
+          where: { isFinalQuiz: true },
+          select: { id: true },
+          take: 1,
+        },
+      },
     });
     const courseIds = new Set(sections.map((s) => s.id));
     for (const id of dto.sectionIds) {
@@ -80,8 +88,18 @@ export class SectionService {
         );
     }
 
+    // Chương chứa bài kiểm tra cuối khóa LUÔN xuống cuối — bỏ khỏi thứ tự client
+    // gửi lên (FE đã loại trừ) rồi gắn vào cuối để tránh lệch/đụng orderIndex.
+    const finalIds = sections
+      .filter((s) => s.lessons.length > 0)
+      .map((s) => s.id);
+    const fullOrder = [
+      ...dto.sectionIds.filter((id) => !finalIds.includes(id)),
+      ...finalIds,
+    ];
+
     await Promise.all(
-      dto.sectionIds.map((id, index) =>
+      fullOrder.map((id, index) =>
         this.prisma.section.update({
           where: { id },
           data: { orderIndex: index + 1 },
@@ -129,7 +147,8 @@ export class SectionService {
         }))
         .filter((s) => s.lessons.length > 0);
     }
-    return sections;
+    // Bài kiểm tra cuối khóa luôn ở dưới cùng, kể cả khi orderIndex bị drift.
+    return sortFinalQuizSectionsLast(sections);
   }
 
   private async assertCourseOwner(

@@ -14,6 +14,14 @@ const emptyDraft = (): QDraft => ({
   options: [{ content: '', isCorrect: true }, { content: '', isCorrect: false }],
 });
 
+const toDraft = (q: any): QDraft => ({
+  content: q.content ?? '',
+  questionType: (q.questionType ?? 'single') as QType,
+  points: q.points ?? 1,
+  explanation: q.explanation ?? '',
+  options: (q.options ?? []).map((o: any) => ({ content: o.content, isCorrect: !!o.isCorrect })),
+});
+
 const typeLabel: Record<QType, string> = {
   single: 'Một đáp án đúng',
   multiple: 'Nhiều đáp án đúng',
@@ -25,6 +33,8 @@ export function QuizBuilder({ lessonId, onError }: { lessonId: string; onError: 
   const { data } = useQuery({ queryKey: ['quiz-build', lessonId], queryFn: () => instructorApi.getQuiz(lessonId) });
   const quiz: any = data?.data;
   const questions: any[] = quiz?.questions ?? [];
+  // Đã có học viên làm bài → khóa nội dung câu hỏi, chỉ cho đổi điểm đạt.
+  const contentLocked: boolean = !!quiz?.contentLocked;
 
   const [passingScore, setPassingScore] = useState<number | null>(null);
   const [timeLimitMin, setTimeLimitMin] = useState<number | null>(null);
@@ -37,9 +47,12 @@ export function QuizBuilder({ lessonId, onError }: { lessonId: string; onError: 
     setHydrated(true);
   }
 
+  // draft != null: đang soạn. editingId != null: đang sửa câu hỏi sẵn có.
   const [draft, setDraft] = useState<QDraft | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const onErr = (e: any) => onError(e?.response?.data?.message ?? 'Có lỗi xảy ra');
   const refresh = () => qc.invalidateQueries({ queryKey: ['quiz-build', lessonId] });
+  const closeForm = () => { setDraft(null); setEditingId(null); };
 
   const saveConfig = useMutation({
     mutationFn: () => instructorApi.configQuiz(lessonId, {
@@ -60,7 +73,21 @@ export function QuizBuilder({ lessonId, onError }: { lessonId: string; onError: 
       explanation: d.explanation || undefined,
       options: d.options.map((o, i) => ({ content: o.content, isCorrect: o.isCorrect, orderIndex: i + 1 })),
     }),
-    onSuccess: () => { onError(''); setDraft(null); refresh(); },
+    onSuccess: () => { onError(''); closeForm(); refresh(); },
+    onError: onErr,
+  });
+
+  const updateQuestion = useMutation({
+    mutationFn: ({ id, d, orderIndex }: { id: string; d: QDraft; orderIndex: number }) =>
+      instructorApi.updateQuizQuestion(id, {
+        content: d.content,
+        questionType: d.questionType,
+        orderIndex,
+        points: d.points,
+        explanation: d.explanation || undefined,
+        options: d.options.map((o, i) => ({ content: o.content, isCorrect: o.isCorrect, orderIndex: i + 1 })),
+      }),
+    onSuccess: () => { onError(''); closeForm(); refresh(); },
     onError: onErr,
   });
 
@@ -70,8 +97,27 @@ export function QuizBuilder({ lessonId, onError }: { lessonId: string; onError: 
     onError: onErr,
   });
 
+  const startEdit = (q: any) => { setEditingId(q.id); setDraft(toDraft(q)); };
+  const saving = addQuestion.isPending || updateQuestion.isPending;
+  const onSaveForm = () => {
+    if (!draft) return;
+    if (editingId) {
+      const q = questions.find((x) => x.id === editingId);
+      updateQuestion.mutate({ id: editingId, d: draft, orderIndex: q?.orderIndex ?? questions.length + 1 });
+    } else {
+      addQuestion.mutate(draft);
+    }
+  };
+
   return (
     <div className="space-y-5">
+      {contentLocked && (
+        <div className="flex items-center gap-2 text-sm text-sun-deep bg-sun-soft border border-sun-deep rounded-lg px-3 py-2">
+          <span>🔒</span>
+          <span>Đã có học viên làm bài kiểm tra — không thể sửa nội dung câu hỏi, chỉ có thể đổi điểm đạt.</span>
+        </div>
+      )}
+
       {/* Cấu hình quiz */}
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-ink-mute">Cấu hình bài kiểm tra</h3>
@@ -82,14 +128,14 @@ export function QuizBuilder({ lessonId, onError }: { lessonId: string; onError: 
               className="mt-1 w-full border border-hairline-strong rounded-lg px-2 py-1.5 text-sm" />
           </label>
           <label className="text-xs text-muted">Giới hạn (phút, 0=không)
-            <input type="number" min={0} value={timeLimitMin ?? 0}
+            <input type="number" min={0} value={timeLimitMin ?? 0} disabled={contentLocked}
               onChange={(e) => setTimeLimitMin(Number(e.target.value))}
-              className="mt-1 w-full border border-hairline-strong rounded-lg px-2 py-1.5 text-sm" />
+              className="mt-1 w-full border border-hairline-strong rounded-lg px-2 py-1.5 text-sm disabled:bg-surface-strong disabled:text-ink-faint disabled:cursor-not-allowed" />
           </label>
           <label className="text-xs text-muted">Số lần làm (0=∞)
-            <input type="number" min={0} value={maxAttempts ?? 0}
+            <input type="number" min={0} value={maxAttempts ?? 0} disabled={contentLocked}
               onChange={(e) => setMaxAttempts(Number(e.target.value))}
-              className="mt-1 w-full border border-hairline-strong rounded-lg px-2 py-1.5 text-sm" />
+              className="mt-1 w-full border border-hairline-strong rounded-lg px-2 py-1.5 text-sm disabled:bg-surface-strong disabled:text-ink-faint disabled:cursor-not-allowed" />
           </label>
         </div>
         <button onClick={() => saveConfig.mutate()} disabled={saveConfig.isPending}
@@ -108,7 +154,12 @@ export function QuizBuilder({ lessonId, onError }: { lessonId: string; onError: 
                 <span className="font-medium text-ink">{i + 1}. {q.content}</span>
                 <span className="ml-2 text-xs text-ink-subtle">({typeLabel[q.questionType as QType]} · {q.points}đ)</span>
               </div>
-              <button onClick={() => deleteQuestion.mutate(q.id)} className="text-coral hover:opacity-80 text-xs">Xóa</button>
+              {!contentLocked && (
+                <div className="flex shrink-0 items-center gap-2">
+                  <button onClick={() => startEdit(q)} className="text-sky hover:opacity-80 text-xs">Sửa</button>
+                  <button onClick={() => deleteQuestion.mutate(q.id)} className="text-coral hover:opacity-80 text-xs">Xóa</button>
+                </div>
+              )}
             </div>
             <ul className="mt-1 ml-4 space-y-0.5">
               {q.options?.map((o: any) => (
@@ -121,29 +172,32 @@ export function QuizBuilder({ lessonId, onError }: { lessonId: string; onError: 
         ))}
       </div>
 
-      {/* Soạn câu hỏi mới */}
-      {draft ? (
-        <QuestionForm
-          draft={draft}
-          setDraft={setDraft}
-          onSave={() => addQuestion.mutate(draft)}
-          onCancel={() => setDraft(null)}
-          saving={addQuestion.isPending}
-        />
-      ) : (
-        <button onClick={() => setDraft(emptyDraft())}
-          className="text-xs border border-sky text-sky px-4 py-2 rounded-lg hover:bg-sky-soft">
-          + Thêm câu hỏi
-        </button>
+      {/* Soạn / sửa câu hỏi */}
+      {!contentLocked && (
+        draft ? (
+          <QuestionForm
+            draft={draft}
+            setDraft={setDraft}
+            onSave={onSaveForm}
+            onCancel={closeForm}
+            saving={saving}
+            editing={!!editingId}
+          />
+        ) : (
+          <button onClick={() => { setEditingId(null); setDraft(emptyDraft()); }}
+            className="text-xs border border-sky text-sky px-4 py-2 rounded-lg hover:bg-sky-soft">
+            + Thêm câu hỏi
+          </button>
+        )
       )}
     </div>
   );
 }
 
 function QuestionForm({
-  draft, setDraft, onSave, onCancel, saving,
+  draft, setDraft, onSave, onCancel, saving, editing,
 }: {
-  draft: QDraft; setDraft: (d: QDraft) => void; onSave: () => void; onCancel: () => void; saving: boolean;
+  draft: QDraft; setDraft: (d: QDraft) => void; onSave: () => void; onCancel: () => void; saving: boolean; editing: boolean;
 }) {
   const setType = (t: QType) => {
     if (t === 'true_false') {
@@ -218,7 +272,7 @@ function QuestionForm({
       <div className="flex gap-2">
         <button onClick={onSave} disabled={saving || !draft.content.trim()}
           className="text-xs bg-sky text-white px-4 py-2 rounded-lg disabled:opacity-50">
-          {saving ? 'Đang lưu...' : 'Lưu câu hỏi'}
+          {saving ? 'Đang lưu...' : editing ? 'Cập nhật câu hỏi' : 'Lưu câu hỏi'}
         </button>
         <button onClick={onCancel} className="text-xs border border-hairline px-4 py-2 rounded-lg text-ink-mute hover:bg-canvas-soft">Hủy</button>
       </div>

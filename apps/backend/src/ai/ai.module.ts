@@ -33,6 +33,7 @@ import { MINDMAP_QUEUE } from './mindmap/mindmap.queue';
 import { ChatSummaryService } from './chat/chat-summary.service';
 import { RaptorService } from './raptor/raptor.service';
 import { RaptorProcessor } from './raptor/raptor.processor';
+import { RaptorListener } from './raptor/raptor.listener';
 import { RAPTOR_BUILD_QUEUE } from './raptor/raptor.queue';
 import { GraphExtractionService } from './lightrag/graph-extraction.service';
 import { GraphRetrieverService } from './lightrag/graph-retriever.service';
@@ -87,6 +88,7 @@ import { ModerationModule } from '../moderation/moderation.module';
     ChatSummaryService,
     RaptorService,
     RaptorProcessor,
+    RaptorListener,
     GraphExtractionService,
     GraphRetrieverService,
     GraphExtractionProcessor,

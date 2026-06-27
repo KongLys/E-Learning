@@ -7,6 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import { createHash } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { GeminiService } from '../ai/providers/gemini.service';
@@ -94,23 +95,36 @@ export class LessonVideoService {
     };
   }
 
-  /** Đưa vào hàng đợi tạo (hoặc tạo lại) video cho 1 bài đọc. */
-  async enqueueForLesson(lessonId: string): Promise<boolean> {
+  /**
+   * Đưa vào hàng đợi tạo (hoặc tạo lại) video cho 1 bài đọc. Bỏ qua nếu nội dung
+   * không đổi so với lần sinh trước (asset 'ready' cùng sourceHash) — trừ khi
+   * `force`. Nhờ vậy khi xuất bản lại chỉ bài thực sự sửa mới sinh lại.
+   */
+  async enqueueForLesson(lessonId: string, force = false): Promise<boolean> {
     if (!this.enabled) return false;
     const lesson = await this.prisma.lesson.findUnique({
       where: { id: lessonId },
       include: { documentAsset: { select: { contentHtml: true } } },
     });
     if (!lesson || lesson.type !== 'document') return false;
-    if (this.collectContent(lesson).length < MIN_SOURCE_CHARS) {
+    const source = this.collectContent(lesson);
+    if (source.length < MIN_SOURCE_CHARS) {
       this.logger.log(`Lesson ${lessonId} không đủ nội dung — bỏ qua tạo video`);
+      return false;
+    }
+
+    const hash = createHash('sha256').update(source).digest('hex');
+    const existing = await this.prisma.lessonVideoAsset.findUnique({
+      where: { lessonId },
+    });
+    if (!force && existing?.status === 'ready' && existing.sourceHash === hash) {
       return false;
     }
 
     await this.prisma.lessonVideoAsset.upsert({
       where: { lessonId },
-      update: { status: 'pending', errorMsg: null },
-      create: { lessonId, status: 'pending' },
+      update: { status: 'pending', errorMsg: null, sourceHash: hash },
+      create: { lessonId, status: 'pending', sourceHash: hash },
     });
     await this.queue.add(
       'generate',

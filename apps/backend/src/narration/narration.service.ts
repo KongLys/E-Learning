@@ -6,9 +6,10 @@ import {
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import { createHash } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
-import { stripHtml } from '../common/sanitize-html.util';
+import { htmlToReadableText } from '../common/sanitize-html.util';
 import { NARRATION_QUEUE, GenerateNarrationJob } from './narration.queue';
 
 // Dưới ngưỡng này coi như bài chỉ có file đính kèm / chưa có nội dung để đọc.
@@ -64,8 +65,12 @@ export class NarrationService {
     };
   }
 
-  /** Đưa vào hàng đợi tạo (hoặc tạo lại) giọng đọc cho 1 bài đọc. */
-  async enqueueForLesson(lessonId: string): Promise<boolean> {
+  /**
+   * Đưa vào hàng đợi tạo (hoặc tạo lại) giọng đọc cho 1 bài đọc. Bỏ qua nếu nội
+   * dung đọc không đổi so với lần sinh trước (asset 'ready' cùng sourceHash) —
+   * trừ khi `force`. Nhờ vậy khi xuất bản lại chỉ bài thực sự sửa mới sinh lại.
+   */
+  async enqueueForLesson(lessonId: string, force = false): Promise<boolean> {
     const lesson = await this.prisma.lesson.findUnique({
       where: { id: lessonId },
       include: { documentAsset: { select: { contentHtml: true } } },
@@ -80,10 +85,18 @@ export class NarrationService {
       return false;
     }
 
+    const hash = createHash('sha256').update(source).digest('hex');
+    const existing = await this.prisma.narrationAsset.findUnique({
+      where: { lessonId },
+    });
+    if (!force && existing?.status === 'ready' && existing.sourceHash === hash) {
+      return false;
+    }
+
     await this.prisma.narrationAsset.upsert({
       where: { lessonId },
-      update: { status: 'pending', errorMsg: null },
-      create: { lessonId, status: 'pending' },
+      update: { status: 'pending', errorMsg: null, sourceHash: hash },
+      create: { lessonId, status: 'pending', sourceHash: hash },
     });
     await this.queue.add(
       'generate',
@@ -150,7 +163,7 @@ export class NarrationService {
     if (lesson.title) parts.push(lesson.title);
     if (lesson.description) parts.push(lesson.description);
     if (lesson.documentAsset?.contentHtml) {
-      parts.push(stripHtml(lesson.documentAsset.contentHtml));
+      parts.push(htmlToReadableText(lesson.documentAsset.contentHtml));
     }
     return parts
       .map((p) => p.trim())

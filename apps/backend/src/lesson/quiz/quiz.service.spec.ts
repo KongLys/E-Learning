@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { QuizService } from './quiz.service';
@@ -9,7 +10,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 
 const mockPrisma = {
   lesson: { findUnique: jest.fn() },
-  quizLesson: { findUnique: jest.fn(), upsert: jest.fn() },
+  quizLesson: { findUnique: jest.fn(), upsert: jest.fn(), update: jest.fn() },
   quizQuestion: {
     create: jest.fn(),
     findUnique: jest.fn(),
@@ -17,12 +18,13 @@ const mockPrisma = {
     delete: jest.fn(),
   },
   quizOption: { deleteMany: jest.fn() },
+  quizAttempt: { count: jest.fn() },
 };
 
-const lessonWithCourse = (instructorId = 'instructor-1') => ({
+const lessonWithCourse = (instructorId = 'instructor-1', status = 'draft') => ({
   id: 'lesson-1',
   sectionId: 'section-1',
-  section: { course: { instructorId } },
+  section: { course: { instructorId, status } },
 });
 
 describe('QuizService', () => {
@@ -38,6 +40,8 @@ describe('QuizService', () => {
 
     service = module.get<QuizService>(QuizService);
     jest.clearAllMocks();
+    // Mặc định chưa có học viên làm bài → nội dung quiz còn sửa được.
+    mockPrisma.quizAttempt.count.mockResolvedValue(0);
   });
 
   describe('addQuestion', () => {
@@ -145,6 +149,26 @@ describe('QuizService', () => {
           dto as any,
         ),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws UnprocessableEntityException when quiz already has attempts', async () => {
+      mockPrisma.lesson.findUnique.mockResolvedValue(
+        lessonWithCourse('instructor-1'),
+      );
+      mockPrisma.quizLesson.findUnique.mockResolvedValue(quiz);
+      mockPrisma.quizAttempt.count.mockResolvedValue(3);
+      const dto = {
+        content: 'Q?',
+        questionType: 'single',
+        orderIndex: 1,
+        options: [
+          { content: 'A', isCorrect: true, orderIndex: 1 },
+          { content: 'B', isCorrect: false, orderIndex: 2 },
+        ],
+      };
+      await expect(
+        service.addQuestion('lesson-1', 'instructor-1', 'instructor', dto as any),
+      ).rejects.toThrow(UnprocessableEntityException);
     });
 
     it('creates question successfully for valid single-choice dto', async () => {

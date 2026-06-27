@@ -48,7 +48,7 @@ export class NarrationGenerateProcessor extends WorkerHost {
 
     try {
       const source = this.narration.collectReadingContent(lesson);
-      const audio = await this.tts.synthesize(source);
+      const { audio, voice } = await this.tts.synthesize(source);
 
       const key = `narrations/${lessonId}/${randomUUID()}.mp3`;
       const audioUrl = await this.storage.uploadFile(key, audio, 'audio/mpeg');
@@ -62,7 +62,7 @@ export class NarrationGenerateProcessor extends WorkerHost {
           status: 'ready',
           audioUrl,
           durationSec,
-          voice: this.tts.voice,
+          voice,
           errorMsg: null,
         },
       });

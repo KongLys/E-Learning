@@ -22,21 +22,19 @@ export default function CourseAiChatPage() {
       <div className="flex gap-1 border-b border-hairline bg-surface-card px-3 pt-2">
         <button
           onClick={() => setTab('chat')}
-          className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 ${
-            tab === 'chat'
-              ? 'border-sky-deep text-sky-deep'
-              : 'border-transparent text-muted hover:text-ink'
-          }`}
+          className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 ${tab === 'chat'
+            ? 'border-sky-deep text-sky-deep'
+            : 'border-transparent text-muted hover:text-ink'
+            }`}
         >
           <MessageSquare className="w-4 h-4" /> Hỏi AI
         </button>
         <button
           onClick={() => setTab('mindmap')}
-          className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 ${
-            tab === 'mindmap'
-              ? 'border-sky-deep text-sky-deep'
-              : 'border-transparent text-muted hover:text-ink'
-          }`}
+          className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 ${tab === 'mindmap'
+            ? 'border-sky-deep text-sky-deep'
+            : 'border-transparent text-muted hover:text-ink'
+            }`}
         >
           <Network className="w-4 h-4" /> Sơ đồ tư duy
         </button>
@@ -95,7 +93,7 @@ function MindMapTab({ courseId }: { courseId: string }) {
     <div className="flex-1 flex flex-col min-h-0 p-4 gap-3">
       <div className="flex flex-wrap items-center gap-2">
         <p className="text-sm text-muted">
-          Sơ đồ tư duy toàn khóa: Khóa học → Phần → Bài → đề mục nội dung.
+          Sơ đồ tư duy toàn khóa
         </p>
         <button
           onClick={() => generate.mutate(ready)}

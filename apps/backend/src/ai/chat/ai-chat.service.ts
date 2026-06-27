@@ -163,6 +163,7 @@ export class AiChatService {
     if (intent.isQuiz) {
       const chatQuiz = this.chatQuiz;
       const courseId = conv.courseId;
+      const language = detectQuizLanguage(effectiveQuery);
       let createdQuiz: CreatedQuizInfo | null = null;
       async function* quizStream(): AsyncGenerator<string> {
         yield 'Đang tạo quiz ôn tập từ nội dung khoá học…\n\n';
@@ -172,6 +173,7 @@ export class AiChatService {
           effectiveQuery,
           scope,
           intent.count,
+          language,
         );
         createdQuiz = info;
         yield `✅ Đã tạo quiz “${info.title}” gồm ${info.questionCount} câu hỏi. Mở ở mục “Quiz của tôi” trong thanh nội dung khoá học để làm bài.`;
@@ -384,6 +386,30 @@ export function detectQuizIntent(query: string): {
   const m = q.match(/(\d{1,3})\s*(câu|cau|question)/);
   const count = m ? parseInt(m[1], 10) : undefined;
   return { isQuiz: true, count };
+}
+
+/**
+ * Nhận diện ngôn ngữ người dùng yêu cầu cho quiz trong chat (vd "bằng tiếng Anh",
+ * "in English"). Trả tên ngôn ngữ hiển thị để đưa vào prompt; `undefined` ⇒ mặc
+ * định tiếng Việt. Chỉ một số ngôn ngữ phổ biến — đủ cho nhu cầu thực tế.
+ */
+export function detectQuizLanguage(query: string): string | undefined {
+  const q = query.toLowerCase();
+  // [regex nhận diện, tên ngôn ngữ hiển thị]
+  const langs: [RegExp, string][] = [
+    [/tiếng anh|tieng anh|english|\bin english\b|bằng anh/, 'tiếng Anh'],
+    [/tiếng nhật|tieng nhat|japanese|\bnhật bản\b/, 'tiếng Nhật'],
+    [/tiếng trung|tieng trung|chinese|mandarin|trung quốc/, 'tiếng Trung'],
+    [/tiếng hàn|tieng han|korean|hàn quốc/, 'tiếng Hàn'],
+    [/tiếng pháp|tieng phap|french/, 'tiếng Pháp'],
+    [/tiếng đức|tieng duc|german/, 'tiếng Đức'],
+    [/tiếng tây ban nha|tieng tay ban nha|spanish/, 'tiếng Tây Ban Nha'],
+    [/tiếng việt|tieng viet|vietnamese/, 'tiếng Việt'],
+  ];
+  for (const [re, name] of langs) {
+    if (re.test(q)) return name;
+  }
+  return undefined;
 }
 
 /**

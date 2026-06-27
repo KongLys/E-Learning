@@ -13,6 +13,9 @@ import { SubmitReviewAttemptDto } from '../../review-quiz/dto/submit-review-atte
 const MIN_QUESTIONS = 10;
 const MAX_QUESTIONS = 30;
 const MIN_SOURCE_CHARS = 200;
+/** Quiz phạm vi toàn khoá: luôn sinh 30 câu, tiêu đề cố định. */
+const WHOLE_COURSE_QUESTIONS = 30;
+const WHOLE_COURSE_TITLE = 'Tổng ôn tập';
 
 export interface CreatedQuizInfo {
   id: string;
@@ -40,6 +43,7 @@ export class ChatQuizService {
     query: string,
     scope?: ChunkScope,
     requestedCount?: number,
+    language?: string,
   ): Promise<CreatedQuizInfo> {
     const source = await this.courseContent.collect(courseId, query, scope);
     if (source.text.length < MIN_SOURCE_CHARS) {
@@ -47,13 +51,25 @@ export class ChatQuizService {
         'Khoá học chưa có đủ nội dung để tạo quiz',
       );
     }
-    const count = Math.min(
-      MAX_QUESTIONS,
-      Math.max(MIN_QUESTIONS, requestedCount ?? MIN_QUESTIONS),
-    );
-    const questions = await this.quizGen.generate(source.text, { count });
 
-    const title = this.buildTitle(query);
+    // Phạm vi toàn khoá (không gắn Bài/Phần): tiêu đề "Tổng ôn tập" + luôn 30 câu.
+    // Phạm vi Bài/Phần: số câu mặc định 10 (tôn trọng số người dùng nêu), tiêu đề
+    // do AI sinh theo nội dung quiz.
+    const isWholeCourse = !scope?.lessonId && !scope?.sectionId;
+    const count = isWholeCourse
+      ? WHOLE_COURSE_QUESTIONS
+      : Math.min(
+          MAX_QUESTIONS,
+          Math.max(MIN_QUESTIONS, requestedCount ?? MIN_QUESTIONS),
+        );
+    const questions = await this.quizGen.generate(source.text, {
+      count,
+      language,
+    });
+
+    const title = isWholeCourse
+      ? WHOLE_COURSE_TITLE
+      : await this.quizGen.generateTitle(questions, language);
     const quiz = await this.prisma.reviewQuiz.create({
       data: {
         lessonId: null,
@@ -160,10 +176,5 @@ export class ChatQuizService {
     if (!quiz) throw new NotFoundException('Quiz not found');
     if (quiz.userId !== userId) throw new ForbiddenException('Access denied');
     return quiz;
-  }
-
-  private buildTitle(query: string): string {
-    const q = query.trim().replace(/\s+/g, ' ');
-    return q.length > 60 ? `${q.slice(0, 60)}…` : q || 'Quiz ôn tập';
   }
 }

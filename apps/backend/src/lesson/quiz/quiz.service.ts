@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { QuizConfigDto } from '../dto/quiz-config.dto';
@@ -21,6 +22,19 @@ export class QuizService {
   ) {
     const lesson = await this.assertLessonOwner(lessonId, userId, userRole);
     assertCourseEditable(lesson.section.course.status);
+
+    const existing = await this.prisma.quizLesson.findUnique({
+      where: { lessonId },
+    });
+    // Khi đã có học viên làm bài: chỉ cho đổi điểm đạt (passingScore), giữ nguyên
+    // giới hạn thời gian và số lần làm để không ảnh hưởng người đã/đang làm.
+    if (existing && (await this.hasAttempts(existing.id))) {
+      return this.prisma.quizLesson.update({
+        where: { lessonId },
+        data: { passingScore: dto.passingScore ?? existing.passingScore },
+      });
+    }
+
     return this.prisma.quizLesson.upsert({
       where: { lessonId },
       update: {
@@ -44,12 +58,12 @@ export class QuizService {
     dto: CreateQuestionDto,
   ) {
     const lesson = await this.assertLessonOwner(lessonId, userId, userRole);
-    assertCourseEditable(lesson.section.course.status);
     const quiz = await this.prisma.quizLesson.findUnique({
       where: { lessonId },
     });
     if (!quiz) throw new NotFoundException('Quiz not configured');
 
+    await this.assertQuizContentEditable(quiz.id, lesson.section.course.status);
     this.validateOptions(dto);
 
     const question = await this.prisma.quizQuestion.create({
@@ -91,7 +105,10 @@ export class QuizService {
       userId,
       userRole,
     );
-    assertCourseEditable(lesson.section.course.status);
+    await this.assertQuizContentEditable(
+      question.quizLessonId,
+      lesson.section.course.status,
+    );
     this.validateOptions(dto);
 
     await this.prisma.quizOption.deleteMany({ where: { questionId } });
@@ -131,8 +148,17 @@ export class QuizService {
       userId,
       userRole,
     );
-    assertCourseEditable(lesson.section.course.status);
-    await this.prisma.quizQuestion.delete({ where: { id: questionId } });
+    await this.assertQuizContentEditable(
+      question.quizLessonId,
+      lesson.section.course.status,
+    );
+    // Câu hỏi đã từng được trả lời trong các lần làm bài (quiz_attempt_answers
+    // có FK RESTRICT tới question_id và option_id). Xoá các câu trả lời lịch sử
+    // trước rồi mới xoá câu hỏi, gói trong transaction để cùng thành công/rollback.
+    await this.prisma.$transaction([
+      this.prisma.quizAttemptAnswer.deleteMany({ where: { questionId } }),
+      this.prisma.quizQuestion.delete({ where: { id: questionId } }),
+    ]);
     await this.markInstructorAuthoredIfFinalQuiz(lesson, question.quizLessonId);
     return { message: 'Question deleted' };
   }
@@ -176,9 +202,37 @@ export class QuizService {
         ...q,
         options: q.options.map((o) => ({ ...o, isCorrect: false })),
       }));
+      return quiz;
     }
 
-    return quiz;
+    // Với giảng viên/admin: báo nội dung đã bị khóa khi có học viên làm bài → FE
+    // chỉ cho đổi điểm đạt, ẩn các thao tác sửa câu hỏi.
+    return { ...quiz, contentLocked: await this.hasAttempts(quiz.id) };
+  }
+
+  /** Đã có học viên làm (nộp hoặc đang làm) bài kiểm tra này chưa? */
+  private async hasAttempts(quizLessonId: string): Promise<boolean> {
+    const count = await this.prisma.quizAttempt.count({
+      where: { quizLessonId },
+    });
+    return count > 0;
+  }
+
+  /**
+   * Chỉ cho sửa NỘI DUNG câu hỏi khi khóa còn ở trạng thái cho sửa (draft/rejected)
+   * VÀ chưa có học viên nào làm bài kiểm tra. Đã có người làm → khóa nội dung,
+   * chỉ còn đổi được điểm đạt qua configQuiz.
+   */
+  private async assertQuizContentEditable(
+    quizLessonId: string,
+    courseStatus: string,
+  ): Promise<void> {
+    assertCourseEditable(courseStatus);
+    if (await this.hasAttempts(quizLessonId)) {
+      throw new UnprocessableEntityException(
+        'Đã có học viên làm bài kiểm tra — không thể sửa nội dung câu hỏi, chỉ có thể đổi điểm đạt',
+      );
+    }
   }
 
   private validateOptions(dto: CreateQuestionDto) {
