@@ -5,6 +5,7 @@ import { FileText, Video, X } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { instructorApi } from '@/lib/api/instructor.api';
 import { learnApi } from '@/lib/api/learn.api';
+import { getApiErrorMessage } from '@/lib/api/error';
 import {
   moderationApi,
   MODERATION_COLORS,
@@ -19,6 +20,7 @@ import { showPrompt } from '@/store/dialog.store';
 import { QuizBuilder } from './QuizBuilder';
 import { ReviewQuizUI } from '@/components/learn/ReviewQuizUI';
 import { LESSON_TYPE_META, type LessonType } from './lessonTypeMeta';
+import type { QuizView } from '@/types/quiz';
 
 const PARSE_LABEL: Record<DocumentParseStatus, string> = {
   uploaded: 'Chờ xử lý AI',
@@ -42,6 +44,29 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+interface LessonVideoAsset {
+  completionMode?: 'percent_90' | 'ended_autonext';
+  videoUrl?: string;
+  fileName?: string;
+}
+interface LessonDocumentAsset {
+  contentHtml?: string;
+  minReadTimeSec?: number;
+  errorMsg?: string;
+  fileName?: string;
+  fileSize?: number;
+  fileType?: string;
+  fileUrl?: string;
+  parseStatus?: DocumentParseStatus;
+}
+interface LessonDetail {
+  title?: string;
+  description?: string;
+  moderationStatus?: ModerationStatus;
+  moderationReason?: string;
+  videoAsset?: LessonVideoAsset | null;
+  documentAsset?: LessonDocumentAsset | null;
+}
 interface LessonContentEditorProps {
   courseId: string;
   lesson: { id: string; title: string; type: LessonType };
@@ -64,7 +89,7 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
     queryKey: ['lesson-edit', lesson.id],
     queryFn: () => instructorApi.getLesson(lesson.id),
   });
-  const detail: any = data?.data;
+  const detail: LessonDetail | undefined = data?.data;
 
   const { data: videoUrlData } = useQuery({
     queryKey: ['instructor-video-url', lesson.id],
@@ -93,7 +118,7 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
     qc.invalidateQueries({ queryKey: ['course-edit', courseId] });
     qc.invalidateQueries({ queryKey: ['instructor-video-url', lesson.id] });
   };
-  const onErr = (e: any) => setError(e?.response?.data?.message ?? 'Có lỗi xảy ra');
+  const onErr = (e: unknown) => setError(getApiErrorMessage(e));
 
   const saveBasics = useMutation({
     mutationFn: () => instructorApi.updateLesson(lesson.id, { title, description }),
@@ -148,7 +173,7 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
     queryFn: () => instructorApi.getReviewQuiz(lesson.id),
     enabled: isMediaLesson,
   });
-  const reviewQuiz: any = reviewQuizResp?.data ?? null;
+  const reviewQuiz: QuizView | null = reviewQuizResp?.data ?? null;
 
   const genReviewQuiz = useMutation({
     mutationFn: () => instructorApi.generateReviewQuiz(lesson.id),

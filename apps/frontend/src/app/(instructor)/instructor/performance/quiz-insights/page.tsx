@@ -5,6 +5,23 @@ import { apiClient } from '@/lib/api/axios';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { AlertTriangle } from 'lucide-react';
 
+interface HardQuestion {
+  questionId: string;
+  content: string;
+  wrongRate: number;
+}
+interface QuizInsight {
+  quizLessonId: string;
+  lessonTitle: string;
+  attemptCount: number;
+  avgScore: number;
+  passRate: number;
+  avgDurationSec: number;
+  retakeCount: number;
+  uniqueStudents: number;
+  hardQuestions: HardQuestion[];
+}
+
 function formatDuration(seconds: number) {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
@@ -17,7 +34,7 @@ export default function QuizInsightsPage() {
     queryFn: () => apiClient.get('/instructor/stats/quiz-insights'),
   });
 
-  const insights: any[] = data?.data?.insights ?? [];
+  const insights: QuizInsight[] = data?.data?.insights ?? [];
 
   return (
     <div className="max-w-5xl space-y-8">
@@ -34,7 +51,7 @@ export default function QuizInsightsPage() {
         </div>
       ) : (
         <div className="space-y-6">
-          {insights.map((insight: any) => (
+          {insights.map((insight) => (
             <div key={insight.quizLessonId} className="bg-surface-card rounded-card border border-hairline overflow-hidden">
               <div className="px-5 py-4 border-b border-hairline bg-canvas-soft">
                 <h2 className="text-base font-semibold text-ink">{insight.lessonTitle}</h2>
@@ -80,7 +97,7 @@ export default function QuizInsightsPage() {
                       <h3 className="text-sm font-semibold text-ink-mute">Câu hỏi học viên hay làm sai</h3>
                     </div>
                     <div className="space-y-2">
-                      {insight.hardQuestions.map((q: any) => (
+                      {insight.hardQuestions.map((q) => (
                         <div key={q.questionId} className="flex items-start justify-between gap-4 bg-sun-soft rounded-lg px-4 py-3">
                           <p className="text-sm text-ink flex-1 line-clamp-2">{q.content}</p>
                           <span className="shrink-0 text-xs font-semibold text-sun-deep bg-sun-soft px-2 py-0.5 rounded-full">

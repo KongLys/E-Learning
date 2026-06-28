@@ -7,8 +7,18 @@ import { Film, FileText, Paperclip, Play } from 'lucide-react';
 import { instructorApi } from '@/lib/api/instructor.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
+import { getApiErrorMessage } from '@/lib/api/error';
 
 type RefType = 'file' | 'youtube' | 'video';
+
+interface ReferenceMaterial {
+  id: string;
+  title: string;
+  type: RefType | string;
+  externalUrl?: string | null;
+  fileName?: string | null;
+  description?: string;
+}
 
 const TYPE_META: Record<RefType, { label: string; icon: ReactNode }> = {
   file: { label: 'Tệp PDF/DOCX', icon: <FileText size={16} /> },
@@ -31,7 +41,7 @@ export default function ReferencesPage() {
   const listQuery = useQuery({
     queryKey: ['ref-materials', id],
     queryFn: async () =>
-      (await instructorApi.listReferenceMaterials(id)).data as any[],
+      (await instructorApi.listReferenceMaterials(id)).data as ReferenceMaterial[],
   });
   const materials = listQuery.data ?? [];
 
@@ -61,9 +71,9 @@ export default function ReferencesPage() {
       reset();
       qc.invalidateQueries({ queryKey: ['ref-materials', id] });
     },
-    onError: (e: any) => {
+    onError: (e) => {
       setPct(null);
-      setError(e?.response?.data?.message ?? 'Thêm tài liệu thất bại');
+      setError(getApiErrorMessage(e, 'Thêm tài liệu thất bại'));
     },
   });
 
@@ -73,9 +83,9 @@ export default function ReferencesPage() {
       setDeleteId(null);
       qc.invalidateQueries({ queryKey: ['ref-materials', id] });
     },
-    onError: (e: any) => {
+    onError: (e) => {
       setDeleteId(null);
-      setError(e?.response?.data?.message ?? 'Xóa thất bại');
+      setError(getApiErrorMessage(e, 'Xóa thất bại'));
     },
   });
 

@@ -20,5 +20,7 @@ export function useProgress(lessonId: string, getPosition: () => number) {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
+    // getPosition đổi mỗi render (đọc vị trí hiện tại); cố ý chỉ reset interval theo lessonId
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lessonId]);
 }

@@ -25,6 +25,19 @@ interface ReviewItem {
   markdownUrl?: string | null;
 }
 
+interface ModerationRaw {
+  id: string;
+  title: string;
+  instructor?: { fullName: string; email: string };
+  moderationStatus: ModerationStatus;
+  moderationLabel: string | null;
+  moderationReason: string | null;
+  appealReason: string | null;
+  markdownUrl?: string | null;
+  sectionTitle?: string;
+  courseTitle?: string;
+}
+
 export default function AdminModerationPage() {
   const qc = useQueryClient();
 
@@ -48,7 +61,7 @@ export default function AdminModerationPage() {
 
   if (isLoading) return <LoadingSpinner />;
 
-  const courses: ReviewItem[] = (data?.data?.courses ?? []).map((c: any) => ({
+  const courses: ReviewItem[] = (data?.data?.courses ?? []).map((c: ModerationRaw) => ({
     type: 'course' as const,
     id: c.id,
     title: c.title,
@@ -59,7 +72,7 @@ export default function AdminModerationPage() {
     moderationReason: c.moderationReason,
     appealReason: c.appealReason,
   }));
-  const lessons: ReviewItem[] = (data?.data?.lessons ?? []).map((l: any) => ({
+  const lessons: ReviewItem[] = (data?.data?.lessons ?? []).map((l: ModerationRaw) => ({
     type: 'lesson' as const,
     id: l.id,
     title: l.title,

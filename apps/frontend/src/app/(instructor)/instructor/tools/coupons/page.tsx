@@ -7,8 +7,17 @@ import { instructorApi } from '@/lib/api/instructor.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { Check, Download, Plus, Trash2, Upload, X } from 'lucide-react';
 import { notify, showConfirm } from '@/store/dialog.store';
+import { getApiErrorMessage } from '@/lib/api/error';
+import type { Coupon } from '@/types/coupon';
+import type { CourseSummary } from '@/types/course';
 
 type Tab = 'list' | 'create' | 'import';
+
+interface BulkResult {
+  code: string;
+  success: boolean;
+  error?: string;
+}
 
 function generateCode(prefix = 'GIAMGIA') {
   return `${prefix}${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
@@ -28,22 +37,22 @@ export default function CouponsPage() {
     maxUses: 0,
   });
   const [formError, setFormError] = useState('');
-  const [csvPreview, setCsvPreview] = useState<any[]>([]);
+  const [csvPreview, setCsvPreview] = useState<Record<string, string>[]>([]);
   const [csvFile, setCsvFile] = useState<File | null>(null);
-  const [bulkResults, setBulkResults] = useState<any[]>([]);
+  const [bulkResults, setBulkResults] = useState<BulkResult[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const { data: couponsData, isLoading: couponsLoading } = useQuery({
     queryKey: ['instructor-coupons'],
     queryFn: () => couponApi.list(),
   });
-  const coupons: any[] = couponsData?.data ?? [];
+  const coupons: Coupon[] = couponsData?.data ?? [];
 
   const { data: coursesData } = useQuery({
     queryKey: ['instructor-courses'],
     queryFn: () => instructorApi.getCourses(),
   });
-  const courses: any[] = coursesData?.data?.courses ?? coursesData?.data ?? [];
+  const courses: CourseSummary[] = coursesData?.data?.courses ?? coursesData?.data ?? [];
 
   const createMutation = useMutation({
     mutationFn: (dto: CreateCouponDto) => couponApi.create(dto),
@@ -53,13 +62,13 @@ export default function CouponsPage() {
       setFormError('');
       setTab('list');
     },
-    onError: (err: any) => setFormError(err?.response?.data?.message ?? 'Lỗi tạo coupon'),
+    onError: (err) => setFormError(getApiErrorMessage(err, 'Lỗi tạo coupon')),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => couponApi.delete(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['instructor-coupons'] }),
-    onError: (err: any) => notify.error(err?.response?.data?.message ?? 'Lỗi xóa coupon'),
+    onError: (err) => notify.error(getApiErrorMessage(err, 'Lỗi xóa coupon')),
   });
 
   const bulkMutation = useMutation({
@@ -70,7 +79,7 @@ export default function CouponsPage() {
       setCsvPreview([]);
       setCsvFile(null);
     },
-    onError: (err: any) => notify.error(err?.response?.data?.message ?? 'Lỗi import CSV'),
+    onError: (err) => notify.error(getApiErrorMessage(err, 'Lỗi import CSV')),
   });
 
   const parseCsvPreview = (file: File) => {
@@ -147,7 +156,7 @@ export default function CouponsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-hairline">
-                {coupons.map((c: any) => {
+                {coupons.map((c) => {
                   const expired = c.expiresAt && new Date(c.expiresAt) < new Date();
                   const full = c.maxUses > 0 && c.usedCount >= c.maxUses;
                   return (
@@ -218,7 +227,7 @@ export default function CouponsPage() {
               className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm"
             >
               <option value="">Tất cả khóa học</option>
-              {courses.map((c: any) => (
+              {courses.map((c) => (
                 <option key={c.id} value={c.id}>{c.title}</option>
               ))}
             </select>
@@ -327,7 +336,7 @@ export default function CouponsPage() {
                     <tbody className="divide-y divide-hairline">
                       {csvPreview.map((row, i) => (
                         <tr key={i}>
-                          {Object.values(row).map((v: any, j) => (
+                          {Object.values(row).map((v, j) => (
                             <td key={j} className="px-3 py-2 text-ink-mute">{v}</td>
                           ))}
                         </tr>
@@ -353,7 +362,7 @@ export default function CouponsPage() {
               <div>
                 <p className="text-xs font-medium text-ink-mute mb-2">Kết quả import:</p>
                 <div className="space-y-1.5 max-h-64 overflow-y-auto">
-                  {bulkResults.map((r: any, i) => (
+                  {bulkResults.map((r, i) => (
                     <div key={i} className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs ${r.success ? 'bg-leaf-soft text-leaf-deep' : 'bg-coral-soft text-coral'}`}>
                       <span className="font-mono font-medium">{r.code}</span>
                       <span className="inline-flex items-center gap-1">{r.success ? <><Check size={12} /> Thành công</> : <><X size={12} /> {r.error}</>}</span>

@@ -8,6 +8,8 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { SafeHtml } from '@/components/common/SafeHtml';
 import { notify, showPrompt } from '@/store/dialog.store';
+import { getApiErrorMessage } from '@/lib/api/error';
+import type { CourseSummary, AdminCourseDetail, SectionSummary, LessonSummary } from '@/types/course';
 import {
   FileText, PenLine, X, ChevronDown, ChevronLeft, ChevronRight,
   Video, File as FileIcon, CheckCircle, Clock, AlertCircle, XCircle,
@@ -80,7 +82,7 @@ function AdminVideoPlayer({ lessonId }: { lessonId: string }) {
 
 // ─── Document viewer (contentHtml or file link) ───────────────────────────────
 
-function AdminDocViewer({ lesson }: { lesson: any }) {
+function AdminDocViewer({ lesson }: { lesson: LessonSummary }) {
   const doc = lesson.documentAsset;
   if (!doc) return <p className="text-sm text-gray-400">Chưa có tài liệu</p>;
 
@@ -91,7 +93,7 @@ function AdminDocViewer({ lesson }: { lesson: any }) {
         <span className="font-medium">{doc.fileName ?? 'Tài liệu'}</span>
         <span className="text-gray-400 text-xs">{doc.fileType?.toUpperCase()}</span>
         {doc.fileSize && <span className="text-gray-400 text-xs">{(Number(doc.fileSize) / 1024 / 1024).toFixed(1)} MB</span>}
-        {doc.pageCount > 0 && <span className="text-gray-400 text-xs">{doc.pageCount} trang</span>}
+        {(doc.pageCount ?? 0) > 0 && <span className="text-gray-400 text-xs">{doc.pageCount} trang</span>}
         {doc.fileUrl && (
           <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="ml-auto text-blue-600 hover:underline text-xs">Mở file</a>
         )}
@@ -116,7 +118,7 @@ function LessonRow({
   onReject,
   isMutating,
 }: {
-  lesson: any;
+  lesson: LessonSummary;
   onApprove?: () => void;
   onReject?: (reason?: string) => void;
   isMutating?: boolean;
@@ -140,8 +142,8 @@ function LessonRow({
             {MOD_LABEL[lesson.moderationStatus]}
           </span>
         )}
-        {lesson.durationSec > 0 && (
-          <span className="text-xs text-gray-400 ml-2">{Math.floor(lesson.durationSec / 60)}:{String(lesson.durationSec % 60).padStart(2, '0')}</span>
+        {(lesson.durationSec ?? 0) > 0 && (
+          <span className="text-xs text-gray-400 ml-2">{Math.floor((lesson.durationSec ?? 0) / 60)}:{String((lesson.durationSec ?? 0) % 60).padStart(2, '0')}</span>
         )}
       </button>
       {open && (
@@ -193,7 +195,7 @@ function LessonRow({
 function CourseDetailModal({ courseId, onClose }: { courseId: string; onClose: () => void }) {
   const qc = useQueryClient();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<AdminCourseDetail>({
     queryKey: ['admin-course-detail', courseId],
     queryFn: () => adminApi.getCourseDetail(courseId).then((r) => r.data),
   });
@@ -208,14 +210,14 @@ function CourseDetailModal({ courseId, onClose }: { courseId: string; onClose: (
     mutationFn: ({ type, id }: { type: 'course' | 'lesson'; id: string }) =>
       adminApi.approveModeration(type, id),
     onSuccess: invalidate,
-    onError: (err: any) => notify.error(err?.response?.data?.message ?? 'Duyệt thất bại'),
+    onError: (err) => notify.error(getApiErrorMessage(err, 'Duyệt thất bại')),
   });
 
   const rejectMod = useMutation({
     mutationFn: ({ type, id, reason }: { type: 'course' | 'lesson'; id: string; reason?: string }) =>
       adminApi.rejectModeration(type, id, reason),
     onSuccess: invalidate,
-    onError: (err: any) => notify.error(err?.response?.data?.message ?? 'Từ chối thất bại'),
+    onError: (err) => notify.error(getApiErrorMessage(err, 'Từ chối thất bại')),
   });
 
   const isMutating = approveMod.isPending || rejectMod.isPending;
@@ -240,6 +242,7 @@ function CourseDetailModal({ courseId, onClose }: { courseId: string; onClose: (
               {/* Thumbnail + meta */}
               <div className="flex gap-4">
                 {course.thumbnailUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img src={course.thumbnailUrl} alt="" className="w-40 h-28 object-cover rounded-lg flex-shrink-0" />
                 )}
                 <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm flex-1">
@@ -247,8 +250,8 @@ function CourseDetailModal({ courseId, onClose }: { courseId: string; onClose: (
                   <div><span className="text-gray-500">Trình độ:</span> <span className="font-medium">{course.level}</span></div>
                   <div><span className="text-gray-500">Giá:</span> <span className="font-medium">{Number(course.price).toLocaleString('vi-VN')}₫</span></div>
                   <div><span className="text-gray-500">Ngôn ngữ:</span> <span className="font-medium">{course.language}</span></div>
-                  <div><span className="text-gray-500">Trạng thái:</span> <span className="font-medium">{STATUS_LABEL[course.status] ?? course.status}</span></div>
-                  <div><span className="text-gray-500">Kiểm duyệt:</span> <span className="flex items-center gap-1 font-medium">{MOD_ICON[course.moderationStatus] ?? null}{MOD_LABEL[course.moderationStatus] ?? course.moderationStatus}</span></div>
+                  <div><span className="text-gray-500">Trạng thái:</span> <span className="font-medium">{STATUS_LABEL[course.status ?? ''] ?? course.status}</span></div>
+                  <div><span className="text-gray-500">Kiểm duyệt:</span> <span className="flex items-center gap-1 font-medium">{MOD_ICON[course.moderationStatus ?? ''] ?? null}{MOD_LABEL[course.moderationStatus ?? ''] ?? course.moderationStatus}</span></div>
                 </div>
               </div>
 
@@ -304,18 +307,18 @@ function CourseDetailModal({ courseId, onClose }: { courseId: string; onClose: (
               )}
 
               {/* Curriculum with full lesson content */}
-              {course.sections?.length > 0 && (
+              {(course.sections?.length ?? 0) > 0 && (
                 <div>
-                  <p className="text-sm font-medium text-gray-700 mb-2">Giáo trình ({course.sections.length} chương)</p>
+                  <p className="text-sm font-medium text-gray-700 mb-2">Giáo trình ({course.sections?.length ?? 0} chương)</p>
                   <div className="space-y-3">
-                    {course.sections.map((s: any, i: number) => (
+                    {course.sections?.map((s: SectionSummary, i: number) => (
                       <div key={s.id} className="border rounded-xl overflow-hidden">
                         <div className="bg-gray-50 px-4 py-2.5 text-sm font-medium flex items-center justify-between">
                           <span>{i + 1}. {s.title}</span>
                           <span className="text-gray-400 text-xs">{s.lessons?.length ?? 0} bài</span>
                         </div>
                         <div className="divide-y px-2 py-1.5 space-y-1">
-                          {s.lessons?.map((l: any) => (
+                          {s.lessons?.map((l: LessonSummary) => (
                             <LessonRow
                               key={l.id}
                               lesson={l}
@@ -364,8 +367,8 @@ function AdminCoursesContent() {
   const [tab, setTab] = useState<Tab>((searchParams.get('tab') as Tab) ?? 'pending');
   const [page, setPage] = useState(1);
   const [detailId, setDetailId] = useState<string | null>(null);
-  const [rejectTarget, setRejectTarget] = useState<any | null>(null);
-  const [approveConfirm, setApproveConfirm] = useState<any | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<CourseSummary | null>(null);
+  const [approveConfirm, setApproveConfirm] = useState<CourseSummary | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
 
   const statusMap: Record<Tab, string | undefined> = { pending: 'pending', all: undefined };
@@ -392,11 +395,11 @@ function AdminCoursesContent() {
       qc.invalidateQueries({ queryKey: ['admin-stats'] });
       setDeleteTarget(null);
     },
-    onError: (err: any) =>
-      notify.error(err?.response?.data?.message ?? 'Xóa khóa học thất bại'),
+    onError: (err) =>
+      notify.error(getApiErrorMessage(err, 'Xóa khóa học thất bại')),
   });
 
-  const courses: any[] = data?.data?.courses ?? [];
+  const courses: CourseSummary[] = data?.data?.courses ?? [];
   const total: number = data?.data?.total ?? 0;
   const totalPages = Math.ceil(total / 20);
 
@@ -428,7 +431,7 @@ function AdminCoursesContent() {
       {approveConfirm && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full space-y-4">
-            <p className="text-gray-800">Duyệt khóa học <strong>"{approveConfirm.title}"</strong>?</p>
+            <p className="text-gray-800">Duyệt khóa học <strong>&quot;{approveConfirm.title}&quot;</strong>?</p>
             <div className="flex gap-3 justify-end">
               <button onClick={() => setApproveConfirm(null)} className="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">Hủy</button>
               <button onClick={() => approveMutation.mutate(approveConfirm.id)} className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700">Duyệt</button>
@@ -473,13 +476,13 @@ function AdminCoursesContent() {
             <tbody className="divide-y divide-gray-100">
               {courses.length === 0 ? (
                 <tr><td colSpan={5} className="text-center py-12 text-gray-400 text-sm">Không có dữ liệu</td></tr>
-              ) : courses.map((c: any) => (
+              ) : courses.map((c) => (
                 <tr key={c.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-800">{c.title}</td>
                   <td className="px-4 py-3 text-gray-500">{c.instructor?.fullName ?? '—'}</td>
                   <td className="px-4 py-3">
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_CLASS[c.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                      {STATUS_LABEL[c.status] ?? c.status}
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_CLASS[c.status ?? ''] ?? 'bg-gray-100 text-gray-600'}`}>
+                      {STATUS_LABEL[c.status ?? ''] ?? c.status}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-gray-400 text-xs">{c.updatedAt ? new Date(c.updatedAt).toLocaleDateString('vi-VN') : '—'}</td>

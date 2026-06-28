@@ -14,6 +14,7 @@ import {
 } from '@/lib/api/instructor-application.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { notify } from '@/store/dialog.store';
+import { getApiErrorMessage } from '@/lib/api/error';
 
 const schema = z.object({
   expertise: z.string().min(10, 'Tối thiểu 10 ký tự').max(2000, 'Tối đa 2000 ký tự'),
@@ -32,7 +33,7 @@ const inputClass =
   'w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky focus:border-sky transition-colors resize-none';
 
 export default function BecomeInstructorPage() {
-  const { user, refreshUser } = useAuthStore();
+  const { user } = useAuthStore();
   const qc = useQueryClient();
   const [files, setFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -53,8 +54,8 @@ export default function BecomeInstructorPage() {
       setFiles([]);
       await qc.invalidateQueries({ queryKey: ['instructor-application-me'] });
     },
-    onError: (err: any) => {
-      notify.error(err?.response?.data?.message ?? 'Gửi đơn thất bại');
+    onError: (err) => {
+      notify.error(getApiErrorMessage(err, 'Gửi đơn thất bại'));
     },
   });
 

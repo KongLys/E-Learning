@@ -1,45 +1,36 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { instructorApi } from '@/lib/api/instructor.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { DynamicListField } from '@/components/instructor/DynamicListField';
 import { notify } from '@/store/dialog.store';
+import { getApiErrorMessage } from '@/lib/api/error';
 
-export default function CourseGoalsPage() {
-  const { id } = useParams<{ id: string }>();
+interface CourseGoals {
+  objectives?: string[];
+  requirements?: string[];
+  targetAudience?: string[];
+}
+
+function GoalsForm({ courseId, initial }: { courseId: string; initial: CourseGoals }) {
   const qc = useQueryClient();
-  const [objectives, setObjectives] = useState<string[]>([]);
-  const [requirements, setRequirements] = useState<string[]>([]);
-  const [targetAudience, setTargetAudience] = useState<string[]>([]);
+  const [objectives, setObjectives] = useState<string[]>(initial.objectives ?? []);
+  const [requirements, setRequirements] = useState<string[]>(initial.requirements ?? []);
+  const [targetAudience, setTargetAudience] = useState<string[]>(initial.targetAudience ?? []);
   const [saved, setSaved] = useState(false);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['course-manage', id],
-    queryFn: () => instructorApi.getCourseById(id).then((r) => r.data),
-  });
-
-  useEffect(() => {
-    if (data) {
-      setObjectives(data.objectives ?? []);
-      setRequirements(data.requirements ?? []);
-      setTargetAudience(data.targetAudience ?? []);
-    }
-  }, [data]);
-
   const saveMutation = useMutation({
-    mutationFn: () => instructorApi.updateCourse(id, { objectives, requirements, targetAudience }),
+    mutationFn: () => instructorApi.updateCourse(courseId, { objectives, requirements, targetAudience }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['course-manage', id] });
+      qc.invalidateQueries({ queryKey: ['course-manage', courseId] });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     },
-    onError: (err: any) => notify.error(err?.response?.data?.message ?? 'Lưu thất bại'),
+    onError: (err) => notify.error(getApiErrorMessage(err, 'Lưu thất bại')),
   });
-
-  if (isLoading) return <LoadingSpinner />;
 
   return (
     <div className="space-y-8">
@@ -86,4 +77,17 @@ export default function CourseGoalsPage() {
       </div>
     </div>
   );
+}
+
+export default function CourseGoalsPage() {
+  const { id } = useParams<{ id: string }>();
+
+  const { data, isLoading } = useQuery<CourseGoals>({
+    queryKey: ['course-manage', id],
+    queryFn: () => instructorApi.getCourseById(id).then((r) => r.data),
+  });
+
+  if (isLoading || !data) return <LoadingSpinner />;
+
+  return <GoalsForm courseId={id} initial={data} />;
 }

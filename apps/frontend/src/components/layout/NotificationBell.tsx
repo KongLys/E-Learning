@@ -6,6 +6,7 @@ import { notificationApi } from '@/lib/api/notification.api';
 import { moderationApi } from '@/lib/api/ai.api';
 import { Bell } from 'lucide-react';
 import { notify, showPrompt } from '@/store/dialog.store';
+import { getApiErrorMessage } from '@/lib/api/error';
 
 type NotificationActionData = {
   action: 'appeal';
@@ -65,7 +66,7 @@ export function NotificationBell() {
       return moderationApi.appealLesson(contentId, reason);
     },
     onSuccess: () => notify.success('Đã gửi kiến nghị thành công!'),
-    onError: (err: any) => notify.error(err?.response?.data?.message ?? 'Gửi kiến nghị thất bại'),
+    onError: (err) => notify.error(getApiErrorMessage(err, 'Gửi kiến nghị thất bại')),
   });
 
   useEffect(() => {
@@ -95,7 +96,7 @@ export function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-80 bg-surface-card border border-hairline rounded-card shadow-modal z-50 overflow-hidden">
+        <div className="absolute right-0 top-full mt-2 w-96 bg-surface-card border border-hairline rounded-card shadow-modal z-50 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-hairline">
             <span className="text-sm font-semibold text-ink">Thông báo</span>
             {unreadCount > 0 && (
@@ -104,7 +105,7 @@ export function NotificationBell() {
               </button>
             )}
           </div>
-          <div className="max-h-72 overflow-y-auto divide-y divide-hairline">
+          <div className="max-h-96 overflow-y-auto divide-y divide-hairline">
             {notifications.length === 0 && (
               <p className="text-center py-8 text-sm text-muted">Không có thông báo</p>
             )}

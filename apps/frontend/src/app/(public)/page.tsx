@@ -1,15 +1,26 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useQuery } from '@tanstack/react-query';
 import { courseApi, enrollmentApi } from '@/lib/api/course.api';
 import { CourseGrid } from '@/components/course/CourseGrid';
+import { ProgressBar } from '@/components/ui/ProgressBar';
 import { formatVND } from '@/lib/utils';
 import { ArrowRight, BookOpen } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { useHasHydrated } from '@/lib/hooks/useHasHydrated';
+import type { CourseSummary } from '@/types/course';
 
-function CourseListItem({ course }: { course: any }) {
+type EnrolledItem = {
+  courseId: string;
+  status?: string;
+  progressPercent?: number;
+  lastLessonId?: string | null;
+  course?: CourseSummary | null;
+};
+
+function CourseListItem({ course }: { course: CourseSummary }) {
   return (
     <Link
       href={`/courses/${course.slug}`}
@@ -42,14 +53,20 @@ export default function HomePage() {
   const { user } = useAuthStore();
   const hasHydrated = useHasHydrated();
 
+  // Cache theo user để tránh phục vụ lại kết quả lấy lúc chưa đăng nhập
+  // (chưa lọc khóa đã mua). Chờ hydrate xong mới fetch.
+  const userId = user?.id;
+
   const { data: popularData, isLoading: loadingPopular } = useQuery({
-    queryKey: ['courses-popular'],
-    queryFn: () => courseApi.getCourses({ sort: 'popular', limit: 3 }),
+    queryKey: ['courses-popular', userId ?? 'guest'],
+    queryFn: () => courseApi.getCourses({ sort: 'popular', limit: 6 }),
+    enabled: hasHydrated,
   });
 
   const { data: newestData, isLoading: loadingNewest } = useQuery({
-    queryKey: ['courses-newest'],
-    queryFn: () => courseApi.getCourses({ sort: 'newest', limit: 5 }),
+    queryKey: ['courses-newest', userId ?? 'guest'],
+    queryFn: () => courseApi.getCourses({ sort: 'newest', limit: 8 }),
+    enabled: hasHydrated,
   });
 
   const { data: enrollmentsData } = useQuery({
@@ -58,22 +75,31 @@ export default function HomePage() {
     enabled: hasHydrated && !!user,
   });
 
-  const popular = popularData?.data?.courses ?? [];
-  const newest = newestData?.data?.courses ?? [];
-  const enrollments: any[] = enrollmentsData?.data ?? [];
+  const enrollments: EnrolledItem[] = enrollmentsData?.data ?? [];
   const hasEnrollments = enrollments.length > 0;
 
+  // Lưới an toàn phía client: loại mọi khóa đã đăng ký khỏi các listing công khai,
+  // kể cả khi backend/cache còn độ trễ.
+  const enrolledIds = new Set(enrollments.map((e) => e.courseId));
+  const notEnrolled = (c: CourseSummary) => !enrolledIds.has(c.id);
+
+  const popular = (popularData?.data?.courses ?? []).filter(notEnrolled).slice(0, 3);
+  const newest = (newestData?.data?.courses ?? []).filter(notEnrolled).slice(0, 5);
+
+  // Khóa đang học dở (chưa hoàn thành) → mục "Tiếp tục học".
+  const inProgress = enrollments.filter((e) => e.status !== 'completed' && e.course);
+
   const categoryIds = [...new Set(
-    enrollments.map((e: any) => e.course?.categoryId).filter(Boolean),
+    enrollments.map((e) => e.course?.categoryId).filter(Boolean),
   )] as string[];
   const primaryCategoryId = categoryIds[0];
 
   const { data: recommendedData, isLoading: loadingRecommended } = useQuery({
-    queryKey: ['courses-recommended', primaryCategoryId],
-    queryFn: () => courseApi.getCourses({ categoryId: primaryCategoryId, sort: 'rating', limit: 4 }),
+    queryKey: ['courses-recommended', primaryCategoryId, userId ?? 'guest'],
+    queryFn: () => courseApi.getCourses({ categoryId: primaryCategoryId, sort: 'rating', limit: 8 }),
     enabled: !!primaryCategoryId,
   });
-  const recommended: any[] = recommendedData?.data?.courses ?? [];
+  const recommended = (recommendedData?.data?.courses ?? []).filter(notEnrolled).slice(0, 4);
 
   const isPersonalized = hasHydrated && !!user && hasEnrollments;
 
@@ -104,6 +130,72 @@ export default function HomePage() {
               </Link>
             </div>
           </section>
+
+          {/* ── Tiếp tục học ─────────────────────────────────── */}
+          {inProgress.length > 0 && (
+            <section className="bg-canvas-soft py-16">
+              <div className="max-w-300 mx-auto px-6">
+                <div className="flex items-end justify-between mb-8">
+                  <div>
+                    <h2 className="font-display text-3xl text-ink mb-1">Tiếp tục học</h2>
+                    <p className="text-sm text-muted">Học tiếp các khóa bạn đang theo dở</p>
+                  </div>
+                  <Link
+                    href="/my-courses"
+                    className="text-sm font-medium text-muted hover:text-ink transition-colors underline underline-offset-4"
+                  >
+                    Xem tất cả
+                  </Link>
+                </div>
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                  {inProgress.map((e) => {
+                    const course = e.course!;
+                    const progress = Math.round(e.progressPercent ?? 0);
+                    const hasStarted = progress > 0;
+                    return (
+                      <div
+                        key={e.courseId}
+                        className="bg-surface-card rounded-2xl border border-hairline overflow-hidden hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] transition-shadow"
+                      >
+                        <div className="relative h-40 bg-surface-strong">
+                          {course.thumbnailUrl ? (
+                            <Image
+                              src={course.thumbnailUrl}
+                              alt={course.title}
+                              fill
+                              className="object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-full items-center justify-center text-muted-soft text-sm">
+                              Chưa có ảnh
+                            </div>
+                          )}
+                        </div>
+                        <div className="p-4">
+                          <h3 className="text-[15px] font-semibold text-ink line-clamp-2 mb-4">
+                            {course.title}
+                          </h3>
+                          <ProgressBar value={progress} className="mb-1.5" />
+                          <p className="text-xs text-muted mb-4">{progress}% hoàn thành</p>
+                          <Link
+                            href={
+                              e.lastLessonId
+                                ? `/learn/${e.courseId}/${e.lastLessonId}`
+                                : `/learn/${e.courseId}`
+                            }
+                            className="w-full inline-flex h-9 items-center justify-center gap-1.5 rounded-pill bg-emphasis text-white text-sm font-medium hover:bg-ink transition-colors"
+                          >
+                            {hasStarted ? 'Tiếp tục học' : 'Bắt đầu học'}
+                            <ArrowRight size={14} />
+                          </Link>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </section>
+          )}
 
           {/* ── Đề xuất cho bạn ─────────────────────────────── */}
           {primaryCategoryId && (
@@ -182,7 +274,7 @@ export default function HomePage() {
                     <p className="text-sm text-muted py-8 text-center">Chưa có khóa học nào</p>
                   ) : (
                     <div className="divide-y divide-hairline">
-                      {newest.map((course: any) => (
+                      {newest.map((course: CourseSummary) => (
                         <CourseListItem key={course.id} course={course} />
                       ))}
                     </div>
@@ -292,7 +384,7 @@ export default function HomePage() {
                     <p className="text-sm text-muted py-8 text-center">Chưa có khóa học nào</p>
                   ) : (
                     <div className="divide-y divide-hairline">
-                      {newest.map((course: any) => (
+                      {newest.map((course: CourseSummary) => (
                         <CourseListItem key={course.id} course={course} />
                       ))}
                     </div>

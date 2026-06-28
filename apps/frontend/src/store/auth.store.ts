@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import Cookies from 'js-cookie';
 import { authApi } from '@/lib/api/auth.api';
+import { queryClient } from '@/lib/query-client';
 
 export interface AuthUser {
   id: string;
@@ -41,6 +42,8 @@ export const useAuthStore = create<AuthState>()(
       setSession: (user, accessToken, refreshToken) => {
         get().setTokens(accessToken, refreshToken);
         set({ user });
+        // Xóa cache của phiên trước để không hiển thị dữ liệu cũ.
+        queryClient.clear();
       },
 
       login: async (email, password) => {
@@ -49,6 +52,8 @@ export const useAuthStore = create<AuthState>()(
           const { data } = await authApi.login({ email, password });
           get().setTokens(data.accessToken, data.refreshToken);
           set({ user: data.user, isLoading: false });
+          // Xóa cache của phiên trước để không hiển thị dữ liệu cũ.
+          queryClient.clear();
         } catch (err) {
           set({ isLoading: false });
           throw err;
@@ -61,6 +66,8 @@ export const useAuthStore = create<AuthState>()(
         localStorage.removeItem('refreshToken');
         Cookies.remove('accessToken', { path: '/' });
         set({ user: null, accessToken: null });
+        // Xóa cache để dữ liệu của người dùng vừa đăng xuất không còn lưu lại.
+        queryClient.clear();
       },
 
       refreshUser: async () => {

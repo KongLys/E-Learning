@@ -1,24 +1,21 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 import { useAuthStore } from '@/store/auth.store';
 
+/**
+ * Trả về true sau khi store zustand (persist) đã hydrate xong từ localStorage.
+ * Dùng useSyncExternalStore để subscribe trực tiếp vào API hydration của persist,
+ * tránh gọi setState đồng bộ trong useEffect.
+ */
 export function useHasHydrated() {
-  const [hasHydrated, setHasHydrated] = useState(false);
-
-  useEffect(() => {
-    const persist = useAuthStore.persist;
-    if (!persist) {
-      setHasHydrated(true);
-      return;
-    }
-    if (persist.hasHydrated()) {
-      setHasHydrated(true);
-      return;
-    }
-    const unsub = persist.onFinishHydration(() => setHasHydrated(true));
-    return unsub;
-  }, []);
-
-  return hasHydrated;
+  return useSyncExternalStore(
+    (onStoreChange) => {
+      const persist = useAuthStore.persist;
+      if (!persist) return () => {};
+      return persist.onFinishHydration(onStoreChange);
+    },
+    () => useAuthStore.persist?.hasHydrated() ?? true,
+    () => false,
+  );
 }

@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { userApi } from '@/lib/api/user.api';
+import { getApiErrorMessage } from '@/lib/api/error';
 
 const schema = z
   .object({
@@ -44,8 +45,8 @@ export function PasswordChangeForm() {
       });
       setSuccess(true);
       reset();
-    } catch (err: any) {
-      setApiError(err?.response?.data?.message ?? 'Đổi mật khẩu thất bại');
+    } catch (err) {
+      setApiError(getApiErrorMessage(err, 'Đổi mật khẩu thất bại'));
     }
   }
 

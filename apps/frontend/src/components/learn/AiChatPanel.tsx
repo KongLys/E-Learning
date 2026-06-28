@@ -17,6 +17,8 @@ import {
 import { learnApi } from '@/lib/api/learn.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorMessage } from '@/components/common/ErrorMessage';
+import { getApiErrorMessage } from '@/lib/api/error';
+import type { QuizView } from '@/types/quiz';
 import { useAiChatBridge } from '@/store/ai-chat-bridge.store';
 
 type Citation = NonNullable<AiMessage['citations']>[number];
@@ -41,7 +43,7 @@ interface AiChatPanelProps {
   /** Truyền vào khi dùng như panel để hiện nút đóng. */
   onClose?: () => void;
   /** Mở quiz ở cột nội dung bài học (thay vì modal nội bộ). */
-  onOpenQuiz?: (quiz: any, kind: 'review' | 'ai') => void;
+  onOpenQuiz?: (quiz: QuizView, kind: 'review' | 'ai') => void;
 }
 
 export function AiChatPanel({
@@ -66,7 +68,11 @@ export function AiChatPanel({
 
   const openQuizMut = useMutation({
     mutationFn: (id: string) => myReviewQuizApi.get(id),
-    onSuccess: (res) => onOpenQuiz?.(res.data, 'ai'),
+    onSuccess: (res) => {
+      onOpenQuiz?.(res.data, 'ai');
+      // Mở quiz xong thì tự ẩn banner mời làm bài.
+      setCreatedQuiz(null);
+    },
   });
 
   const conversationsQuery = useQuery({
@@ -124,11 +130,10 @@ export function AiChatPanel({
     },
   });
 
-  useEffect(() => {
-    if (!activeId && (conversationsQuery.data?.length ?? 0) > 0) {
-      setActiveId(conversationsQuery.data![0].id);
-    }
-  }, [activeId, conversationsQuery.data]);
+  // Tự chọn hội thoại đầu tiên khi chưa chọn (set-state-during-render thay useEffect)
+  if (!activeId && (conversationsQuery.data?.length ?? 0) > 0) {
+    setActiveId(conversationsQuery.data![0].id);
+  }
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
@@ -199,8 +204,19 @@ export function AiChatPanel({
     }
 
     setStreaming(false);
+    // Ghi thẳng cặp hỏi–đáp vừa stream vào cache (cùng một nhịp với việc xóa
+    // pending) để tránh khoảng trống/giật do refetch. Dùng `q`/`buffer` cục bộ
+    // (không đọc state `pending` vì closure đã cũ). Tin nhắn tạm mang id
+    // `local-…`; bản chuẩn từ server sẽ tự nạp khi đổi hội thoại quay lại.
+    const finalId = convId;
+    const now = new Date().toISOString();
+    const stamp = Date.now();
+    qc.setQueryData<AiMessage[]>(['ai-messages', finalId], (old = []) => [
+      ...old,
+      { id: `local-${finalId}-${stamp}-u`, conversationId: finalId, role: 'user', content: q, citations: null, createdAt: now },
+      { id: `local-${finalId}-${stamp}-a`, conversationId: finalId, role: 'assistant', content: buffer, citations: citations.length ? citations : null, createdAt: now },
+    ]);
     setPending([]);
-    qc.invalidateQueries({ queryKey: ['ai-messages', convId] });
     qc.invalidateQueries({ queryKey: ['ai-conversations', courseId] });
   };
 
@@ -211,6 +227,8 @@ export function AiChatPanel({
     if (!pendingAsk || streaming) return;
     const p = consumeAsk();
     if (!p) return;
+    // setState hợp lệ trong effect: đây là việc tiêu thụ prompt bơm từ ngoài (side-effect thật).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (p.scope?.lessonId) setScopeKey(`l:${p.scope.lessonId}`);
     else if (p.scope?.sectionId) setScopeKey(`s:${p.scope.sectionId}`);
     void handleAsk({ query: p.text, scope: p.scope, explain: p.explain });
@@ -366,8 +384,7 @@ export function AiChatPanel({
             </div>
             {generateReviewQuiz.isError && (
               <p className="text-xs text-semantic-error">
-                {(generateReviewQuiz.error as any)?.response?.data?.message ??
-                  'Không tạo được quiz ôn tập, vui lòng thử lại.'}
+                {getApiErrorMessage(generateReviewQuiz.error, 'Không tạo được quiz ôn tập, vui lòng thử lại.')}
               </p>
             )}
           </div>

@@ -1,49 +1,42 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { instructorApi } from '@/lib/api/instructor.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { formatVND } from '@/lib/utils';
 import { notify } from '@/store/dialog.store';
+import { getApiErrorMessage } from '@/lib/api/error';
 
 const inputClass = 'w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky';
 
-export default function CoursePricingPage() {
-  const { id } = useParams<{ id: string }>();
+interface CoursePricing {
+  price?: number | string;
+  discountPrice?: number | string | null;
+}
+
+function PricingForm({ courseId, initial }: { courseId: string; initial: CoursePricing }) {
   const qc = useQueryClient();
-  const [price, setPrice] = useState(0);
-  const [discountPrice, setDiscountPrice] = useState<number | ''>('');
+  const [price, setPrice] = useState(Number(initial.price ?? 0));
+  const [discountPrice, setDiscountPrice] = useState<number | ''>(
+    initial.discountPrice != null ? Number(initial.discountPrice) : '',
+  );
   const [saved, setSaved] = useState(false);
-
-  const { data, isLoading } = useQuery({
-    queryKey: ['course-manage', id],
-    queryFn: () => instructorApi.getCourseById(id).then((r) => r.data),
-  });
-
-  useEffect(() => {
-    if (data) {
-      setPrice(Number(data.price ?? 0));
-      setDiscountPrice(data.discountPrice != null ? Number(data.discountPrice) : '');
-    }
-  }, [data]);
 
   const saveMutation = useMutation({
     mutationFn: () =>
-      instructorApi.updateCourse(id, {
+      instructorApi.updateCourse(courseId, {
         price,
         discountPrice: discountPrice === '' ? undefined : Number(discountPrice),
       }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['course-manage', id] });
+      qc.invalidateQueries({ queryKey: ['course-manage', courseId] });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     },
-    onError: (err: any) => notify.error(err?.response?.data?.message ?? 'Lưu thất bại'),
+    onError: (err) => notify.error(getApiErrorMessage(err, 'Lưu thất bại')),
   });
-
-  if (isLoading) return <LoadingSpinner />;
 
   const invalidDiscount = discountPrice !== '' && Number(discountPrice) >= price;
 
@@ -94,4 +87,17 @@ export default function CoursePricingPage() {
       </div>
     </div>
   );
+}
+
+export default function CoursePricingPage() {
+  const { id } = useParams<{ id: string }>();
+
+  const { data, isLoading } = useQuery<CoursePricing>({
+    queryKey: ['course-manage', id],
+    queryFn: () => instructorApi.getCourseById(id).then((r) => r.data),
+  });
+
+  if (isLoading || !data) return <LoadingSpinner />;
+
+  return <PricingForm courseId={id} initial={data} />;
 }

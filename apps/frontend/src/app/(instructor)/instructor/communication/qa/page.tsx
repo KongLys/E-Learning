@@ -5,6 +5,22 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { instructorApi } from '@/lib/api/instructor.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { notify } from '@/store/dialog.store';
+import { getApiErrorMessage } from '@/lib/api/error';
+import type { CourseSummary } from '@/types/course';
+
+interface QaReply {
+  id: string;
+  content: string;
+}
+
+interface QaQuestion {
+  id: string;
+  content: string;
+  status: string;
+  createdAt: string;
+  student?: { fullName?: string } | null;
+  replies?: QaReply[];
+}
 
 const STATUS_LABELS: Record<string, string> = {
   pending: 'Chờ trả lời',
@@ -28,14 +44,14 @@ export default function QaPage() {
     queryKey: ['instructor-courses'],
     queryFn: () => instructorApi.getCourses(),
   });
-  const courses: any[] = coursesData?.data?.courses ?? coursesData?.data ?? [];
+  const courses: CourseSummary[] = coursesData?.data?.courses ?? coursesData?.data ?? [];
 
   const { data: inboxData, isLoading } = useQuery({
     queryKey: ['instructor-qa', selectedCourseId, statusFilter],
     queryFn: () => instructorApi.getInbox(selectedCourseId, statusFilter || undefined),
     enabled: !!selectedCourseId,
   });
-  const questions: any[] = inboxData?.data?.questions ?? inboxData?.data ?? [];
+  const questions: QaQuestion[] = inboxData?.data?.questions ?? inboxData?.data ?? [];
 
   const replyMutation = useMutation({
     mutationFn: ({ qId, content }: { qId: string; content: string }) =>
@@ -44,7 +60,7 @@ export default function QaPage() {
       qc.invalidateQueries({ queryKey: ['instructor-qa'] });
       setReplyMap((prev) => ({ ...prev, [qId]: '' }));
     },
-    onError: (err: any) => notify.error(err?.response?.data?.message ?? 'Lỗi gửi trả lời'),
+    onError: (err) => notify.error(getApiErrorMessage(err, 'Lỗi gửi trả lời')),
   });
 
   const closeMutation = useMutation({
@@ -66,7 +82,7 @@ export default function QaPage() {
           className="flex-1 border border-hairline-strong rounded-lg px-3 py-2 text-sm"
         >
           <option value="">Chọn khóa học</option>
-          {courses.map((c: any) => (
+          {courses.map((c) => (
             <option key={c.id} value={c.id}>{c.title}</option>
           ))}
         </select>
@@ -90,7 +106,7 @@ export default function QaPage() {
         <div className="text-center py-16 text-muted text-sm">Không có câu hỏi nào</div>
       ) : (
         <div className="space-y-4">
-          {questions.map((q: any) => (
+          {questions.map((q) => (
             <div key={q.id} className="bg-surface-card rounded-card border border-hairline p-5">
               <div className="flex items-start justify-between gap-4 mb-3">
                 <div className="flex-1">
@@ -105,9 +121,9 @@ export default function QaPage() {
                 </span>
               </div>
 
-              {q.replies?.length > 0 && (
+              {(q.replies?.length ?? 0) > 0 && (
                 <div className="mt-3 pt-3 border-t border-hairline space-y-2">
-                  {q.replies.map((r: any) => (
+                  {q.replies?.map((r) => (
                     <div key={r.id} className="flex gap-2 text-sm">
                       <span className="text-ink-subtle shrink-0">↳</span>
                       <p className="text-ink-mute">{r.content}</p>

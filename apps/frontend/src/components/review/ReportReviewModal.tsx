@@ -5,6 +5,7 @@ import { useMutation } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import { reviewApi, type ReviewReportReason } from '@/lib/api/review.api';
 import { REPORT_REASON_OPTIONS } from './reportReasons';
+import { getApiErrorMessage } from '@/lib/api/error';
 
 interface ReportReviewModalProps {
   reviewId: string;
@@ -29,7 +30,7 @@ export function ReportReviewModal({ reviewId, onClose, onReported }: ReportRevie
   const mutation = useMutation({
     mutationFn: () => reviewApi.reportReview(reviewId, { reason: reason as ReviewReportReason, detail: detail || undefined }),
     onSuccess: onReported,
-    onError: (err: any) => setError(err?.response?.data?.message ?? 'Không thể gửi báo cáo'),
+    onError: (err) => setError(getApiErrorMessage(err, 'Không thể gửi báo cáo')),
   });
 
   const submit = () => {

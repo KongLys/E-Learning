@@ -8,6 +8,14 @@ import { apiClient } from '@/lib/api/axios';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorMessage } from '@/components/common/ErrorMessage';
 
+interface SectionLessonLite {
+  id: string;
+  orderIndex: number;
+}
+interface SectionLite {
+  lessons?: SectionLessonLite[];
+}
+
 export default function LearnCoursePage() {
   const { courseId } = useParams<{ courseId: string }>();
   const router = useRouter();
@@ -37,18 +45,18 @@ export default function LearnCoursePage() {
 
     if (sectionsLoading || !sectionsData) return;
 
-    const sections: any[] = sectionsData ?? [];
+    const sections: SectionLite[] = sectionsData ?? [];
     const firstLesson = sections
-      .flatMap((s: any) => s.lessons ?? [])
-      .sort((a: any, b: any) => a.orderIndex - b.orderIndex)[0];
+      .flatMap((s) => s.lessons ?? [])
+      .sort((a, b) => a.orderIndex - b.orderIndex)[0];
 
     if (firstLesson) {
       router.replace(`/learn/${courseId}/${firstLesson.id}`);
     }
   }, [progressLoading, lastLessonId, sectionsLoading, sectionsData, courseId, router]);
 
-  const sections: any[] = sectionsData ?? [];
-  const hasLessons = sections.some((s: any) => s.lessons?.length > 0);
+  const sections: SectionLite[] = sectionsData ?? [];
+  const hasLessons = sections.some((s) => (s.lessons?.length ?? 0) > 0);
   const isLoading = progressLoading || sectionsLoading;
 
   if (!isLoading && !lastLessonId && !hasLessons) {

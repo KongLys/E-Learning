@@ -9,6 +9,17 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { LessonContentEditor } from '@/components/instructor/LessonContentEditor';
 import { LessonTypeIcon, type LessonType } from '@/components/instructor/lessonTypeMeta';
 
+interface CurriculumLesson {
+  id: string;
+  title: string;
+  type: LessonType;
+}
+interface CurriculumSection {
+  id: string;
+  title: string;
+  lessons?: CurriculumLesson[];
+}
+
 export default function CurriculumDetailPage() {
   const { id, lessonId } = useParams<{ id: string; lessonId: string }>();
 
@@ -22,11 +33,11 @@ export default function CurriculumDetailPage() {
     queryFn: () => instructorApi.getCourseById(id).then((r) => r.data),
   });
 
-  const sections: any[] = data?.data ?? [];
+  const sections: CurriculumSection[] = data?.data ?? [];
 
   const currentLesson = sections
-    .flatMap((s: any) => s.lessons ?? [])
-    .find((l: any) => l.id === lessonId) as { id: string; title: string; type: LessonType } | undefined;
+    .flatMap((s) => s.lessons ?? [])
+    .find((l) => l.id === lessonId);
 
   return (
     <div className="-m-4 sm:-m-6 lg:-m-7 flex h-[calc(100vh-3rem)] flex-col lg:flex-row">
@@ -49,7 +60,7 @@ export default function CurriculumDetailPage() {
           {isLoading ? (
             <div className="py-12"><LoadingSpinner /></div>
           ) : (
-            sections.map((section: any, idx: number) => (
+            sections.map((section, idx) => (
               <details key={section.id} open className="group border-b border-hairline">
                 <summary className="px-4 py-3 cursor-pointer hover:bg-canvas-soft list-none flex items-start justify-between gap-2">
                   <div>
@@ -59,7 +70,7 @@ export default function CurriculumDetailPage() {
                   <ChevronDown size={16} className="text-ink-subtle mt-0.5 shrink-0 transition-transform group-open:rotate-180" />
                 </summary>
                 <ul className="pb-1">
-                  {section.lessons?.map((lesson: any) => {
+                  {section.lessons?.map((lesson) => {
                     const isCurrent = lesson.id === lessonId;
                     return (
                       <li key={lesson.id}>

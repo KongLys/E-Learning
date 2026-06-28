@@ -6,6 +6,20 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { learnApi } from '@/lib/api/learn.api';
 import { formatSeconds } from './VideoPlayer';
 
+interface QuestionReply {
+  id: string;
+  content: string;
+  author?: { fullName?: string } | null;
+}
+interface LessonQuestion {
+  id: string;
+  content: string;
+  status: string;
+  positionType?: string;
+  positionValue?: number;
+  replies?: QuestionReply[];
+}
+
 interface QuestionsPanelProps {
   lessonId: string;
   positionType: 'video_timestamp' | 'document_page' | 'none';
@@ -32,7 +46,7 @@ export function QuestionsPanel({ lessonId, positionType, getCurrentPosition, onJ
     queryKey: ['questions', lessonId],
     queryFn: () => learnApi.getQuestions(lessonId),
   });
-  const questions: any[] = data?.data ?? [];
+  const questions: LessonQuestion[] = data?.data ?? [];
 
   const createMutation = useMutation({
     mutationFn: () => {
@@ -117,26 +131,26 @@ export function QuestionsPanel({ lessonId, positionType, getCurrentPosition, onJ
       )}
 
       <div className="space-y-3 max-h-112 overflow-y-auto">
-        {questions.map((q: any) => {
+        {questions.map((q) => {
           const badge = STATUS_BADGE[q.status] ?? STATUS_BADGE.pending;
           return (
             <div key={q.id} className="rounded-2xl bg-slate-50 p-4 text-sm space-y-2.5">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className={`text-[11px] px-2.5 py-0.5 rounded-full font-medium ${badge.cls}`}>{badge.label}</span>
-                {q.positionType === 'video_timestamp' && q.positionValue > 0 && (
+                {q.positionType === 'video_timestamp' && (q.positionValue ?? 0) > 0 && (
                   <button
-                    onClick={() => onJumpTo?.(q.positionValue)}
+                    onClick={() => onJumpTo?.(q.positionValue ?? 0)}
                     className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 bg-blue-100 hover:bg-blue-200 px-2.5 py-1 rounded-full"
                   >
-                    <Clock size={12} /> {formatSeconds(q.positionValue)}
+                    <Clock size={12} /> {formatSeconds(q.positionValue ?? 0)}
                   </button>
                 )}
               </div>
               <p className="text-[15px] text-gray-800 whitespace-pre-wrap leading-relaxed">{q.content}</p>
 
-              {q.replies?.length > 0 && (
+              {(q.replies?.length ?? 0) > 0 && (
                 <div className="space-y-2 mt-1">
-                  {q.replies.map((r: any) => (
+                  {q.replies?.map((r) => (
                     <div key={r.id} className="rounded-xl bg-green-50 px-3 py-2">
                       <p className="text-xs font-semibold text-green-700 mb-0.5">↳ {r.author?.fullName ?? 'Giảng viên'}</p>
                       <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{r.content}</p>

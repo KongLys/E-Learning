@@ -6,6 +6,7 @@ import { adminApi } from '@/lib/api/admin.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { FileText, ImageIcon } from 'lucide-react';
 import { notify, showPrompt } from '@/store/dialog.store';
+import { getApiErrorMessage } from '@/lib/api/error';
 
 type StatusFilter = 'pending' | 'approved' | 'rejected';
 
@@ -62,7 +63,7 @@ export default function AdminInstructorApplicationsPage() {
       notify.success('Đã duyệt đơn. Học viên đã trở thành giảng viên.');
       invalidate();
     },
-    onError: (err: any) => notify.error(err?.response?.data?.message ?? 'Thao tác thất bại'),
+    onError: (err) => notify.error(getApiErrorMessage(err, 'Thao tác thất bại')),
   });
 
   const rejectMutation = useMutation({
@@ -72,7 +73,7 @@ export default function AdminInstructorApplicationsPage() {
       notify.success('Đã từ chối đơn.');
       invalidate();
     },
-    onError: (err: any) => notify.error(err?.response?.data?.message ?? 'Thao tác thất bại'),
+    onError: (err) => notify.error(getApiErrorMessage(err, 'Thao tác thất bại')),
   });
 
   const items: ApplicationItem[] = data?.data ?? [];

@@ -17,6 +17,8 @@ import { notify, showConfirm } from '@/store/dialog.store';
 import { PriceDisplay } from '@/components/ui/PriceDisplay';
 import Link from 'next/link';
 import { Plus, Search, X } from 'lucide-react';
+import { getApiErrorMessage } from '@/lib/api/error';
+import type { CourseSummary } from '@/types/course';
 
 const STATUS_COLORS: Record<string, string> = {
   draft: 'bg-surface-strong text-ink-mute',
@@ -63,7 +65,7 @@ function CreateCourseModal({ onClose }: { onClose: () => void }) {
       qc.invalidateQueries({ queryKey: ['instructor-courses'] });
       router.push(`/instructor/courses/${res.data.id}/manage/goals`);
     },
-    onError: (err: any) => setError(err?.response?.data?.message ?? 'Lỗi tạo khóa học'),
+    onError: (err) => setError(getApiErrorMessage(err, 'Lỗi tạo khóa học')),
   });
 
   const valid = title.trim().length >= 5;
@@ -149,8 +151,8 @@ export default function InstructorCoursesPage() {
       qc.invalidateQueries({ queryKey: ['instructor-courses'] });
       setCourseToDelete(null);
     },
-    onError: (err: any) =>
-      notify.error(err?.response?.data?.message ?? 'Xóa khóa học thất bại'),
+    onError: (err) =>
+      notify.error(getApiErrorMessage(err, 'Xóa khóa học thất bại')),
   });
 
   const unpublishMutation = useMutation({
@@ -159,11 +161,14 @@ export default function InstructorCoursesPage() {
       qc.invalidateQueries({ queryKey: ['instructor-courses'] });
       setCourseToUnpublish(null);
     },
-    onError: (err: any) =>
-      notify.error(err?.response?.data?.message ?? 'Hủy xuất bản thất bại'),
+    onError: (err) =>
+      notify.error(getApiErrorMessage(err, 'Hủy xuất bản thất bại')),
   });
 
-  const allCourses: any[] = data?.data?.courses ?? data?.data ?? [];
+  const allCourses: CourseSummary[] = useMemo(
+    () => data?.data?.courses ?? data?.data ?? [],
+    [data],
+  );
 
   const courses = useMemo(() => {
     let list = [...allCourses];
@@ -252,15 +257,15 @@ export default function InstructorCoursesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-hairline">
-              {courses.map((course: any) => (
+              {courses.map((course) => (
                 <tr key={course.id} className="hover:bg-canvas-soft">
                   <td className="px-4 py-3">
                     <p className="font-medium text-ink">{course.title}</p>
                     <p className="text-xs text-ink-subtle">{course.totalLessons ?? 0} bài học</p>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[course.status] ?? 'bg-surface-strong'}`}>
-                      {STATUS_LABELS[course.status] ?? course.status}
+                    <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[course.status ?? ''] ?? 'bg-surface-strong'}`}>
+                      {STATUS_LABELS[course.status ?? ''] ?? course.status}
                     </span>
                   </td>
                   <td className="px-4 py-3">

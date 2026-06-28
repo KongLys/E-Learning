@@ -6,6 +6,15 @@ import { adminApi } from '@/lib/api/admin.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
 
+interface AdminUser {
+  id: string;
+  email: string;
+  fullName: string;
+  role: string;
+  status: string;
+  createdAt: string;
+}
+
 function ConfirmDialog({ message, onConfirm, onCancel }: { message: string; onConfirm: () => void; onCancel: () => void }) {
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
@@ -44,7 +53,7 @@ export default function AdminUsersPage() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-users'] }); qc.invalidateQueries({ queryKey: ['admin-stats'] }); setConfirm(null); },
   });
 
-  const users: any[] = data?.data?.users ?? [];
+  const users: AdminUser[] = data?.data?.users ?? [];
   const total: number = data?.data?.total ?? 0;
   const totalPages = Math.ceil(total / 20);
 
@@ -104,7 +113,7 @@ export default function AdminUsersPage() {
             <tbody className="divide-y divide-gray-100">
               {users.length === 0 ? (
                 <tr><td colSpan={6} className="text-center py-12 text-gray-400 text-sm">Không có dữ liệu</td></tr>
-              ) : users.map((u: any) => (
+              ) : users.map((u) => (
                 <tr key={u.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-gray-700">{u.email}</td>
                   <td className="px-4 py-3 text-gray-700">{u.fullName}</td>

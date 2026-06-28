@@ -4,25 +4,26 @@ import { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { learnApi } from '@/lib/api/learn.api';
+import type { QuizView, QuizSubmitResult, QuizAttemptRecord } from '@/types/quiz';
 
 interface QuizUIProps {
   lessonId: string;
-  quiz: any;
+  quiz: QuizView;
   onPassed: () => void;
 }
 
 type QuizState = 'ready' | 'in_progress' | 'submitted';
 
-export function QuizUI({ lessonId, quiz, onPassed }: QuizUIProps) {
+export function QuizUI({ quiz, onPassed }: QuizUIProps) {
   const qc = useQueryClient();
   const [state, setState] = useState<QuizState>('ready');
   const [currentQ, setCurrentQ] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<QuizSubmitResult | null>(null);
   const [timeLeft, setTimeLeft] = useState(0);
 
   // Lịch sử các lần làm trước (mới nhất trước) — để hiện điểm đã đạt khi quay lại.
-  const attemptsQuery = useQuery({
+  const attemptsQuery = useQuery<QuizAttemptRecord[]>({
     queryKey: ['quiz-attempts', quiz.id],
     queryFn: async () => (await learnApi.getQuizAttempts(quiz.id)).data,
     enabled: !!quiz.id,
@@ -31,15 +32,12 @@ export function QuizUI({ lessonId, quiz, onPassed }: QuizUIProps) {
 
   useEffect(() => {
     if (state !== 'in_progress' || !quiz.timeLimit) return;
-    setTimeLeft(quiz.timeLimit);
     const interval = setInterval(() => {
-      setTimeLeft((t) => {
-        if (t <= 1) { clearInterval(interval); handleSubmit(); return 0; }
-        return t - 1;
-      });
+      // Updater phải thuần — chỉ tính giá trị mới, không gọi side-effect ở đây.
+      setTimeLeft((t) => (t <= 1 ? 0 : t - 1));
     }, 1000);
     return () => clearInterval(interval);
-  }, [state]);
+  }, [state, quiz.timeLimit]);
 
   const submitMutation = useMutation({
     mutationFn: (ans: { questionId: string; optionIds: string[] }[]) =>
@@ -53,12 +51,20 @@ export function QuizUI({ lessonId, quiz, onPassed }: QuizUIProps) {
   });
 
   const handleSubmit = () => {
-    const ansArr = quiz.questions.map((q: any) => ({
+    const ansArr = (quiz.questions ?? []).map((q) => ({
       questionId: q.id,
       optionIds: answers[q.id] ?? [],
     }));
     submitMutation.mutate(ansArr);
   };
+
+  // Hết giờ thì tự nộp bài.
+  useEffect(() => {
+    if (state === 'in_progress' && quiz.timeLimit && timeLeft === 0) {
+      handleSubmit();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeLeft, state]);
 
   const toggleOption = (questionId: string, optionId: string, isSingle: boolean) => {
     setAnswers((prev) => {
@@ -73,7 +79,7 @@ export function QuizUI({ lessonId, quiz, onPassed }: QuizUIProps) {
     });
   };
 
-  const startFresh = () => { setAnswers({}); setResult(null); setCurrentQ(0); setState('in_progress'); };
+  const startFresh = () => { setAnswers({}); setResult(null); setCurrentQ(0); setTimeLeft(quiz.timeLimit ?? 0); setState('in_progress'); };
 
   const maxAttempts: number = quiz.maxAttempts ?? 0;
   const attemptCount = attempts.length;
@@ -128,7 +134,7 @@ export function QuizUI({ lessonId, quiz, onPassed }: QuizUIProps) {
               {maxAttempts > 0 && <p>Tối đa {maxAttempts} lần làm</p>}
             </div>
             <button
-              onClick={() => setState('in_progress')}
+              onClick={() => { setTimeLeft(quiz.timeLimit ?? 0); setState('in_progress'); }}
               className="mt-6 inline-flex h-10 items-center justify-center rounded-pill bg-emphasis px-8 text-sm font-medium text-white transition-colors hover:bg-ink"
             >
               Bắt đầu làm bài
@@ -153,8 +159,8 @@ export function QuizUI({ lessonId, quiz, onPassed }: QuizUIProps) {
         </div>
 
         <div className="space-y-2.5">
-          {result.results?.map((r: any, i: number) => {
-            const q = quiz.questions[i];
+          {result.results?.map((r, i) => {
+            const q = quiz.questions?.[i];
             return (
               <div key={r.questionId} className="rounded-xl border border-hairline bg-surface-card p-4">
                 <div className="flex items-start justify-between gap-3">
@@ -210,7 +216,7 @@ export function QuizUI({ lessonId, quiz, onPassed }: QuizUIProps) {
         <p className="text-[15px] font-medium text-ink">{q?.content}</p>
         {!isSingle && <p className="text-xs text-muted">Chọn tất cả đáp án đúng</p>}
         <div className="space-y-2">
-          {q?.options?.map((opt: any) => (
+          {q?.options?.map((opt) => (
             <label
               key={opt.id}
               className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${

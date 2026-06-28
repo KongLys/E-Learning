@@ -4,15 +4,16 @@ import { useQuery } from '@tanstack/react-query';
 import { instructorApi } from '@/lib/api/instructor.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import Link from 'next/link';
+import type { CourseSummary } from '@/types/course';
 
 export default function StudentsPage() {
   const { data: coursesData, isLoading } = useQuery({
     queryKey: ['instructor-courses'],
     queryFn: () => instructorApi.getCourses(),
   });
-  const courses: any[] = coursesData?.data?.courses ?? coursesData?.data ?? [];
-  const publishedCourses = courses.filter((c: any) => c.status === 'published');
-  const totalStudents = courses.reduce((s: number, c: any) => s + (c.totalStudents ?? 0), 0);
+  const courses: CourseSummary[] = coursesData?.data?.courses ?? coursesData?.data ?? [];
+  const publishedCourses = courses.filter((c) => c.status === 'published');
+  const totalStudents = courses.reduce((s, c) => s + (c.totalStudents ?? 0), 0);
 
   if (isLoading) return <LoadingSpinner />;
 
@@ -59,8 +60,8 @@ export default function StudentsPage() {
             </thead>
             <tbody className="divide-y divide-hairline">
               {courses
-                .sort((a: any, b: any) => (b.totalStudents ?? 0) - (a.totalStudents ?? 0))
-                .map((course: any) => (
+                .sort((a, b) => (b.totalStudents ?? 0) - (a.totalStudents ?? 0))
+                .map((course) => (
                   <tr key={course.id} className="hover:bg-canvas-soft">
                     <td className="px-5 py-3 font-medium text-ink">{course.title}</td>
                     <td className="px-5 py-3">

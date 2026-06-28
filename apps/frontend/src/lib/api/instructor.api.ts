@@ -2,8 +2,8 @@ import { apiClient } from './axios';
 
 export const instructorApi = {
   getCourses: () => apiClient.get('/instructor/courses'),
-  createCourse: (dto: any) => apiClient.post('/courses', dto),
-  updateCourse: (id: string, dto: any) => apiClient.patch(`/courses/${id}`, dto),
+  createCourse: (dto: Record<string, unknown>) => apiClient.post('/courses', dto),
+  updateCourse: (id: string, dto: Record<string, unknown>) => apiClient.patch(`/courses/${id}`, dto),
   uploadThumbnail: (id: string, file: File) => {
     const fd = new FormData();
     fd.append('file', file);
@@ -20,16 +20,16 @@ export const instructorApi = {
 
   // Sections
   getSections: (courseId: string) => apiClient.get(`/courses/${courseId}/sections`),
-  addSection: (courseId: string, dto: any) => apiClient.post(`/courses/${courseId}/sections`, dto),
-  updateSection: (courseId: string, id: string, dto: any) => apiClient.patch(`/courses/${courseId}/sections/${id}`, dto),
+  addSection: (courseId: string, dto: Record<string, unknown>) => apiClient.post(`/courses/${courseId}/sections`, dto),
+  updateSection: (courseId: string, id: string, dto: Record<string, unknown>) => apiClient.patch(`/courses/${courseId}/sections/${id}`, dto),
   deleteSection: (courseId: string, id: string) => apiClient.delete(`/courses/${courseId}/sections/${id}`),
   reorderSections: (courseId: string, ids: string[]) => apiClient.patch(`/courses/${courseId}/sections/reorder`, { sectionIds: ids }),
 
   // Lessons
-  addLesson: (sectionId: string, dto: any) => apiClient.post(`/sections/${sectionId}/lessons`, dto),
+  addLesson: (sectionId: string, dto: Record<string, unknown>) => apiClient.post(`/sections/${sectionId}/lessons`, dto),
   reorderLessons: (sectionId: string, ids: string[]) =>
     apiClient.patch(`/sections/${sectionId}/lessons/reorder`, { lessonIds: ids }),
-  updateLesson: (id: string, dto: any) => apiClient.patch(`/lessons/${id}`, dto),
+  updateLesson: (id: string, dto: Record<string, unknown>) => apiClient.patch(`/lessons/${id}`, dto),
   deleteLesson: (id: string) => apiClient.delete(`/lessons/${id}`),
   uploadVideo: (lessonId: string, file: File, onProgress?: (pct: number) => void) => {
     const fd = new FormData();
@@ -56,7 +56,7 @@ export const instructorApi = {
   configDocument: (lessonId: string, dto: { contentHtml?: string; minReadTimeSec?: number }) =>
     apiClient.post(`/lessons/${lessonId}/document/config`, dto),
   getQuiz: (lessonId: string) => apiClient.get(`/lessons/${lessonId}/quiz`),
-  configQuiz: (lessonId: string, dto: any) => apiClient.post(`/lessons/${lessonId}/quiz/config`, dto),
+  configQuiz: (lessonId: string, dto: Record<string, unknown>) => apiClient.post(`/lessons/${lessonId}/quiz/config`, dto),
   // Quiz ôn tập (AI) cho bài video/tài liệu
   getReviewQuiz: (lessonId: string) => apiClient.get(`/lessons/${lessonId}/review-quiz`),
   generateReviewQuiz: (lessonId: string) => apiClient.post(`/lessons/${lessonId}/review-quiz`),
@@ -82,8 +82,8 @@ export const instructorApi = {
     });
   },
   deleteReferenceMaterial: (id: string) => apiClient.delete(`/reference-materials/${id}`),
-  addQuizQuestion: (lessonId: string, dto: any) => apiClient.post(`/lessons/${lessonId}/quiz/questions`, dto),
-  updateQuizQuestion: (qId: string, dto: any) => apiClient.patch(`/quiz/questions/${qId}`, dto),
+  addQuizQuestion: (lessonId: string, dto: Record<string, unknown>) => apiClient.post(`/lessons/${lessonId}/quiz/questions`, dto),
+  updateQuizQuestion: (qId: string, dto: Record<string, unknown>) => apiClient.patch(`/quiz/questions/${qId}`, dto),
   deleteQuizQuestion: (qId: string) => apiClient.delete(`/quiz/questions/${qId}`),
 
   // Statistics

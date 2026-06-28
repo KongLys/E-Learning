@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams, useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { MessageSquare, Network } from 'lucide-react';
 import { mindmapApi } from '@/lib/api/ai.api';
@@ -66,9 +66,12 @@ function MindMapTab({ courseId }: { courseId: string }) {
   });
 
   const status = mindmapQuery.data?.status;
-  useEffect(() => {
+  // Tắt cờ triggered khi sinh mindmap xong (set-state-during-render thay cho useEffect).
+  const [prevStatus, setPrevStatus] = useState(status);
+  if (status !== prevStatus) {
+    setPrevStatus(status);
     if (status === 'ready' || status === 'failed') setTriggered(false);
-  }, [status]);
+  }
 
   const generate = useMutation({
     mutationFn: (force: boolean) => mindmapApi.generate(courseId, force),
@@ -136,7 +139,7 @@ function MindMapTab({ courseId }: { courseId: string }) {
         ) : (
           <div className="h-full flex items-center justify-center p-8">
             <p className="text-center text-muted text-sm">
-              Bấm <span className="font-medium">"Tạo sơ đồ tư duy"</span> để dựng sơ đồ từ nội dung
+              Bấm <span className="font-medium">&quot;Tạo sơ đồ tư duy&quot;</span> để dựng sơ đồ từ nội dung
               các bài học trong khóa.
             </p>
           </div>

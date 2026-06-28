@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { io, Socket } from 'socket.io-client';
 import type { ChatMessage, ChatReaction } from '@/lib/api/chat.api';
 
@@ -161,15 +161,21 @@ export function useChatSocket(accessToken: string | null): UseChatSocketReturn {
     [],
   );
 
-  const onNewMessage = useCallback(subscribe('onNewMessage'), [subscribe]);
-  const onMessageAck = useCallback(subscribe('onMessageAck'), [subscribe]);
-  const onMessageEdited = useCallback(subscribe('onMessageEdited'), [subscribe]);
-  const onMessageDeleted = useCallback(subscribe('onMessageDeleted'), [subscribe]);
-  const onReactionUpdated = useCallback(subscribe('onReactionUpdated'), [subscribe]);
-  const onUserTyping = useCallback(subscribe('onUserTyping'), [subscribe]);
-  const onUserOnline = useCallback(subscribe('onUserOnline'), [subscribe]);
-  const onUserOffline = useCallback(subscribe('onUserOffline'), [subscribe]);
-  const onMessageRead = useCallback(subscribe('onMessageRead'), [subscribe]);
+  // Tạo sẵn các hàm subscribe ổn định (subscribe không đổi nên chỉ dựng một lần).
+  const subscribers = useMemo(
+    () => ({
+      onNewMessage: subscribe('onNewMessage'),
+      onMessageAck: subscribe('onMessageAck'),
+      onMessageEdited: subscribe('onMessageEdited'),
+      onMessageDeleted: subscribe('onMessageDeleted'),
+      onReactionUpdated: subscribe('onReactionUpdated'),
+      onUserTyping: subscribe('onUserTyping'),
+      onUserOnline: subscribe('onUserOnline'),
+      onUserOffline: subscribe('onUserOffline'),
+      onMessageRead: subscribe('onMessageRead'),
+    }),
+    [subscribe],
+  );
 
   return {
     isConnected,
@@ -180,14 +186,6 @@ export function useChatSocket(accessToken: string | null): UseChatSocketReturn {
     editMessage,
     deleteMessage,
     react,
-    onNewMessage,
-    onMessageAck,
-    onMessageEdited,
-    onMessageDeleted,
-    onReactionUpdated,
-    onUserTyping,
-    onUserOnline,
-    onUserOffline,
-    onMessageRead,
+    ...subscribers,
   };
 }

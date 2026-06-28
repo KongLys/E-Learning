@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { GoogleLoginButton } from '@/components/auth/GoogleLoginButton';
+import { getApiErrorMessage } from '@/lib/api/error';
 
 const schema = z.object({
   fullName: z.string().min(2, 'Họ tên ít nhất 2 ký tự'),
@@ -62,8 +63,8 @@ export default function RegisterPage() {
       setStep('otp');
       setCooldown(RESEND_COOLDOWN);
       otpForm.reset();
-    } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Không gửi được mã xác minh');
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Không gửi được mã xác minh'));
     }
   };
 
@@ -77,8 +78,8 @@ export default function RegisterPage() {
       });
       setSession(res.user, res.accessToken, res.refreshToken);
       router.push('/');
-    } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Xác minh thất bại');
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Xác minh thất bại'));
     }
   };
 
@@ -88,8 +89,8 @@ export default function RegisterPage() {
     try {
       await authApi.resendRegisterOtp({ email: info.email });
       setCooldown(RESEND_COOLDOWN);
-    } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Không gửi lại được mã');
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Không gửi lại được mã'));
     }
   };
 

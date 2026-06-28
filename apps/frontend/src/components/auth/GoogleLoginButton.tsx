@@ -4,6 +4,7 @@ import { GoogleLogin } from '@react-oauth/google';
 import { authApi } from '@/lib/api/auth.api';
 import { useAuthStore } from '@/store/auth.store';
 import { useRouter } from 'next/navigation';
+import { getApiErrorMessage } from '@/lib/api/error';
 
 /**
  * Nút "Đăng nhập với Google". Chỉ hiển thị khi NEXT_PUBLIC_GOOGLE_CLIENT_ID được cấu hình
@@ -39,10 +40,8 @@ export function GoogleLoginButton({
               const { data } = await authApi.googleLogin(cred.credential);
               setSession(data.user, data.accessToken, data.refreshToken);
               router.push('/');
-            } catch (err: any) {
-              onError?.(
-                err?.response?.data?.message ?? 'Đăng nhập Google thất bại',
-              );
+            } catch (err) {
+              onError?.(getApiErrorMessage(err, 'Đăng nhập Google thất bại'));
             }
           }}
           onError={() => onError?.('Đăng nhập Google thất bại')}

@@ -70,27 +70,43 @@ export default function ChatPage() {
   // Join conversation room when selected & connected
   useEffect(() => {
     if (selectedId && socket.isConnected) socket.joinConversation(selectedId);
+    // socket được tạo mới mỗi render nên cố ý không đưa vào deps (tránh re-join liên tục)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, socket.isConnected]);
 
-  // Load messages from query, then mark the conversation read
+  // Đồng bộ tin nhắn từ query vào state cục bộ (set-state-during-render thay useEffect)
+  const [prevMessagesData, setPrevMessagesData] = useState(messagesQuery.data);
+  if (messagesQuery.data && messagesQuery.data !== prevMessagesData) {
+    setPrevMessagesData(messagesQuery.data);
+    setMessages(messagesQuery.data);
+  }
+
+  // Đánh dấu hội thoại đã đọc khi mở
   useEffect(() => {
     if (!messagesQuery.data) return;
-    setMessages(messagesQuery.data);
     if (selectedId && socket.isConnected) {
       socket.markRead(selectedId);
       qc.invalidateQueries({ queryKey: ['conversations'] });
       qc.invalidateQueries({ queryKey: ['chat-rooms-unread'] });
     }
+    // socket/qc ổn định theo vòng đời; cố ý chỉ chạy lại khi dữ liệu/hội thoại đổi
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messagesQuery.data, selectedId, socket.isConnected]);
 
-  // Reset transient state on conversation switch
-  useEffect(() => {
+  // Reset trạng thái tạm khi đổi hội thoại (set-state-during-render thay useEffect)
+  const [prevConvId, setPrevConvId] = useState(selectedId);
+  if (selectedId !== prevConvId) {
+    setPrevConvId(selectedId);
     setTypingUsers(new Set());
     setOtherReadId(null);
     setEditingId(null);
     setReactionPickerFor(null);
-    typingClearTimers.current.forEach((t) => clearTimeout(t));
-    typingClearTimers.current.clear();
+  }
+
+  // Dọn các timer "đang gõ" khi rời hội thoại
+  useEffect(() => {
+    const timers = typingClearTimers.current;
+    return () => { timers.forEach((t) => clearTimeout(t)); timers.clear(); };
   }, [selectedId]);
 
   // Auto-scroll to bottom on new messages — scroll only the message list,
@@ -99,6 +115,16 @@ export default function ChatPage() {
     const c = messagesContainerRef.current;
     if (c) c.scrollTo({ top: c.scrollHeight, behavior: 'smooth' });
   }, [messages, typingUsers]);
+
+  // Đóng bộ chọn cảm xúc khi bấm ra ngoài vùng react.
+  useEffect(() => {
+    if (!reactionPickerFor) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (!(e.target as HTMLElement).closest('[data-reaction-ui]')) setReactionPickerFor(null);
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [reactionPickerFor]);
 
   // Clear timers on unmount
   useEffect(() => {
@@ -351,7 +377,7 @@ export default function ChatPage() {
                 return (
                   <div key={msg.id} className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
                     <div className={`group flex items-end gap-2 ${isOwn ? 'flex-row-reverse' : ''}`}>
-                      <div className="relative max-w-sm">
+                      <div className="relative max-w-md lg:max-w-2xl">
                         {/* Bubble */}
                         {editingId === msg.id ? (
                           <div className="flex items-center gap-1">
@@ -385,8 +411,8 @@ export default function ChatPage() {
                                 {msg.attachments.map((att) => (
                                   <div key={att.id} className="mb-1">
                                     {msg.messageType === 'image' ? (
-                                      // eslint-disable-next-line @next/next/no-img-element
                                       <a href={att.fileUrl} target="_blank" rel="noreferrer">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img src={att.fileUrl} alt={att.fileName} className="rounded-lg max-h-60 object-cover" />
                                       </a>
                                     ) : msg.messageType === 'video' ? (
@@ -423,7 +449,7 @@ export default function ChatPage() {
 
                         {/* Reaction picker */}
                         {reactionPickerFor === msg.id && (
-                          <div className="absolute -top-9 z-10 flex gap-1 bg-surface-card border border-hairline rounded-full px-2 py-1 shadow-lg">
+                          <div data-reaction-ui className="absolute top-full mt-1 z-10 flex gap-1 bg-surface-card border border-hairline rounded-full px-2 py-1 shadow-lg">
                             {REACTION_EMOJIS.map((e) => (
                               <button key={e} onClick={() => toggleReaction(msg, e)} className="hover:scale-125 transition-transform">
                                 {e}
@@ -437,6 +463,7 @@ export default function ChatPage() {
                       {!msg.isDeleted && editingId !== msg.id && (
                         <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-muted">
                           <button
+                            data-reaction-ui
                             onClick={() => setReactionPickerFor(reactionPickerFor === msg.id ? null : msg.id)}
                             className="hover:text-ink"
                             title="Thả cảm xúc"

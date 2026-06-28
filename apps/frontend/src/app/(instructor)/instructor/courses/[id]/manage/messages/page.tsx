@@ -1,43 +1,34 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { instructorApi } from '@/lib/api/instructor.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { RichTextEditor } from '@/components/common/RichTextEditor';
 import { notify } from '@/store/dialog.store';
+import { getApiErrorMessage } from '@/lib/api/error';
 
-export default function CourseMessagesPage() {
-  const { id } = useParams<{ id: string }>();
+interface CourseMessages {
+  welcomeMessage?: string;
+  congratulationsMessage?: string;
+}
+
+function MessagesForm({ courseId, initial }: { courseId: string; initial: CourseMessages }) {
   const qc = useQueryClient();
-  const [welcomeMessage, setWelcomeMessage] = useState('');
-  const [congratulationsMessage, setCongratulationsMessage] = useState('');
+  const [welcomeMessage, setWelcomeMessage] = useState(initial.welcomeMessage ?? '');
+  const [congratulationsMessage, setCongratulationsMessage] = useState(initial.congratulationsMessage ?? '');
   const [saved, setSaved] = useState(false);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['course-manage', id],
-    queryFn: () => instructorApi.getCourseById(id).then((r) => r.data),
-  });
-
-  useEffect(() => {
-    if (data) {
-      setWelcomeMessage(data.welcomeMessage ?? '');
-      setCongratulationsMessage(data.congratulationsMessage ?? '');
-    }
-  }, [data]);
-
   const saveMutation = useMutation({
-    mutationFn: () => instructorApi.updateCourse(id, { welcomeMessage, congratulationsMessage }),
+    mutationFn: () => instructorApi.updateCourse(courseId, { welcomeMessage, congratulationsMessage }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['course-manage', id] });
+      qc.invalidateQueries({ queryKey: ['course-manage', courseId] });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     },
-    onError: (err: any) => notify.error(err?.response?.data?.message ?? 'Lưu thất bại'),
+    onError: (err) => notify.error(getApiErrorMessage(err, 'Lưu thất bại')),
   });
-
-  if (isLoading) return <LoadingSpinner />;
 
   return (
     <div className="space-y-6">
@@ -70,4 +61,17 @@ export default function CourseMessagesPage() {
       </div>
     </div>
   );
+}
+
+export default function CourseMessagesPage() {
+  const { id } = useParams<{ id: string }>();
+
+  const { data, isLoading } = useQuery<CourseMessages>({
+    queryKey: ['course-manage', id],
+    queryFn: () => instructorApi.getCourseById(id).then((r) => r.data),
+  });
+
+  if (isLoading || !data) return <LoadingSpinner />;
+
+  return <MessagesForm courseId={id} initial={data} />;
 }

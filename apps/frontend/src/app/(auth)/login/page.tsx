@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useState } from 'react';
 import { GoogleLoginButton } from '@/components/auth/GoogleLoginButton';
+import { getApiErrorMessage } from '@/lib/api/error';
 
 const schema = z.object({
   email: z.email('Email không hợp lệ'),
@@ -36,8 +37,8 @@ export default function LoginPage() {
     try {
       await login(data.email, data.password);
       router.push('/');
-    } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Đăng nhập thất bại');
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Đăng nhập thất bại'));
     }
   };
 

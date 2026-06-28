@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { courseApi } from '@/lib/api/course.api';
@@ -35,10 +35,13 @@ function CoursesContent() {
   const [sort, setSort] = useState('newest');
   const [page, setPage] = useState(1);
 
-  // Reset to page 1 when the search query from the navbar changes
-  useEffect(() => {
+  // Reset về trang 1 khi từ khóa tìm kiếm trên navbar đổi
+  // (pattern set-state-during-render thay cho useEffect).
+  const [prevSearch, setPrevSearch] = useState(search);
+  if (search !== prevSearch) {
+    setPrevSearch(search);
     setPage(1);
-  }, [search]);
+  }
 
   const { data: catData } = useQuery({
     queryKey: ['categories'],
@@ -50,7 +53,7 @@ function CoursesContent() {
   const { data, isLoading } = useQuery({
     queryKey: ['courses', search, category, level, price, sort, page],
     queryFn: () =>
-      courseApi.getCourses({ search, category, level, price: price as any, sort, page, limit: 12 }),
+      courseApi.getCourses({ search, category, level, price: (price || undefined) as 'free' | 'paid' | undefined, sort, page, limit: 12 }),
   });
 
   const courses = data?.data?.courses ?? [];

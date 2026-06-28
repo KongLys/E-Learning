@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { chatApi, ChatMessage, Conversation } from '@/lib/api/chat.api';
@@ -45,14 +45,13 @@ export default function MessagesPage() {
   const [editingText, setEditingText] = useState('');
   const [reactionPickerFor, setReactionPickerFor] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  // false khi SSR + lần render đầu, true sau khi mount ở client (tránh setState trong effect)
+  const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
 
   const typingClearTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const ownTypingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => { setMounted(true); }, []);
 
   const socket = useChatSocket(accessToken);
 
@@ -73,30 +72,58 @@ export default function MessagesPage() {
 
   useEffect(() => {
     if (selectedId && socket.isConnected) socket.joinConversation(selectedId);
+    // socket được tạo mới mỗi render nên cố ý không đưa vào deps (tránh re-join liên tục)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, socket.isConnected]);
 
+  // Đồng bộ tin nhắn từ query vào state cục bộ (set-state-during-render thay useEffect)
+  const [prevMessagesData, setPrevMessagesData] = useState(messagesQuery.data);
+  if (messagesQuery.data && messagesQuery.data !== prevMessagesData) {
+    setPrevMessagesData(messagesQuery.data);
+    setMessages(messagesQuery.data);
+  }
+
+  // Đánh dấu hội thoại đã đọc khi mở
   useEffect(() => {
     if (!messagesQuery.data) return;
-    setMessages(messagesQuery.data);
     if (selectedId && socket.isConnected) {
       socket.markRead(selectedId);
       qc.invalidateQueries({ queryKey: ['conversations'] });
       qc.invalidateQueries({ queryKey: ['chat-rooms-unread'] });
     }
+    // socket/qc ổn định theo vòng đời; cố ý chỉ chạy lại khi dữ liệu/hội thoại đổi
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messagesQuery.data, selectedId, socket.isConnected]);
 
-  useEffect(() => {
+  // Reset trạng thái tạm khi đổi hội thoại (set-state-during-render thay useEffect)
+  const [prevConvId, setPrevConvId] = useState(selectedId);
+  if (selectedId !== prevConvId) {
+    setPrevConvId(selectedId);
     setTypingUsers(new Set());
     setOtherReadId(null);
     setEditingId(null);
     setReactionPickerFor(null);
-    typingClearTimers.current.forEach((t) => clearTimeout(t));
-    typingClearTimers.current.clear();
+  }
+
+  // Dọn các timer "đang gõ" khi rời hội thoại
+  useEffect(() => {
+    const timers = typingClearTimers.current;
+    return () => { timers.forEach((t) => clearTimeout(t)); timers.clear(); };
   }, [selectedId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, typingUsers]);
+
+  // Đóng bộ chọn cảm xúc khi bấm ra ngoài vùng react.
+  useEffect(() => {
+    if (!reactionPickerFor) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (!(e.target as HTMLElement).closest('[data-reaction-ui]')) setReactionPickerFor(null);
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [reactionPickerFor]);
 
   useEffect(() => {
     const timers = typingClearTimers.current;
@@ -317,7 +344,7 @@ export default function MessagesPage() {
                 return (
                   <div key={msg.id} className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
                     <div className={`group flex items-end gap-2 ${isOwn ? 'flex-row-reverse' : ''}`}>
-                      <div className="relative max-w-sm">
+                      <div className="relative max-w-md lg:max-w-2xl">
                         {editingId === msg.id ? (
                           <div className="flex items-center gap-1">
                             <input
@@ -339,8 +366,8 @@ export default function MessagesPage() {
                                 {msg.attachments.map((att) => (
                                   <div key={att.id} className="mb-1">
                                     {msg.messageType === 'image' ? (
-                                      // eslint-disable-next-line @next/next/no-img-element
                                       <a href={att.fileUrl} target="_blank" rel="noreferrer">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img src={att.fileUrl} alt={att.fileName} className="rounded-lg max-h-52 object-cover" />
                                       </a>
                                     ) : msg.messageType === 'video' ? (
@@ -366,7 +393,7 @@ export default function MessagesPage() {
                         )}
 
                         {reactionPickerFor === msg.id && (
-                          <div className="absolute -top-9 z-10 flex gap-1 bg-surface-card border border-hairline rounded-full px-2 py-1 shadow-lg">
+                          <div data-reaction-ui className="absolute top-full mt-1 z-10 flex gap-1 bg-surface-card border border-hairline rounded-full px-2 py-1 shadow-lg">
                             {REACTION_EMOJIS.map((e) => (
                               <button key={e} onClick={() => toggleReaction(msg, e)} className="hover:scale-125 transition-transform">{e}</button>
                             ))}
@@ -376,7 +403,7 @@ export default function MessagesPage() {
 
                       {!msg.isDeleted && editingId !== msg.id && (
                         <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-ink-subtle">
-                          <button onClick={() => setReactionPickerFor(reactionPickerFor === msg.id ? null : msg.id)} className="hover:text-ink" title="Cảm xúc">
+                          <button data-reaction-ui onClick={() => setReactionPickerFor(reactionPickerFor === msg.id ? null : msg.id)} className="hover:text-ink" title="Cảm xúc">
                             <Smile className="w-3.5 h-3.5" />
                           </button>
                           {isOwn && msg.messageType === 'text' && (

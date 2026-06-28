@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { instructorApi } from '@/lib/api/instructor.api';
 import { Check, AlertTriangle } from 'lucide-react';
 import { notify } from '@/store/dialog.store';
+import { getApiErrorMessage } from '@/lib/api/error';
 
 type NavItem = { segment: string; label: string };
 type NavGroup = { heading: string; items: NavItem[] };
@@ -54,7 +55,7 @@ export default function ManageCourseLayout({ children }: { children: React.React
       notify.success('Khóa học đã được gửi để duyệt!');
       qc.invalidateQueries({ queryKey: ['course-thumbnail', id] });
     },
-    onError: (err: any) => notify.error(err?.response?.data?.message ?? 'Gửi duyệt thất bại'),
+    onError: (err) => notify.error(getApiErrorMessage(err, 'Gửi duyệt thất bại')),
   });
 
   const unpublishMutation = useMutation({
@@ -63,7 +64,7 @@ export default function ManageCourseLayout({ children }: { children: React.React
       notify.success('Đã hủy xuất bản. Bây giờ bạn có thể chỉnh sửa nội dung.');
       qc.invalidateQueries({ queryKey: ['course-thumbnail', id] });
     },
-    onError: (err: any) => notify.error(err?.response?.data?.message ?? 'Hủy xuất bản thất bại'),
+    onError: (err) => notify.error(getApiErrorMessage(err, 'Hủy xuất bản thất bại')),
   });
 
   return (

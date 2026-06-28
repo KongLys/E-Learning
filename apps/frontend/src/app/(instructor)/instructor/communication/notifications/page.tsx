@@ -6,6 +6,7 @@ import { moderationApi } from '@/lib/api/ai.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { Bell, BellOff } from 'lucide-react';
 import { notify, showPrompt } from '@/store/dialog.store';
+import { getApiErrorMessage } from '@/lib/api/error';
 
 type NotificationActionData = {
   action: 'appeal';
@@ -13,6 +14,15 @@ type NotificationActionData = {
   contentId: string;
   courseId?: string;
 };
+
+interface NotificationItem {
+  id: string;
+  title?: string;
+  body?: string;
+  createdAt: string;
+  isRead?: boolean;
+  data?: { action?: string } & Partial<NotificationActionData>;
+}
 
 const notificationApi = {
   list: (page = 1) => apiClient.get('/notifications', { params: { page } }),
@@ -61,11 +71,11 @@ export default function NotificationsPage() {
       notify.success('Đã gửi kiến nghị thành công!');
       qc.invalidateQueries({ queryKey: ['instructor-notifications'] });
     },
-    onError: (err: any) => notify.error(err?.response?.data?.message ?? 'Gửi kiến nghị thất bại'),
+    onError: (err) => notify.error(getApiErrorMessage(err, 'Gửi kiến nghị thất bại')),
   });
 
-  const notifications: any[] = data?.data?.notifications ?? data?.data ?? [];
-  const unreadCount = notifications.filter((n: any) => !n.isRead).length;
+  const notifications: NotificationItem[] = data?.data?.notifications ?? data?.data ?? [];
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   return (
     <div className="max-w-3xl">
@@ -95,7 +105,7 @@ export default function NotificationsPage() {
         </div>
       ) : (
         <div className="bg-surface-card rounded-card border border-hairline divide-y divide-hairline">
-          {notifications.map((n: any) => (
+          {notifications.map((n) => (
             <div
               key={n.id}
               className={`flex items-start gap-4 px-5 py-4 transition-colors ${

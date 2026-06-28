@@ -20,7 +20,22 @@ const STATUS_TEXT_CLASS: Record<string, string> = {
   pending: 'text-gray-600',
 };
 
-function OrderDetailModal({ order, onClose, onRefund, refunding }: { order: any; onClose: () => void; onRefund: () => void; refunding: boolean }) {
+interface OrderItem {
+  courseId: string;
+  title: string;
+  price: number | string;
+}
+
+interface AdminOrder {
+  orderId: string;
+  status: string;
+  totalAmount: number | string;
+  createdAt: string;
+  items?: OrderItem[];
+  payment?: { transactionId?: string; status?: string } | null;
+}
+
+function OrderDetailModal({ order, onClose, onRefund, refunding }: { order: AdminOrder; onClose: () => void; onRefund: () => void; refunding: boolean }) {
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
@@ -52,7 +67,7 @@ function OrderDetailModal({ order, onClose, onRefund, refunding }: { order: any;
           <div>
             <span className="text-xs text-gray-400 uppercase tracking-wide">Sản phẩm</span>
             <ul className="mt-2 space-y-1.5">
-              {order.items?.map((item: any) => (
+              {order.items?.map((item) => (
                 <li key={item.courseId} className="flex justify-between text-sm">
                   <span className="text-gray-700">{item.title}</span>
                   <span className="text-gray-400">{Number(item.price).toLocaleString('vi-VN')}₫</span>
@@ -88,7 +103,7 @@ export default function AdminOrdersPage() {
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState('');
-  const [selected, setSelected] = useState<any | null>(null);
+  const [selected, setSelected] = useState<AdminOrder | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-orders', page, status],
@@ -100,7 +115,7 @@ export default function AdminOrdersPage() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-orders'] }); setSelected(null); },
   });
 
-  const orders: any[] = data?.data?.orders ?? [];
+  const orders: AdminOrder[] = data?.data?.orders ?? [];
   const total: number = data?.data?.total ?? 0;
   const totalPages = Math.ceil(total / 20);
 
@@ -144,10 +159,10 @@ export default function AdminOrdersPage() {
             <tbody className="divide-y divide-gray-100">
               {orders.length === 0 ? (
                 <tr><td colSpan={6} className="text-center py-12 text-gray-400 text-sm">Không có dữ liệu</td></tr>
-              ) : orders.map((o: any) => (
+              ) : orders.map((o) => (
                 <tr key={o.orderId} className="hover:bg-gray-50 cursor-pointer" onClick={() => setSelected(o)}>
                   <td className="px-4 py-3 font-mono text-xs text-gray-400">{o.orderId.slice(0, 8)}…</td>
-                  <td className="px-4 py-3 text-gray-700">{o.items?.map((i: any) => i.title).join(', ')}</td>
+                  <td className="px-4 py-3 text-gray-700">{o.items?.map((i) => i.title).join(', ')}</td>
                   <td className="px-4 py-3 font-medium text-gray-900">{Number(o.totalAmount).toLocaleString('vi-VN')}₫</td>
                   <td className="px-4 py-3">
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_CLASS[o.status] ?? 'bg-gray-100 text-gray-600'}`}>

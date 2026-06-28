@@ -5,13 +5,19 @@ import { Check, ChevronLeft, ChevronRight, Lightbulb, Sparkles, X } from 'lucide
 import { useMutation } from '@tanstack/react-query';
 import { useAiChatBridge } from '@/store/ai-chat-bridge.store';
 import type { AskScope } from '@/lib/api/ai.api';
+import type {
+  QuizView,
+  QuizQuestionView,
+  ReviewQuizResult,
+  ReviewResultItem,
+} from '@/types/quiz';
 
 interface ReviewQuizUIProps {
-  quiz: any; // { id, questions: [{ id, content, questionType, options: [{ id, content }] }] }
+  quiz: QuizView;
   /** Nộp đáp án, trả về axios response chứa kết quả chấm điểm. */
   submit: (
     answers: { questionId: string; optionIds: string[] }[],
-  ) => Promise<{ data: any }>;
+  ) => Promise<{ data: ReviewQuizResult }>;
   onClose: () => void;
   /** Phạm vi RAG cho nút "Vì sao đúng/sai?" (vd: theo bài học). */
   askScope?: AskScope;
@@ -23,16 +29,16 @@ export function ReviewQuizUI({ quiz, submit, onClose, askScope }: ReviewQuizUIPr
   const [state, setState] = useState<State>('ready');
   const [currentQ, setCurrentQ] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<ReviewQuizResult | null>(null);
   const askAi = useAiChatBridge((s) => s.askAi);
 
-  const questions: any[] = quiz.questions ?? [];
+  const questions: QuizQuestionView[] = quiz.questions ?? [];
 
   /**
    * Mở panel "Hỏi AI" để giải thích một câu. Chỉ gửi questionId + lựa chọn; server
    * tự tra đáp án đúng + chunk nguồn đã lưu để giải thích bám tài liệu (tránh bịa).
    */
-  const explainQuestion = (q: any, r: any) => {
+  const explainQuestion = (q: QuizQuestionView, r: ReviewResultItem | undefined) => {
     const verdict = r?.isCorrect ? 'đúng' : 'chưa chính xác';
     const displayText = `Vì sao câu "${q.content}" — lựa chọn của tôi ${verdict}?`;
     askAi(displayText.slice(0, 500), askScope, {
@@ -106,7 +112,7 @@ export function ReviewQuizUI({ quiz, submit, onClose, askScope }: ReviewQuizUIPr
 
   // ----- Màn hình kết quả -----
   if (state === 'submitted' && result) {
-    const resultById: Record<string, any> = {};
+    const resultById: Record<string, ReviewResultItem> = {};
     for (const r of result.results ?? []) resultById[r.questionId] = r;
     return (
       <div className="space-y-4">
@@ -133,7 +139,7 @@ export function ReviewQuizUI({ quiz, submit, onClose, askScope }: ReviewQuizUIPr
                   </span>
                 </div>
                 <div className="mt-2 space-y-1">
-                  {q.options?.map((opt: any) => {
+                  {q.options?.map((opt) => {
                     const isCorrectOpt = r?.correctOptionIds?.includes(opt.id);
                     const youPicked = picked.includes(opt.id);
                     return (
@@ -203,7 +209,7 @@ export function ReviewQuizUI({ quiz, submit, onClose, askScope }: ReviewQuizUIPr
         <p className="text-[15px] font-medium text-ink">{q?.content}</p>
         {!isSingle && <p className="text-xs text-muted">Chọn tất cả đáp án đúng</p>}
         <div className="space-y-2">
-          {q?.options?.map((opt: any) => (
+          {q?.options?.map((opt) => (
             <label
               key={opt.id}
               className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${

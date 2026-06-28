@@ -32,11 +32,8 @@ export default function CertificatePreview({
   data,
   onClose,
 }: CertificatePreviewProps) {
-  const [origin, setOrigin] = useState('');
-
-  useEffect(() => {
-    setOrigin(window.location.origin);
-  }, []);
+  // Component này chỉ render phía client (next/dynamic ssr:false) nên window luôn có sẵn.
+  const [origin] = useState(() => (typeof window !== 'undefined' ? window.location.origin : ''));
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {

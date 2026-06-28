@@ -99,7 +99,7 @@ export function VideoPlayer({ lessonId, videoUrl, initialPositionSec = 0, cues =
     const handleKey = (e: KeyboardEvent) => {
       if (e.code === 'Space' && e.target === document.body) {
         e.preventDefault();
-        isPlaying ? video.pause() : video.play();
+        if (isPlaying) video.pause(); else video.play();
       }
       if (e.code === 'ArrowLeft') video.currentTime = Math.max(0, video.currentTime - 10);
       if (e.code === 'ArrowRight') video.currentTime = Math.min(video.duration, video.currentTime + 10);
@@ -125,7 +125,7 @@ export function VideoPlayer({ lessonId, videoUrl, initialPositionSec = 0, cues =
   const togglePlay = () => {
     const video = videoRef.current;
     if (!video) return;
-    isPlaying ? video.pause() : video.play();
+    if (isPlaying) video.pause(); else video.play();
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {

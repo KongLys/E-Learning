@@ -379,7 +379,9 @@ export class CourseService {
     // Exclude courses the student has already enrolled in
     if (query.studentId) {
       const enrolled = await this.prisma.enrollment.findMany({
-        where: { studentId: query.studentId, status: 'active' },
+        // Loại cả khóa đang học (active) lẫn đã hoàn thành (completed),
+        // chỉ chừa enrollment đã hủy (cancelled).
+        where: { studentId: query.studentId, status: { not: 'cancelled' } },
         select: { courseId: true },
       });
       if (enrolled.length > 0) {

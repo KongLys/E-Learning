@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { userApi } from '@/lib/api/user.api';
+import { getApiErrorMessage } from '@/lib/api/error';
 
 const schema = z.object({
   fullName: z.string().min(2, 'Họ tên ít nhất 2 ký tự').max(100, 'Tối đa 100 ký tự'),
@@ -50,8 +51,8 @@ export function ProfileForm({ initialData, onSaved }: Props) {
       });
       setSuccess(true);
       onSaved();
-    } catch (err: any) {
-      setApiError(err?.response?.data?.message ?? 'Cập nhật thất bại');
+    } catch (err) {
+      setApiError(getApiErrorMessage(err, 'Cập nhật thất bại'));
     }
   }
 

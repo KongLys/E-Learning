@@ -10,11 +10,23 @@ import Link from 'next/link';
 import { Check, CheckCircle2, ChevronLeft, ChevronUp, Pin, X } from 'lucide-react';
 import { showConfirm } from '@/store/dialog.store';
 
+interface CommunityComment {
+  id: string;
+  body: string;
+  authorId: string;
+  author?: { fullName?: string } | null;
+  createdAt: string;
+  isSolution?: boolean;
+  postId?: string;
+  upvotes?: number;
+  replies?: CommunityComment[];
+}
+
 /** Một comment hoặc reply — hỗ trợ sửa, upvote, xóa, đánh dấu giải pháp (chỉ top-level). */
 function CommentItem({
   comment, postAuthorId, isReply = false, onDelete, onSolution, onReply,
 }: {
-  comment: any;
+  comment: CommunityComment;
   postAuthorId: string;
   isReply?: boolean;
   onDelete: (id: string) => void;
@@ -78,9 +90,9 @@ function CommentItem({
         </div>
       </div>
       {/* Replies */}
-      {comment.replies?.length > 0 && (
+      {(comment.replies?.length ?? 0) > 0 && (
         <div className="ml-6 mt-3 space-y-2 border-l-2 border-outline pl-4">
-          {comment.replies.map((reply: any) => (
+          {comment.replies?.map((reply) => (
             <CommentItem
               key={reply.id}
               comment={reply}
@@ -223,8 +235,8 @@ export default function CommunityPostPage() {
   if (isLoading) return <LoadingSpinner />;
   if (!post) return <div className="p-8 text-center text-ink-subtle">Bài viết không tồn tại</div>;
 
-  const comments: any[] = post.comments ?? [];
-  const replyTarget = replyTo ? comments.find((c: any) => c.id === replyTo) : null;
+  const comments: CommunityComment[] = post.comments ?? [];
+  const replyTarget = replyTo ? comments.find((c) => c.id === replyTo) : null;
 
   const isAuthor = user && user.id === post.authorId;
   const isAdmin = user?.role === 'admin';
@@ -301,7 +313,7 @@ export default function CommunityPostPage() {
       {/* Comments */}
       <div className="space-y-3">
         <h2 className="font-semibold text-ink-deep">{comments.length} bình luận</h2>
-        {comments.map((comment: any) => (
+        {comments.map((comment) => (
           <CommentItem
             key={comment.id}
             comment={comment}

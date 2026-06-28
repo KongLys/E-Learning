@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { reviewApi, type Review } from '@/lib/api/review.api';
 import { StarInput } from './StarInput';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
+import { getApiErrorMessage } from '@/lib/api/error';
 
 interface WriteReviewFormProps {
   courseId: string;
@@ -19,10 +20,14 @@ export function WriteReviewForm({ courseId, existing }: WriteReviewFormProps) {
   const [error, setError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  useEffect(() => {
+  // Đồng bộ lại form khi đánh giá hiện có thay đổi (pattern set-state-during-render
+  // chính thức của React thay cho useEffect).
+  const [prevExisting, setPrevExisting] = useState(existing);
+  if (existing !== prevExisting) {
+    setPrevExisting(existing);
     setRating(existing?.rating ?? 0);
     setContent(existing?.content ?? '');
-  }, [existing]);
+  }
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['course-reviews', courseId] });
@@ -36,7 +41,7 @@ export function WriteReviewForm({ courseId, existing }: WriteReviewFormProps) {
       setError('');
       invalidate();
     },
-    onError: (err: any) => setError(err?.response?.data?.message ?? 'Không thể gửi đánh giá'),
+    onError: (err) => setError(getApiErrorMessage(err, 'Không thể gửi đánh giá')),
   });
 
   const deleteMutation = useMutation({
@@ -45,9 +50,9 @@ export function WriteReviewForm({ courseId, existing }: WriteReviewFormProps) {
       setConfirmDelete(false);
       invalidate();
     },
-    onError: (err: any) => {
+    onError: (err) => {
       setConfirmDelete(false);
-      setError(err?.response?.data?.message ?? 'Không thể xóa đánh giá');
+      setError(getApiErrorMessage(err, 'Không thể xóa đánh giá'));
     },
   });
 

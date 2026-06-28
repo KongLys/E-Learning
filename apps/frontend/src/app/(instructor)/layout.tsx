@@ -194,9 +194,12 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
     else if (user.role !== 'instructor' && user.role !== 'admin') router.replace('/');
   }, [user, hasHydrated, router]);
 
-  useEffect(() => {
+  // Đóng sidebar khi điều hướng (set-state-during-render thay cho useEffect).
+  const [prevPathname, setPrevPathname] = useState(pathname);
+  if (pathname !== prevPathname) {
+    setPrevPathname(pathname);
     setSidebarOpen(false);
-  }, [pathname]);
+  }
 
   if (!hasHydrated) return <LoadingSpinner />;
   if (!user || (user.role !== 'instructor' && user.role !== 'admin')) return null;

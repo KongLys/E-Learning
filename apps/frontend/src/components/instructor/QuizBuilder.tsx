@@ -4,22 +4,41 @@ import { useState } from 'react';
 import { Check, Circle, X } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { instructorApi } from '@/lib/api/instructor.api';
+import { getApiErrorMessage } from '@/lib/api/error';
 
 type QType = 'single' | 'multiple' | 'true_false';
 interface OptDraft { content: string; isCorrect: boolean }
 interface QDraft { content: string; questionType: QType; points: number; explanation: string; options: OptDraft[] }
+
+interface ServerOption { id?: string; content: string; isCorrect?: boolean }
+interface ServerQuestion {
+  id: string;
+  content?: string;
+  questionType?: string;
+  points?: number;
+  explanation?: string;
+  orderIndex?: number;
+  options?: ServerOption[];
+}
+interface ServerQuiz {
+  questions?: ServerQuestion[];
+  contentLocked?: boolean;
+  passingScore?: number;
+  timeLimit?: number;
+  maxAttempts?: number;
+}
 
 const emptyDraft = (): QDraft => ({
   content: '', questionType: 'single', points: 1, explanation: '',
   options: [{ content: '', isCorrect: true }, { content: '', isCorrect: false }],
 });
 
-const toDraft = (q: any): QDraft => ({
+const toDraft = (q: ServerQuestion): QDraft => ({
   content: q.content ?? '',
   questionType: (q.questionType ?? 'single') as QType,
   points: q.points ?? 1,
   explanation: q.explanation ?? '',
-  options: (q.options ?? []).map((o: any) => ({ content: o.content, isCorrect: !!o.isCorrect })),
+  options: (q.options ?? []).map((o) => ({ content: o.content, isCorrect: !!o.isCorrect })),
 });
 
 const typeLabel: Record<QType, string> = {
@@ -31,8 +50,8 @@ const typeLabel: Record<QType, string> = {
 export function QuizBuilder({ lessonId, onError }: { lessonId: string; onError: (m: string) => void }) {
   const qc = useQueryClient();
   const { data } = useQuery({ queryKey: ['quiz-build', lessonId], queryFn: () => instructorApi.getQuiz(lessonId) });
-  const quiz: any = data?.data;
-  const questions: any[] = quiz?.questions ?? [];
+  const quiz: ServerQuiz | undefined = data?.data;
+  const questions: ServerQuestion[] = quiz?.questions ?? [];
   // Đã có học viên làm bài → khóa nội dung câu hỏi, chỉ cho đổi điểm đạt.
   const contentLocked: boolean = !!quiz?.contentLocked;
 
@@ -50,7 +69,7 @@ export function QuizBuilder({ lessonId, onError }: { lessonId: string; onError: 
   // draft != null: đang soạn. editingId != null: đang sửa câu hỏi sẵn có.
   const [draft, setDraft] = useState<QDraft | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const onErr = (e: any) => onError(e?.response?.data?.message ?? 'Có lỗi xảy ra');
+  const onErr = (e: unknown) => onError(getApiErrorMessage(e));
   const refresh = () => qc.invalidateQueries({ queryKey: ['quiz-build', lessonId] });
   const closeForm = () => { setDraft(null); setEditingId(null); };
 
@@ -97,7 +116,7 @@ export function QuizBuilder({ lessonId, onError }: { lessonId: string; onError: 
     onError: onErr,
   });
 
-  const startEdit = (q: any) => { setEditingId(q.id); setDraft(toDraft(q)); };
+  const startEdit = (q: ServerQuestion) => { setEditingId(q.id); setDraft(toDraft(q)); };
   const saving = addQuestion.isPending || updateQuestion.isPending;
   const onSaveForm = () => {
     if (!draft) return;
@@ -147,12 +166,12 @@ export function QuizBuilder({ lessonId, onError }: { lessonId: string; onError: 
       {/* Danh sách câu hỏi */}
       <div className="space-y-2">
         <h3 className="text-sm font-semibold text-ink-mute">Câu hỏi ({questions.length})</h3>
-        {questions.map((q: any, i: number) => (
+        {questions.map((q, i) => (
           <div key={q.id} className="border border-hairline rounded-lg px-3 py-2 text-sm">
             <div className="flex items-start justify-between gap-2">
               <div>
                 <span className="font-medium text-ink">{i + 1}. {q.content}</span>
-                <span className="ml-2 text-xs text-ink-subtle">({typeLabel[q.questionType as QType]} · {q.points}đ)</span>
+                <span className="ml-2 text-xs text-ink-subtle">({typeLabel[(q.questionType ?? 'single') as QType]} · {q.points}đ)</span>
               </div>
               {!contentLocked && (
                 <div className="flex shrink-0 items-center gap-2">
@@ -162,7 +181,7 @@ export function QuizBuilder({ lessonId, onError }: { lessonId: string; onError: 
               )}
             </div>
             <ul className="mt-1 ml-4 space-y-0.5">
-              {q.options?.map((o: any) => (
+              {q.options?.map((o) => (
                 <li key={o.id} className={`flex items-center gap-1 text-xs ${o.isCorrect ? 'text-leaf' : 'text-muted'}`}>
                   {o.isCorrect ? <Check size={12} className="shrink-0" /> : <Circle size={12} className="shrink-0" />} {o.content}
                 </li>

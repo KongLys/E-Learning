@@ -9,6 +9,16 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Award, ArrowRight, BookOpen, Check, MessageSquare, Users } from 'lucide-react';
+import type { CourseSummary } from '@/types/course';
+
+interface Enrollment {
+  enrollmentId: string;
+  courseId: string;
+  status?: string;
+  progressPercent?: number;
+  lastLessonId?: string | null;
+  course?: CourseSummary | null;
+}
 
 export default function MyCoursesPage() {
   const router = useRouter();
@@ -25,7 +35,7 @@ export default function MyCoursesPage() {
     },
   });
 
-  const enrollments: any[] = data?.data ?? [];
+  const enrollments: Enrollment[] = data?.data ?? [];
 
   if (isLoading) return <LoadingSpinner />;
 
@@ -59,7 +69,7 @@ export default function MyCoursesPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {enrollments.map((enrollment: any) => {
+            {enrollments.map((enrollment) => {
               const course = enrollment.course;
               const progress = Math.round(enrollment.progressPercent ?? 0);
               const isCompleted = enrollment.status === 'completed';
@@ -122,7 +132,7 @@ export default function MyCoursesPage() {
                       <button
                         onClick={() =>
                           startChatMutation.mutate({
-                            instructorId: course.instructor.id,
+                            instructorId: course!.instructor!.id!,
                           })
                         }
                         disabled={startChatMutation.isPending}

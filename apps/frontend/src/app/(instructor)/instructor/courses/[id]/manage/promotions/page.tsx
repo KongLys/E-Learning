@@ -7,6 +7,8 @@ import { couponApi, CreateCouponDto } from '@/lib/api/coupon.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { Plus, Trash2 } from 'lucide-react';
 import { notify, showConfirm } from '@/store/dialog.store';
+import { getApiErrorMessage } from '@/lib/api/error';
+import type { Coupon } from '@/types/coupon';
 
 const inputClass = 'w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky';
 
@@ -30,7 +32,7 @@ export default function CoursePromotionsPage() {
     queryKey: ['instructor-coupons'],
     queryFn: () => couponApi.list(),
   });
-  const allCoupons: any[] = data?.data ?? [];
+  const allCoupons: Coupon[] = data?.data ?? [];
   const coupons = allCoupons.filter((c) => (c.courseId ?? c.course?.id) === id);
 
   const createMutation = useMutation({
@@ -41,13 +43,13 @@ export default function CoursePromotionsPage() {
       setFormError('');
       setShowForm(false);
     },
-    onError: (err: any) => setFormError(err?.response?.data?.message ?? 'Lỗi tạo coupon'),
+    onError: (err) => setFormError(getApiErrorMessage(err, 'Lỗi tạo coupon')),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (couponId: string) => couponApi.delete(couponId),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['instructor-coupons'] }),
-    onError: (err: any) => notify.error(err?.response?.data?.message ?? 'Lỗi xóa coupon'),
+    onError: (err) => notify.error(getApiErrorMessage(err, 'Lỗi xóa coupon')),
   });
 
   return (
@@ -135,7 +137,7 @@ export default function CoursePromotionsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-hairline">
-              {coupons.map((c: any) => {
+              {coupons.map((c) => {
                 const expired = c.expiresAt && new Date(c.expiresAt) < new Date();
                 const full = c.maxUses > 0 && c.usedCount >= c.maxUses;
                 return (

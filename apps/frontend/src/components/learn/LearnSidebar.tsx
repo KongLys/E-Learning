@@ -22,12 +22,49 @@ function durationLabel(type: string, durationSec: number): string {
   return `${TYPE_LABELS[type] ?? 'Bài học'} • ${min} phút`;
 }
 
+interface SidebarLesson {
+  id: string;
+  title: string;
+  type: string;
+  durationSec: number;
+  isFinalQuiz?: boolean;
+}
+interface SidebarSection {
+  id: string;
+  title: string;
+  lessons?: SidebarLesson[];
+}
+interface LessonProgressItem {
+  lessonId: string;
+  completed: boolean;
+}
+interface SidebarRefMaterial {
+  id: string;
+  title: string;
+  type: string;
+  externalUrl?: string;
+  fileType?: string;
+  description?: string;
+}
+interface SidebarCourseFile {
+  lessonId: string;
+  fileName?: string;
+  lessonTitle?: string;
+  fileType?: string;
+  pageCount?: number;
+}
+interface SidebarFileSection {
+  id: string;
+  title: string;
+  files: SidebarCourseFile[];
+}
+
 interface LearnSidebarProps {
   courseId: string;
   courseTitle?: string;
   currentLessonId: string;
-  sections: any[];
-  lessonProgress: any[];
+  sections: SidebarSection[];
+  lessonProgress: LessonProgressItem[];
   progressPercent: number;
   isOpen: boolean;
   collapsed?: boolean;
@@ -45,14 +82,14 @@ interface LearnSidebarProps {
 type Viewer = { title: string; kind: MaterialKind; url: string };
 
 export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections, lessonProgress, progressPercent, isOpen, collapsed, onClose, onNavigate, onOpenMyQuiz, onOpenReviewQuiz, activeQuizKey }: LearnSidebarProps) {
-  const completedIds = new Set(lessonProgress.filter((lp: any) => lp.completed).map((lp: any) => lp.lessonId));
+  const completedIds = new Set(lessonProgress.filter((lp) => lp.completed).map((lp) => lp.lessonId));
   const [viewer, setViewer] = useState<Viewer | null>(null);
 
   // Bài kiểm tra cuối khóa chỉ mở khi đã hoàn thành tất cả bài học nội dung.
   const contentLessonIds = sections
-    .flatMap((s: any) => s.lessons ?? [])
-    .filter((l: any) => !l.isFinalQuiz)
-    .map((l: any) => l.id);
+    .flatMap((s) => s.lessons ?? [])
+    .filter((l) => !l.isFinalQuiz)
+    .map((l) => l.id);
   const contentComplete =
     contentLessonIds.length > 0 &&
     contentLessonIds.every((id: string) => completedIds.has(id));
@@ -78,20 +115,20 @@ export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections,
 
   const refQuery = useQuery({
     queryKey: ['reference-materials', courseId],
-    queryFn: async () => (await learnApi.getReferenceMaterials(courseId)).data as any[],
+    queryFn: async () => (await learnApi.getReferenceMaterials(courseId)).data as SidebarRefMaterial[],
   });
   const refMaterials = refQuery.data ?? [];
 
   const filesQuery = useQuery({
     queryKey: ['lesson-files', courseId],
-    queryFn: async () => (await learnApi.getCourseLessonFiles(courseId)).data as any[],
+    queryFn: async () => (await learnApi.getCourseLessonFiles(courseId)).data as SidebarFileSection[],
   });
   const fileSections = filesQuery.data ?? [];
   const fileCount = fileSections.reduce((n, s) => n + (s.files?.length ?? 0), 0);
 
   // Mở tài liệu tham khảo: youtube → embed; video/file → signed URL.
   const openRef = useMutation({
-    mutationFn: async (m: any): Promise<Viewer> => {
+    mutationFn: async (m: SidebarRefMaterial): Promise<Viewer> => {
       if (m.type === 'youtube') {
         const url = youtubeEmbedUrl(m.externalUrl);
         if (!url) throw new Error('Link YouTube không hợp lệ');
@@ -107,10 +144,10 @@ export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections,
 
   // Mở file đính kèm của bài (dùng lại endpoint document-url đã ký).
   const openDoc = useMutation({
-    mutationFn: async (f: any): Promise<Viewer> => {
+    mutationFn: async (f: SidebarCourseFile): Promise<Viewer> => {
       const res = await learnApi.getDocumentUrl(f.lessonId);
       const kind: MaterialKind = f.fileType === 'pdf' ? 'pdf' : 'docx';
-      return { title: f.fileName || f.lessonTitle, kind, url: res.data.url };
+      return { title: f.fileName || f.lessonTitle || 'Tài liệu', kind, url: res.data.url };
     },
     onSuccess: (v) => setViewer(v),
   });
@@ -131,7 +168,7 @@ export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections,
 
         {/* Sections */}
         <div className="flex-1 overflow-y-auto">
-          {sections.map((section: any, idx: number) => (
+          {sections.map((section, idx) => (
             <details key={section.id} open className="group border-b border-gray-100">
               <summary className="px-5 py-3.5 cursor-pointer hover:bg-gray-50 list-none flex items-start justify-between gap-2">
                 <div>
@@ -141,7 +178,7 @@ export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections,
                 <ChevronDown size={16} className="text-gray-400 mt-0.5 shrink-0 transition-transform group-open:rotate-180" />
               </summary>
               <ul className="pb-1">
-                {section.lessons?.map((lesson: any) => {
+                {section.lessons?.map((lesson) => {
                   // Đang mở quiz ôn tập ở cột nội dung → không tô sáng bài học,
                   // chỉ tô sáng mục quiz ôn tập (tránh 2 mục cùng active).
                   const isCurrent = lesson.id === currentLessonId && !activeQuizKey;
@@ -258,7 +295,7 @@ export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections,
                 <ChevronDown size={16} className="text-gray-400 transition-transform group-open:rotate-180" />
               </summary>
               <ul className="pb-1">
-                {refMaterials.map((m: any) => (
+                {refMaterials.map((m) => (
                   <li key={m.id}>
                     <button
                       onClick={() => openRef.mutate(m)}
@@ -285,11 +322,11 @@ export function LearnSidebar({ courseId, courseTitle, currentLessonId, sections,
                 <ChevronDown size={16} className="text-gray-400 transition-transform group-open:rotate-180" />
               </summary>
               <div className="pb-1">
-                {fileSections.map((s: any) => (
+                {fileSections.map((s) => (
                   <div key={s.id}>
                     <p className="px-5 pt-2 pb-1 text-[11px] font-medium uppercase tracking-wide text-gray-400">{s.title}</p>
                     <ul>
-                      {s.files.map((f: any) => (
+                      {s.files.map((f) => (
                         <li key={f.lessonId + f.fileName}>
                           <button
                             onClick={() => openDoc.mutate(f)}

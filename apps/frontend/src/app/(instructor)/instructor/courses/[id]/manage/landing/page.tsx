@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { instructorApi } from '@/lib/api/instructor.api';
@@ -9,6 +9,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { RichTextEditor } from '@/components/common/RichTextEditor';
 import { CourseThumbnailUpload } from '@/components/instructor/CourseThumbnailUpload';
 import { notify } from '@/store/dialog.store';
+import { getApiErrorMessage } from '@/lib/api/error';
 
 const LEVELS = [
   { value: 'beginner', label: 'Sơ cấp' },
@@ -18,23 +19,26 @@ const LEVELS = [
 
 const inputClass = 'w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky';
 
-export default function CourseLandingPage() {
-  const { id } = useParams<{ id: string }>();
+interface CourseLanding {
+  title?: string;
+  shortDescription?: string;
+  description?: string;
+  language?: string;
+  level?: string;
+  categoryId?: string;
+}
+
+function LandingForm({ courseId, initial }: { courseId: string; initial: CourseLanding }) {
   const qc = useQueryClient();
   const [form, setForm] = useState({
-    title: '',
-    shortDescription: '',
-    description: '',
-    language: 'vi',
-    level: 'beginner',
-    categoryId: '',
+    title: initial.title ?? '',
+    shortDescription: initial.shortDescription ?? '',
+    description: initial.description ?? '',
+    language: initial.language ?? 'vi',
+    level: initial.level ?? 'beginner',
+    categoryId: initial.categoryId ?? '',
   });
   const [saved, setSaved] = useState(false);
-
-  const { data, isLoading } = useQuery({
-    queryKey: ['course-manage', id],
-    queryFn: () => instructorApi.getCourseById(id).then((r) => r.data),
-  });
 
   const { data: catData } = useQuery({
     queryKey: ['categories'],
@@ -43,22 +47,9 @@ export default function CourseLandingPage() {
   });
   const categories: { id: string; name: string }[] = catData?.data ?? [];
 
-  useEffect(() => {
-    if (data) {
-      setForm({
-        title: data.title ?? '',
-        shortDescription: data.shortDescription ?? '',
-        description: data.description ?? '',
-        language: data.language ?? 'vi',
-        level: data.level ?? 'beginner',
-        categoryId: data.categoryId ?? '',
-      });
-    }
-  }, [data]);
-
   const saveMutation = useMutation({
     mutationFn: () =>
-      instructorApi.updateCourse(id, {
+      instructorApi.updateCourse(courseId, {
         title: form.title,
         shortDescription: form.shortDescription,
         description: form.description,
@@ -67,14 +58,12 @@ export default function CourseLandingPage() {
         categoryId: form.categoryId || undefined,
       }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['course-manage', id] });
+      qc.invalidateQueries({ queryKey: ['course-manage', courseId] });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     },
-    onError: (err: any) => notify.error(err?.response?.data?.message ?? 'Lưu thất bại'),
+    onError: (err) => notify.error(getApiErrorMessage(err, 'Lưu thất bại')),
   });
-
-  if (isLoading) return <LoadingSpinner />;
 
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -135,7 +124,7 @@ export default function CourseLandingPage() {
         </div>
       </div>
 
-      <CourseThumbnailUpload courseId={id} />
+      <CourseThumbnailUpload courseId={courseId} />
 
       <div className="flex items-center gap-3 pt-2">
         <button
@@ -149,4 +138,17 @@ export default function CourseLandingPage() {
       </div>
     </div>
   );
+}
+
+export default function CourseLandingPage() {
+  const { id } = useParams<{ id: string }>();
+
+  const { data, isLoading } = useQuery<CourseLanding>({
+    queryKey: ['course-manage', id],
+    queryFn: () => instructorApi.getCourseById(id).then((r) => r.data),
+  });
+
+  if (isLoading || !data) return <LoadingSpinner />;
+
+  return <LandingForm courseId={id} initial={data} />;
 }

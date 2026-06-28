@@ -46,7 +46,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function PaymentQrModal({ payment, courseId, onClose, onPaid }: PaymentQrModalProps) {
+export function PaymentQrModal({ payment, onClose, onPaid }: PaymentQrModalProps) {
   const [secondsLeft, setSecondsLeft] = useState(EXPIRE_SECONDS);
   const expired = secondsLeft <= 0;
 

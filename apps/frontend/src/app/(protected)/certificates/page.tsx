@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useState } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -41,9 +41,12 @@ function CertificatesContent() {
     queryFn: () => certificateApi.getByCourse(courseId as string),
     enabled: !!courseId,
   });
-  useEffect(() => {
+  // Mở sẵn khi query theo khóa resolve (set-state-during-render thay useEffect).
+  const [prevByCourse, setPrevByCourse] = useState(byCourse);
+  if (byCourse !== prevByCourse) {
+    setPrevByCourse(byCourse);
     if (byCourse?.data) setSelected(byCourse.data);
-  }, [byCourse]);
+  }
 
   if (isLoading) return <LoadingSpinner />;
 

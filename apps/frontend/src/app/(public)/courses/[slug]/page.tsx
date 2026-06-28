@@ -22,6 +22,18 @@ import { ReviewSection } from '@/components/review/ReviewSection';
 import { formatDuration, formatVND } from '@/lib/utils';
 import { useState } from 'react';
 import { BookOpen, Check, ChevronDown, Clock, Lock, Play, Users } from 'lucide-react';
+import { getApiErrorMessage } from '@/lib/api/error';
+
+interface CourseDetailLesson {
+  id: string;
+  title: string;
+  isPreview?: boolean;
+}
+interface CourseDetailSection {
+  id: string;
+  title: string;
+  lessons?: CourseDetailLesson[];
+}
 
 const LEVEL_LABELS: Record<string, string> = {
   beginner: 'Cơ bản',
@@ -52,14 +64,14 @@ export default function CourseDetailPage() {
   });
 
   const course = data?.data;
-  const enrollments: any[] = enrollData?.data ?? [];
-  const isEnrolled = enrollments.some((e: any) => e.courseId === course?.id);
+  const enrollments: { courseId: string }[] = enrollData?.data ?? [];
+  const isEnrolled = enrollments.some((e) => e.courseId === course?.id);
   const isOwner = !!user && course?.instructor?.id === user.id;
 
   const enrollMutation = useMutation({
     mutationFn: () => enrollmentApi.enrollFree(course.id),
     onSuccess: () => router.push(`/learn/${course.id}`),
-    onError: (err: any) => setEnrollError(err?.response?.data?.message ?? 'Lỗi đăng ký'),
+    onError: (err) => setEnrollError(getApiErrorMessage(err, 'Lỗi đăng ký')),
   });
 
   const validateCouponMutation = useMutation({
@@ -68,9 +80,9 @@ export default function CourseDetailPage() {
       setAppliedCoupon(data);
       setCouponError('');
     },
-    onError: (err: any) => {
+    onError: (err) => {
       setAppliedCoupon(null);
-      setCouponError(err?.response?.data?.message ?? 'Mã không hợp lệ');
+      setCouponError(getApiErrorMessage(err, 'Mã không hợp lệ'));
     },
   });
 
@@ -91,7 +103,7 @@ export default function CourseDetailPage() {
       if (paymentInfo) setPayment(paymentInfo);
       else router.push(`/learn/${course.id}`);
     },
-    onError: (err: any) => setEnrollError(err?.response?.data?.message ?? 'Lỗi thanh toán'),
+    onError: (err) => setEnrollError(getApiErrorMessage(err, 'Lỗi thanh toán')),
   });
 
   if (isLoading) return <LoadingSpinner />;
@@ -228,7 +240,7 @@ export default function CourseDetailPage() {
               <section>
                 <h2 className="font-display text-2xl text-ink mb-4">Nội dung khóa học</h2>
                 <div className="space-y-2">
-                  {course.sections.map((section: any) => {
+                  {course.sections.map((section: CourseDetailSection) => {
                     const isOpen = openSection === section.id;
                     return (
                       <div key={section.id} className="bg-surface-card rounded-xl border border-hairline overflow-hidden">
@@ -244,9 +256,9 @@ export default function CourseDetailPage() {
                           </span>
                           <ChevronDown size={16} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                         </button>
-                        {isOpen && section.lessons?.length > 0 && (
+                        {isOpen && (section.lessons?.length ?? 0) > 0 && (
                           <ul className="border-t border-hairline divide-y divide-hairline-soft">
-                            {section.lessons.map((lesson: any) => (
+                            {section.lessons?.map((lesson: CourseDetailLesson) => (
                               <li
                                 key={lesson.id}
                                 className="flex items-center justify-between px-4 py-2.5 text-sm"

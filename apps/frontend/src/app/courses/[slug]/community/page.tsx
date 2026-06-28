@@ -9,6 +9,23 @@ import { useAuthStore } from '@/store/auth.store';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ChevronLeft, ChevronRight, ChevronUp, Image as ImageIcon, MessageSquare, Pin, X } from 'lucide-react';
 
+interface CommunityPostMedia {
+  url?: string;
+  type?: string;
+}
+interface CommunityPost {
+  id: string;
+  title: string;
+  body: string;
+  type?: string;
+  author?: { fullName?: string } | null;
+  createdAt: string;
+  isPinned?: boolean;
+  upvotes?: number;
+  media?: CommunityPostMedia[];
+  _count?: { comments?: number };
+}
+
 const TYPE_LABELS: Record<string, string> = {
   question: 'Hỏi đáp',
   discussion: 'Thảo luận',
@@ -65,7 +82,7 @@ export default function CourseCommunityPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['community-posts', courseId] }),
   });
 
-  const posts: any[] = data?.data?.posts ?? [];
+  const posts: CommunityPost[] = data?.data?.posts ?? [];
   const total: number = data?.data?.total ?? 0;
   const totalPages = Math.ceil(total / 20);
 
@@ -183,7 +200,7 @@ export default function CourseCommunityPage() {
           {posts.length === 0 && (
             <p className="text-center py-12 text-ink-subtle">Chưa có bài đăng nào — hãy là người mở đầu cuộc trò chuyện!</p>
           )}
-          {posts.map((post: any) => (
+          {posts.map((post) => (
             <div
               key={post.id}
               role="link"
@@ -196,7 +213,7 @@ export default function CourseCommunityPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     {post.isPinned && <span className="inline-flex items-center gap-1 text-xs text-sun-deep font-semibold"><Pin size={12} /> Ghim</span>}
-                    <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${TYPE_COLORS[post.type]}`}>{TYPE_LABELS[post.type]}</span>
+                    <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${TYPE_COLORS[post.type ?? '']}`}>{TYPE_LABELS[post.type ?? '']}</span>
                   </div>
                   <h3 className="font-semibold text-ink-deep line-clamp-2">{post.title}</h3>
                   <p className="text-sm text-ink-mute mt-1 line-clamp-2">{post.body}</p>

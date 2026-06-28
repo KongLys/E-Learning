@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { learnApi } from '@/lib/api/learn.api';
 import { myReviewQuizApi, type AskScope } from '@/lib/api/ai.api';
+import type { QuizView } from '@/types/quiz';
 import { useAiChatBridge } from '@/store/ai-chat-bridge.store';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { VideoPlayer, formatSeconds } from '@/components/learn/VideoPlayer';
@@ -79,7 +80,7 @@ export default function LearnPage() {
     queryFn: () => learnApi.getTranscript(lessonId),
     enabled: lessonData?.data?.type === 'video',
     refetchInterval: (q) => {
-      const s = (q.state.data as any)?.data?.status;
+      const s = (q.state.data as { data?: { status?: string } } | undefined)?.data?.status;
       return s === 'pending' || s === 'processing' ? 8000 : false;
     },
   });
@@ -99,7 +100,7 @@ export default function LearnPage() {
   // Quiz đang làm — hiển thị ngay trong cột nội dung (không dùng modal).
   // 'review' = quiz ôn tập theo bài; 'ai' = quiz cá nhân ("Quiz của tôi").
   const [activeQuiz, setActiveQuiz] = useState<{
-    quiz: any;
+    quiz: QuizView;
     kind: 'review' | 'ai';
     scope?: AskScope;
   } | null>(null);
@@ -120,7 +121,7 @@ export default function LearnPage() {
     queryFn: async () => (await learnApi.getNarration(lessonId)).data,
     enabled: lessonData?.data?.type === 'document',
     refetchInterval: (q) => {
-      const s = (q.state.data as any)?.status;
+      const s = (q.state.data as { status?: string } | undefined)?.status;
       return s === 'pending' || s === 'processing' ? 8000 : false;
     },
   });
@@ -132,7 +133,7 @@ export default function LearnPage() {
     queryFn: async () => (await learnApi.getAiVideo(lessonId)).data,
     enabled: lessonData?.data?.type === 'document',
     refetchInterval: (q) => {
-      const s = (q.state.data as any)?.status;
+      const s = (q.state.data as { status?: string } | undefined)?.status;
       return s === 'pending' || s === 'processing' ? 15000 : false;
     },
   });
@@ -140,7 +141,7 @@ export default function LearnPage() {
 
   // Mở quiz ở cột nội dung, GIỮ mục lục khung chương trình để điều hướng dễ.
   // Quiz ôn tập gắn với bài của chính nó (quiz.lessonId), không nhất thiết là bài đang xem.
-  const openQuiz = (quiz: any, kind: 'review' | 'ai') => {
+  const openQuiz = (quiz: QuizView, kind: 'review' | 'ai') => {
     const scope = kind === 'review' ? { lessonId: quiz.lessonId ?? lessonId } : undefined;
     setActiveQuiz({ quiz, kind, scope });
     setSidebarOpen(false); // đóng overlay mục lục trên mobile; mục lục desktop vẫn hiện
@@ -155,11 +156,11 @@ export default function LearnPage() {
 
   const lesson = lessonData?.data;
   const progress = progressData?.data;
-  const lessonProgress: any[] = progress?.lessonProgress ?? [];
-  const sections: any[] = sectionsData ?? [];
+  const lessonProgress = progress?.lessonProgress ?? [];
+  const sections = sectionsData ?? [];
 
   // Danh sách bài học phẳng (theo thứ tự) để xác định bài kế tiếp
-  const flatLessons: { id: string }[] = sections.flatMap((s: any) => s.lessons ?? []);
+  const flatLessons: { id: string }[] = sections.flatMap((s: { lessons?: { id: string }[] }) => s.lessons ?? []);
   const currentIdx = flatLessons.findIndex((l) => l.id === lessonId);
   const nextLessonId = currentIdx >= 0 && currentIdx < flatLessons.length - 1 ? flatLessons[currentIdx + 1].id : null;
 
@@ -195,10 +196,17 @@ export default function LearnPage() {
     if (prev && prev !== 'completed' && status === 'completed' && p?.certificateEligible) {
       setShowCelebration(true);
     }
+    // cố ý chỉ theo dõi status + certificateEligible (đọc p qua ref, tránh chạy thừa)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [progressData?.data?.status, progressData?.data?.certificateEligible]);
 
-  // Đổi bài học thì thoát quiz đang mở để hiện nội dung bài (điều hướng qua lại mượt).
-  useEffect(() => { setActiveQuiz(null); setDocScrolled(false); }, [lessonId]);
+  // Đổi bài học thì thoát quiz đang mở (set-state-during-render thay useEffect).
+  const [prevLessonId, setPrevLessonId] = useState(lessonId);
+  if (lessonId !== prevLessonId) {
+    setPrevLessonId(lessonId);
+    setActiveQuiz(null);
+    setDocScrolled(false);
+  }
 
   // Kéo để mở rộng/thu nhỏ khung chat AI (cột phải)
   useEffect(() => {
@@ -235,11 +243,13 @@ export default function LearnPage() {
   const openAiPanel = () => { setAiPanelOpen(true); setOutlineCollapsed(true); setSidebarOpen(false); };
 
   // Khi có prompt được bơm vào panel (vd: nút "Vì sao đúng/sai?"), đảm bảo panel mở.
+  // (set-state-during-render thay useEffect)
   const pendingAsk = useAiChatBridge((s) => s.pending);
-  useEffect(() => {
+  const [prevPendingAsk, setPrevPendingAsk] = useState(pendingAsk);
+  if (pendingAsk !== prevPendingAsk) {
+    setPrevPendingAsk(pendingAsk);
     if (pendingAsk && !aiPanelOpen) openAiPanel();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingAsk]);
+  }
 
   const markCompleteOnce = (then?: () => void) => {
     if (completedRef.current) { then?.(); return; }
@@ -258,7 +268,7 @@ export default function LearnPage() {
   if (lessonLoading) return <LoadingSpinner />;
   if (!lesson) return <div className="p-8 text-center text-gray-500">Bài học không tìm thấy</div>;
 
-  const initialPos = lessonProgress.find((lp: any) => lp.lessonId === lessonId)?.lastPositionSec ?? 0;
+  const initialPos = lessonProgress.find((lp: { lessonId: string; lastPositionSec?: number }) => lp.lessonId === lessonId)?.lastPositionSec ?? 0;
   const videoCompletionMode: 'percent_90' | 'ended_autonext' = lesson.videoAsset?.completionMode ?? 'percent_90';
   const docReadEnough = readSec >= minReadTime;
 
@@ -571,7 +581,7 @@ export default function LearnPage() {
                     {transcriptStatus === 'ready' && chapters.length === 0 && (
                       <p className="text-sm text-gray-500">Chưa có phân tích nội dung cho video này.</p>
                     )}
-                    {chapters.map((c: any, i: number) => (
+                    {chapters.map((c: { startSec: number; title?: string; summary?: string }, i: number) => (
                       <button
                         key={i}
                         onClick={() => jumpToVideo(c.startSec)}

@@ -1,10 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Clock, FileText, Pencil, Trash2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { learnApi } from '@/lib/api/learn.api';
 import { formatSeconds } from './VideoPlayer';
+
+interface Note {
+  id: string;
+  content: string;
+  positionValue: number;
+  positionType?: string;
+}
 
 interface NotesPanelProps {
   lessonId: string;
@@ -27,7 +34,7 @@ export function NotesPanel({ lessonId, lessonTitle, positionType, getCurrentPosi
     queryKey: ['notes', lessonId],
     queryFn: () => learnApi.getNotes(lessonId),
   });
-  const notes: any[] = data?.data ?? [];
+  const notes: Note[] = data?.data ?? [];
 
   const createMutation = useMutation({
     mutationFn: () => learnApi.createNote(lessonId, newContent, positionType, capturedPos),
@@ -50,10 +57,12 @@ export function NotesPanel({ lessonId, lessonTitle, positionType, getCurrentPosi
   };
 
   // Mở form thêm ghi chú khi nhận tín hiệu từ nút "Lưu ghi chú" bên ngoài
-  useEffect(() => {
+  // (pattern set-state-during-render thay cho useEffect).
+  const [prevAddSignal, setPrevAddSignal] = useState(addSignal);
+  if (addSignal !== prevAddSignal) {
+    setPrevAddSignal(addSignal);
     if (addSignal) startAdding();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [addSignal]);
+  }
 
   const positionBadge = (value: number) => {
     if (positionType === 'video_timestamp') return <><Clock size={12} /> {formatSeconds(value)}</>;
@@ -107,7 +116,7 @@ export function NotesPanel({ lessonId, lessonTitle, positionType, getCurrentPosi
       )}
 
       <div className="space-y-3 max-h-112 overflow-y-auto">
-        {notes.map((note: any) => (
+        {notes.map((note) => (
           <div key={note.id} className="group rounded-2xl bg-slate-50 p-4 transition-colors hover:bg-slate-100/80">
             <div className="flex items-center justify-between gap-2 mb-2">
               {note.positionValue > 0 ? (
