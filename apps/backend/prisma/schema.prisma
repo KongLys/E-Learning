@@ -1070,6 +1070,7 @@ model GraphEntity {
   description String                      @db.Text
   lessonIds   String[]                    @default([]) @map("lesson_ids")
   sectionIds  String[]                    @default([]) @map("section_ids")
+  chunkIds    String[]                    @default([]) @map("chunk_ids") // chunk nguồn (chunk-level provenance)
   degree      Int                         @default(0) // số quan hệ chạm tới (rank low-level)
   embedding   Unsupported("vector(768)")?
   contentTsv  Unsupported("tsvector")?    @default(dbgenerated("to_tsvector('simple'::regconfig, COALESCE(name, ''::text) || ' ' || COALESCE(description, ''::text))")) @map("content_tsv")
@@ -1083,8 +1084,9 @@ model GraphEntity {
   @@map("graph_entities")
 }
 
-// Quan hệ có hướng giữa 2 entity, gắn bài nguồn (lesson_id) để xóa incremental +
-// truy vết citation. keywords/description dùng cho truy hồi high-level.
+// Quan hệ có hướng giữa 2 entity. Dedup theo cặp (course, src, dst) → một cạnh
+// duy nhất tích lũy qua nhiều bài: weight = số bài đóng góp, lesson_ids/chunk_ids
+// gom nguồn để xóa incremental + truy vết citation chunk-level.
 model GraphRelation {
   id          String                      @id @default(uuid())
   courseId    String                      @map("course_id")
@@ -1092,17 +1094,18 @@ model GraphRelation {
   dstId       String                      @map("dst_id")
   keywords    String                      @default("")
   description String                      @db.Text
-  lessonId    String?                     @map("lesson_id")
-  sectionId   String?                     @map("section_id")
-  weight      Float                       @default(1)
+  lessonIds   String[]                    @default([]) @map("lesson_ids")
+  sectionIds  String[]                    @default([]) @map("section_ids")
+  chunkIds    String[]                    @default([]) @map("chunk_ids")
+  weight      Float                       @default(1) // = số bài (lesson) đóng góp cạnh này
   embedding   Unsupported("vector(768)")?
   contentTsv  Unsupported("tsvector")?    @default(dbgenerated("to_tsvector('simple'::regconfig, COALESCE(keywords, ''::text) || ' ' || COALESCE(description, ''::text))")) @map("content_tsv")
   createdAt   DateTime                    @default(now()) @map("created_at")
 
   course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
+  @@unique([courseId, srcId, dstId])
   @@index([courseId])
-  @@index([lessonId])
   @@index([srcId])
   @@index([dstId])
   @@map("graph_relations")

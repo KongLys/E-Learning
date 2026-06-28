@@ -18,6 +18,7 @@ interface EntityRow {
   type: string;
   description: string;
   lesson_ids: string[];
+  chunk_ids: string[];
   score: number;
 }
 interface RelationRow {
@@ -26,7 +27,8 @@ interface RelationRow {
   dst_id: string;
   keywords: string;
   description: string;
-  lesson_id: string | null;
+  lesson_ids: string[];
+  chunk_ids: string[];
   score: number;
 }
 
@@ -44,6 +46,9 @@ export class GraphRetrieverService {
   private readonly topRelations: number;
   private readonly chunkLimit: number;
   private readonly maxHops: number;
+  /** Trọng số cộng thêm theo degree (entity) / weight (relation) vào điểm RRF. */
+  private readonly degreeBoost: number;
+  private readonly relWeightBoost: number;
 
   constructor(
     private prisma: PrismaService,
@@ -54,6 +59,12 @@ export class GraphRetrieverService {
     this.topRelations = config.get<number>('GRAPH_TOP_RELATIONS', 8);
     this.chunkLimit = config.get<number>('GRAPH_RETRIEVE_TOP', 30);
     this.maxHops = config.get<number>('GRAPH_MAX_HOPS', 1);
+    // A1: tắt boost degree/weight theo MẶC ĐỊNH. Benchmark cho thấy boost theo độ
+    // trung tâm tuyệt đối đẩy entity hub generic (vd "UX","user") lên cho mọi câu
+    // → cùng cụm chunk bị trả về lặp lại, sai chủ đề. Vẫn để cấu hình bật lại nếu
+    // muốn thử nghiệm (đặt env > 0).
+    this.degreeBoost = config.get<number>('GRAPH_DEGREE_BOOST', 0);
+    this.relWeightBoost = config.get<number>('GRAPH_REL_WEIGHT_BOOST', 0);
   }
 
   async retrieve(
@@ -110,26 +121,48 @@ export class GraphRetrieverService {
     }
     const entityDetail = await this.entityDetails(courseId, [...entityIds]);
 
-    // Điểm theo bài: max score của entity/relation tham chiếu bài đó.
-    const lessonScore = new Map<string, number>();
-    const bump = (lessonId: string | null | undefined, score: number) => {
-      if (!lessonId) return;
-      lessonScore.set(
-        lessonId,
-        Math.max(lessonScore.get(lessonId) ?? 0, score),
-      );
+    // A2: điểm chunk theo ĐỒNG THUẬN + PHẠT HUB (thay cho max trước đây).
+    //  - Cộng dồn đóng góp: chunk được NHIỀU entity/relation khớp-query trỏ tới sẽ
+    //    nổi lên (tín hiệu đồng thuận), thay vì để 1 entity hub quyết định bằng max.
+    //  - Phạt entity/relation phổ biến: chia đóng góp cho log số chunk nó trỏ tới —
+    //    entity hub (trỏ rất nhiều chunk) bị hạ trọng số, nhường chỗ cho entity đặc
+    //    thù của câu hỏi. Đây là sửa trực tiếp cho hiện tượng "cụm hub lặp lại".
+    const chunkScore = new Map<string, number>();
+    const addChunks = (ids: string[] | undefined, score: number) => {
+      const n = ids?.length ?? 0;
+      if (n === 0) return;
+      const spread = 1 / Math.log2(2 + n); // n lớn (hub) → spread nhỏ
+      for (const id of ids!)
+        chunkScore.set(id, (chunkScore.get(id) ?? 0) + score * spread);
     };
-    for (const e of entities) for (const l of e.lesson_ids) bump(l, e.score);
-    for (const r of allRelations) bump(r.lesson_id, r.score || 1e-4);
+    for (const e of entities) addChunks(e.chunk_ids, e.score);
+    for (const r of allRelations) addChunks(r.chunk_ids, r.score || 1e-4);
 
-    const lessonIds = [...lessonScore.keys()];
-    const chunks = lessonIds.length
-      ? await this.chunksForLessons(courseId, lessonIds, lessonScore, scope)
-      : [];
+    let chunks: RetrievedChunk[] = [];
+    if (chunkScore.size > 0) {
+      chunks = await this.chunksByIds(
+        courseId,
+        [...chunkScore.keys()],
+        chunkScore,
+        scope,
+      );
+    } else {
+      // Fallback dữ liệu cũ (chưa có chunk_ids): quy về bài như trước.
+      const lessonScore = new Map<string, number>();
+      const bump = (lessonId: string, score: number) =>
+        lessonScore.set(lessonId, Math.max(lessonScore.get(lessonId) ?? 0, score));
+      for (const e of entities) for (const l of e.lesson_ids) bump(l, e.score);
+      for (const r of allRelations)
+        for (const l of r.lesson_ids) bump(l, r.score || 1e-4);
+      const lessonIds = [...lessonScore.keys()];
+      chunks = lessonIds.length
+        ? await this.chunksForLessons(courseId, lessonIds, lessonScore, scope)
+        : [];
+    }
 
     const graphContext = buildGraphContext(entityDetail, allRelations);
     this.logger.debug(
-      `[Graph] entities=${entities.length} relations=${allRelations.length} lessons=${lessonIds.length} chunks=${chunks.length}`,
+      `[Graph] entities=${entities.length} relations=${allRelations.length} chunks=${chunks.length}`,
     );
     return { chunks, graphContext };
   }
@@ -167,8 +200,9 @@ export class GraphRetrieverService {
           AND content_tsv @@ plainto_tsquery('simple', ${queryText})${scopeSql}
         LIMIT 50
       )
-      SELECT e.id, e.name, e.type, e.description, e.lesson_ids,
-             (COALESCE(1.0/(60 + vec.rnk), 0) + COALESCE(1.0/(60 + fts.rnk), 0))::float AS score
+      SELECT e.id, e.name, e.type, e.description, e.lesson_ids, e.chunk_ids,
+             (COALESCE(1.0/(60 + vec.rnk), 0) + COALESCE(1.0/(60 + fts.rnk), 0)
+              + ${this.degreeBoost} * (e.degree::float / (e.degree + 5)))::float AS score
       FROM graph_entities e
       LEFT JOIN vec ON vec.id = e.id
       LEFT JOIN fts ON fts.id = e.id
@@ -188,15 +222,7 @@ export class GraphRetrieverService {
     scope?: ChunkScope,
   ): Promise<RelationRow[]> {
     const vec = `[${embedding.join(',')}]`;
-    const scopeSql = Prisma.sql`${
-      scope?.lessonId
-        ? Prisma.sql` AND lesson_id = ${scope.lessonId}`
-        : Prisma.empty
-    }${
-      scope?.sectionId
-        ? Prisma.sql` AND section_id = ${scope.sectionId}`
-        : Prisma.empty
-    }`;
+    const scopeSql = relScopeSql(scope);
     const rows = await this.prisma.$queryRaw<RelationRow[]>(Prisma.sql`
       WITH vec AS (
         SELECT id, row_number() OVER (ORDER BY embedding <=> ${vec}::vector) AS rnk
@@ -212,8 +238,9 @@ export class GraphRetrieverService {
           AND content_tsv @@ plainto_tsquery('simple', ${queryText})${scopeSql}
         LIMIT 50
       )
-      SELECT r.id, r.src_id, r.dst_id, r.keywords, r.description, r.lesson_id,
-             (COALESCE(1.0/(60 + vec.rnk), 0) + COALESCE(1.0/(60 + fts.rnk), 0))::float AS score
+      SELECT r.id, r.src_id, r.dst_id, r.keywords, r.description, r.lesson_ids, r.chunk_ids,
+             (COALESCE(1.0/(60 + vec.rnk), 0) + COALESCE(1.0/(60 + fts.rnk), 0)
+              + ${this.relWeightBoost} * (r.weight / (r.weight + 3)))::float AS score
       FROM graph_relations r
       LEFT JOIN vec ON vec.id = r.id
       LEFT JOIN fts ON fts.id = r.id
@@ -230,17 +257,9 @@ export class GraphRetrieverService {
     entityIds: string[],
     scope?: ChunkScope,
   ): Promise<RelationRow[]> {
-    const scopeSql = Prisma.sql`${
-      scope?.lessonId
-        ? Prisma.sql` AND lesson_id = ${scope.lessonId}`
-        : Prisma.empty
-    }${
-      scope?.sectionId
-        ? Prisma.sql` AND section_id = ${scope.sectionId}`
-        : Prisma.empty
-    }`;
+    const scopeSql = relScopeSql(scope);
     return this.prisma.$queryRaw<RelationRow[]>(Prisma.sql`
-      SELECT id, src_id, dst_id, keywords, description, lesson_id, 0::float AS score
+      SELECT id, src_id, dst_id, keywords, description, lesson_ids, chunk_ids, 0::float AS score
       FROM graph_relations
       WHERE course_id = ${courseId}
         AND (src_id = ANY(${entityIds}) OR dst_id = ANY(${entityIds}))${scopeSql}
@@ -316,9 +335,76 @@ export class GraphRetrieverService {
       }))
       .sort((a, b) => b.score - a.score);
   }
+
+  /**
+   * Kéo chính các course_chunks là nguồn của entity/relation (chunk-level), loại
+   * bài quiz, gắn score theo chunk rồi lấy top `chunkLimit`. Chính xác hơn cách
+   * cũ (nở ra cả bài) vì chỉ lấy đoạn thực sự sinh ra tri thức liên quan.
+   */
+  private async chunksByIds(
+    courseId: string,
+    chunkIds: string[],
+    chunkScore: Map<string, number>,
+    scope?: ChunkScope,
+  ): Promise<RetrievedChunk[]> {
+    const scopeSql = Prisma.sql`${
+      scope?.lessonId
+        ? Prisma.sql` AND lesson_id = ${scope.lessonId}`
+        : Prisma.empty
+    }${
+      scope?.sectionId
+        ? Prisma.sql` AND section_id = ${scope.sectionId}`
+        : Prisma.empty
+    }`;
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        id: string;
+        content: string;
+        section_title: string | null;
+        page_number: number | null;
+        section_id: string | null;
+        lesson_id: string | null;
+        source_type: string;
+      }>
+    >(Prisma.sql`
+      SELECT id, content, section_title, page_number, section_id, lesson_id, source_type
+      FROM course_chunks
+      WHERE course_id = ${courseId} AND id = ANY(${chunkIds})${scopeSql}
+        AND NOT EXISTS (
+          SELECT 1 FROM lessons ql
+          WHERE ql.id = course_chunks.lesson_id AND ql.type::text = 'quiz'
+        );
+    `);
+    return rows
+      .map((r) => ({
+        id: r.id,
+        content: r.content,
+        sectionTitle: r.section_title,
+        pageNumber: r.page_number,
+        sectionId: r.section_id,
+        lessonId: r.lesson_id,
+        sourceType: r.source_type,
+        score: chunkScore.get(r.id) ?? 0,
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, this.chunkLimit);
+  }
 }
 
 // ─── Pure helpers ───────────────────────────────────────────────────────────────
+
+/** Lọc scope cho graph_relations (bài/chương dạng MẢNG: = ANY(...)). */
+function relScopeSql(scope?: ChunkScope): Prisma.Sql {
+  return Prisma.sql`${
+    scope?.lessonId
+      ? Prisma.sql` AND ${scope.lessonId} = ANY(lesson_ids)`
+      : Prisma.empty
+  }${
+    scope?.sectionId
+      ? Prisma.sql` AND ${scope.sectionId} = ANY(section_ids)`
+      : Prisma.empty
+  }`;
+}
 
 function buildGraphContext(
   entityDetail: Map<

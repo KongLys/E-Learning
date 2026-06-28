@@ -80,6 +80,76 @@ export interface ExtractedGraph {
   relations: ExtractedRelation[];
 }
 
+// ─── Hợp nhất mô tả khi trùng entity/relation (LLM summarize-merge) ───────────────
+
+export const DESCRIPTION_MERGE_SYSTEM =
+  'Bạn là công cụ hợp nhất mô tả tri thức cho đồ thị học tập (lĩnh vực CNTT). ' +
+  'Với mỗi mục, bạn nhận mô tả CŨ và mô tả MỚI của cùng một khái niệm/quan hệ rút ' +
+  'từ các bài khác nhau. Hãy tổng hợp thành MỘT mô tả ngắn gọn (1-2 câu), giữ mọi ' +
+  'thông tin tri thức quan trọng từ cả hai, loại trùng lặp, KHÔNG bịa thêm. ' +
+  'Trả lời bằng JSON hợp lệ duy nhất. ' +
+  UNTRUSTED_DATA_RULE;
+
+/** Một mục cần hợp nhất: mô tả cũ (trong DB) + mô tả mới (vừa trích). */
+export interface DescriptionMergeItem {
+  /** Khóa định danh để map kết quả về (norm_name của entity, hoặc "srcId|dstId"). */
+  id: string;
+  /** Tên entity / từ khóa quan hệ — bối cảnh cho model. */
+  name: string;
+  existing: string;
+  incoming: string;
+}
+
+/**
+ * Prompt gộp NHIỀU mô tả trùng trong MỘT lời gọi (1 call/bài thay vì N call).
+ * Mọi nội dung do tài liệu sinh ra đều untrusted → neutralize trước khi nhúng.
+ */
+export function buildDescriptionMergePrompt(
+  items: DescriptionMergeItem[],
+): string {
+  const blocks = items
+    .map(
+      (it) =>
+        `{ "id": ${JSON.stringify(it.id)}, "name": ${JSON.stringify(
+          neutralizeInline(it.name, 120),
+        )}, "old": ${JSON.stringify(
+          neutralizeInline(it.existing, 600),
+        )}, "new": ${JSON.stringify(neutralizeInline(it.incoming, 600))} }`,
+    )
+    .join(',\n');
+
+  return `Hợp nhất các cặp mô tả (cũ + mới) của cùng một khái niệm/quan hệ dưới đây:
+[
+${blocks}
+]
+
+Trả về JSON đúng cấu trúc (không markdown, không giải thích), GIỮ NGUYÊN "id":
+{ "merged": [ { "id": "<id tương ứng>", "description": "<mô tả hợp nhất 1-2 câu>" } ] }`;
+}
+
+/** Parse kết quả merge → Map<id, description>. Chịu lỗi như parseExtractedGraph. */
+export function parseMergedDescriptions(raw: string): Map<string, string> {
+  const out = new Map<string, string>();
+  const start = raw.indexOf('{');
+  const end = raw.lastIndexOf('}');
+  if (start === -1 || end <= start) return out;
+  try {
+    const obj = JSON.parse(raw.slice(start, end + 1)) as {
+      merged?: Array<{ id?: unknown; description?: unknown }>;
+    };
+    if (Array.isArray(obj.merged)) {
+      for (const m of obj.merged) {
+        const id = String(m?.id ?? '').trim();
+        const desc = String(m?.description ?? '').trim();
+        if (id && desc) out.set(id, desc);
+      }
+    }
+  } catch {
+    /* trả map rỗng → caller fallback giữ mô tả dài hơn */
+  }
+  return out;
+}
+
 /** Parse chịu lỗi JSON do model trả (gỡ code fence, lấy object ngoài cùng). */
 export function parseExtractedGraph(raw: string): ExtractedGraph {
   const empty: ExtractedGraph = { entities: [], relations: [] };

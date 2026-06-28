@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { EnrollmentService } from './enrollment.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -12,6 +13,7 @@ const mockPrisma = {
   course: { findUnique: jest.fn() },
   enrollment: { findFirst: jest.fn(), create: jest.fn(), findMany: jest.fn() },
 };
+const mockEvents = { emit: jest.fn() };
 
 const publishedFreeCourse = {
   id: 'course-1',
@@ -34,6 +36,7 @@ describe('EnrollmentService', () => {
       providers: [
         EnrollmentService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: EventEmitter2, useValue: mockEvents },
       ],
     }).compile();
 

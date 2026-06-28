@@ -1,13 +1,16 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ProgressService } from './progress.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 const mockPrisma = {
-  lesson: { findUnique: jest.fn(), count: jest.fn() },
-  enrollment: { findFirst: jest.fn(), update: jest.fn() },
+  course: { findUnique: jest.fn() },
+  lesson: { findUnique: jest.fn(), findFirst: jest.fn(), count: jest.fn() },
+  enrollment: { findFirst: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
   lessonProgress: { upsert: jest.fn(), count: jest.fn() },
 };
+const mockEvents = { emit: jest.fn() };
 
 describe('ProgressService', () => {
   let service: ProgressService;
@@ -17,11 +20,19 @@ describe('ProgressService', () => {
       providers: [
         ProgressService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: EventEmitter2, useValue: mockEvents },
       ],
     }).compile();
 
     service = module.get<ProgressService>(ProgressService);
     jest.clearAllMocks();
+    // Mặc định: không có quiz cuối khóa → tiến độ tính thuần theo bài nội dung.
+    mockPrisma.course.findUnique.mockResolvedValue({ finalQuizEnabled: false });
+    mockPrisma.lesson.findFirst.mockResolvedValue(null);
+    mockPrisma.enrollment.findUnique.mockResolvedValue({
+      status: 'active',
+      studentId: 'student-1',
+    });
   });
 
   describe('recalculateProgress', () => {

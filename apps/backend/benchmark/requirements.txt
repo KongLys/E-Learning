@@ -1,0 +1,13 @@
+# Chấm điểm generation cho benchmark RAG (score.py). Judge LLM mặc định chạy trên
+# Anthropic Haiku (RAGAS_JUDGE=anthropic), embeddings vẫn dùng Ollama local vì
+# Anthropic không có API embeddings. Đặt RAGAS_JUDGE=ollama để chấm hoàn toàn local.
+# Pin langchain 0.3.x: ragas 0.2.x KHÔNG tương thích langchain 1.x (đã xoá module
+# langchain_community.chat_models.vertexai mà ragas 0.2 import lúc load).
+ragas>=0.2.0,<0.3
+langchain>=0.3,<0.4
+langchain-core>=0.3,<0.4
+langchain-community>=0.3,<0.4
+langchain-ollama>=0.2,<0.3
+langchain-anthropic>=0.2,<0.4
+datasets>=2.16
+pandas>=2.0

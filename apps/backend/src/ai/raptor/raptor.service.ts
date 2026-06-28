@@ -344,6 +344,140 @@ export class RaptorService {
     return { label: 'toàn bộ khóa học', nodes };
   }
 
+  // ─── Truy hồi collapsed-tree (cho benchmark RAG) ──────────────────────────────
+
+  /**
+   * Truy hồi RAPTOR "collapsed tree" HAI TẦNG (B1+B2):
+   *  1) ANN trên raptor_nodes mọi tầng → top-N node phù hợp (vùng liên quan).
+   *  2) B1 — DRILL xuống lá: gom leaf chunk của các node đó rồi xếp hạng bằng
+   *     HYBRID (RRF của dense ANN + BM25 full-text) GIỚI HẠN trong tập leaf ứng
+   *     viên, lấy TOP_LEAF chunk GỐC. Dùng hybrid thay vì dense thuần để bắt cả
+   *     khớp từ khoá (mã, thuật ngữ) lẫn ngữ nghĩa → chunk thật chính xác hơn.
+   *  3) B2 — ngữ cảnh hai tầng: kèm vài bản TÓM TẮT vùng (high-level) cùng các leaf
+   *     chunk (chi tiết). Item tóm tắt có leafChunkIds rỗng (chỉ làm giàu ngữ cảnh,
+   *     không tính recall); item leaf mang đúng chunk id.
+   */
+  async collapsedTreeRetrieve(
+    courseId: string,
+    queryEmbedding: number[],
+    queryText: string,
+    topN = 8,
+    scope?: ChunkScope,
+    topLeaf = 8,
+  ): Promise<
+    Array<{
+      id: string;
+      title: string | null;
+      content: string;
+      leafChunkIds: string[];
+      score: number;
+      kind: 'summary' | 'leaf';
+    }>
+  > {
+    const SUMMARY_N = 2; // số bản tóm tắt vùng đưa vào ngữ cảnh
+    const TOP_LEAF = topLeaf; // số leaf chunk gốc lấy sau khi drill (tham số hoá để
+    // khi có rerank phía sau ta drill pool lớn hơn rồi rerank cắt còn TOP_K)
+    const vec = `[${queryEmbedding.join(',')}]`;
+    const scopeSql = Prisma.sql`${
+      scope?.lessonId
+        ? Prisma.sql` AND lesson_id = ${scope.lessonId}`
+        : Prisma.empty
+    }${scope?.sectionId ? Prisma.sql` AND section_id = ${scope.sectionId}` : Prisma.empty}`;
+    const top = await this.prisma.$queryRaw<
+      Array<{ id: string; title: string | null; content: string; score: number }>
+    >(Prisma.sql`
+      SELECT id, title, content,
+             (1 - (embedding <=> ${vec}::vector))::float AS score
+      FROM raptor_nodes
+      WHERE course_id = ${courseId} AND embedding IS NOT NULL${scopeSql}
+      ORDER BY embedding <=> ${vec}::vector
+      LIMIT ${topN};
+    `);
+    if (top.length === 0) return [];
+
+    // Mở rộng childNodeIds → leaf chunk ids cho các node top.
+    const all = await this.prisma.raptorNode.findMany({
+      where: { courseId },
+      select: { id: true, childChunkIds: true, childNodeIds: true },
+    });
+    const byId = new Map(all.map((n) => [n.id, n]));
+    const leavesOf = (nodeId: string): string[] => {
+      const seen = new Set<string>();
+      const chunks = new Set<string>();
+      const stack = [nodeId];
+      while (stack.length) {
+        const id = stack.pop()!;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        const node = byId.get(id);
+        if (!node) continue;
+        for (const c of node.childChunkIds) chunks.add(c);
+        for (const child of node.childNodeIds) stack.push(child);
+      }
+      return [...chunks];
+    };
+
+    // B1: xếp hạng leaf chunk ứng viên bằng HYBRID (RRF dense + BM25) trong tập
+    // candidateLeafIds → lấy TOP_LEAF chunk gốc. Hằng số RRF = 60 (chuẩn).
+    const candidateLeafIds = [
+      ...new Set(top.flatMap((n) => leavesOf(n.id))),
+    ];
+    let leaves: Array<{
+      id: string;
+      content: string;
+      title: string | null;
+      score: number;
+    }> = [];
+    if (candidateLeafIds.length > 0) {
+      leaves = await this.prisma.$queryRaw<typeof leaves>(Prisma.sql`
+        WITH vec AS (
+          SELECT id, row_number() OVER (ORDER BY embedding <=> ${vec}::vector) AS rnk
+          FROM course_chunks
+          WHERE id = ANY(${candidateLeafIds}) AND embedding IS NOT NULL
+          ORDER BY embedding <=> ${vec}::vector
+          LIMIT 100
+        ),
+        fts AS (
+          SELECT id,
+                 row_number() OVER (
+                   ORDER BY ts_rank(content_tsv, plainto_tsquery('simple', ${queryText})) DESC
+                 ) AS rnk
+          FROM course_chunks
+          WHERE id = ANY(${candidateLeafIds})
+            AND content_tsv @@ plainto_tsquery('simple', ${queryText})
+          LIMIT 100
+        )
+        SELECT c.id, c.content, c.section_title AS title,
+               (COALESCE(1.0/(60 + vec.rnk), 0) + COALESCE(1.0/(60 + fts.rnk), 0))::float AS score
+        FROM course_chunks c
+        LEFT JOIN vec ON vec.id = c.id
+        LEFT JOIN fts ON fts.id = c.id
+        WHERE vec.id IS NOT NULL OR fts.id IS NOT NULL
+        ORDER BY score DESC
+        LIMIT ${TOP_LEAF};
+      `);
+    }
+
+    // B2: gộp tóm tắt vùng (high-level) + leaf chunk gốc (chi tiết).
+    const summaries = top.slice(0, SUMMARY_N).map((n) => ({
+      id: n.id,
+      title: n.title,
+      content: `[Tóm tắt vùng] ${n.content}`,
+      leafChunkIds: [] as string[],
+      score: n.score,
+      kind: 'summary' as const,
+    }));
+    const leafItems = leaves.map((c) => ({
+      id: c.id,
+      title: c.title,
+      content: c.content,
+      leafChunkIds: [c.id],
+      score: c.score,
+      kind: 'leaf' as const,
+    }));
+    return [...summaries, ...leafItems];
+  }
+
   private async findNodes(where: {
     courseId: string;
     level?: number;

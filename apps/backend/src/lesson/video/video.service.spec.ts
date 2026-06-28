@@ -34,6 +34,7 @@ const mockStorage = {
 const mockLessonService = {
   isEnrolled: jest.fn(),
   updateCourseStats: jest.fn(),
+  enqueueVideoTranscribe: jest.fn(),
 };
 
 describe('VideoService', () => {
@@ -60,7 +61,7 @@ describe('VideoService', () => {
       path: '/tmp/upload-123',
     } as Express.Multer.File;
     const lesson = { id: 'lesson-1', sectionId: 'section-1', type: 'video' };
-    const section = { course: { instructorId: 'instructor-1' } };
+    const section = { course: { instructorId: 'instructor-1', status: 'draft' } };
 
     it('throws BadRequestException for non-video mimetype', async () => {
       const file = { mimetype: 'image/png', size: 1024 } as Express.Multer.File;

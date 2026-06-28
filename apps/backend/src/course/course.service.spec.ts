@@ -4,9 +4,12 @@ import {
   ForbiddenException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CourseService } from './course.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
+import { ModerationService } from '../moderation/moderation.service';
+import { FinalQuizService } from '../final-quiz/final-quiz.service';
 
 const mockPrisma = {
   course: {
@@ -18,12 +21,16 @@ const mockPrisma = {
   },
   section: { count: jest.fn() },
   lesson: { count: jest.fn() },
+  documentAsset: { count: jest.fn() },
 };
 const mockStorage = {
   deleteFile: jest.fn(),
   uploadFile: jest.fn(),
   extractKeyFromUrl: jest.fn(),
 };
+const mockModeration = { moderateCourse: jest.fn() };
+const mockFinalQuiz = { enqueueForCourse: jest.fn() };
+const mockEvents = { emit: jest.fn() };
 
 describe('CourseService', () => {
   let service: CourseService;
@@ -34,6 +41,9 @@ describe('CourseService', () => {
         CourseService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: StorageService, useValue: mockStorage },
+        { provide: ModerationService, useValue: mockModeration },
+        { provide: FinalQuizService, useValue: mockFinalQuiz },
+        { provide: EventEmitter2, useValue: mockEvents },
       ],
     }).compile();
     service = module.get<CourseService>(CourseService);
@@ -46,6 +56,7 @@ describe('CourseService', () => {
         id: 'c1',
         instructorId: 'u1',
         status: 'draft',
+        moderationStatus: 'approved',
       });
       mockPrisma.section.count.mockResolvedValue(0);
       await expect(service.submitForReview('c1', 'u1')).rejects.toThrow(
@@ -58,6 +69,7 @@ describe('CourseService', () => {
         id: 'c1',
         instructorId: 'u1',
         status: 'draft',
+        moderationStatus: 'approved',
       });
       mockPrisma.section.count.mockResolvedValue(1);
       mockPrisma.lesson.count.mockResolvedValue(0);

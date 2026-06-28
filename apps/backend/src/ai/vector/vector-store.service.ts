@@ -146,6 +146,57 @@ export class VectorStoreService {
     }));
   }
 
+  /**
+   * Truy hồi THUẦN vector (cosine ANN), không trộn BM25. Dùng làm baseline
+   * "Naive RAG" cho benchmark — giữ nguyên bộ lọc phạm vi + loại bài quiz như
+   * hybridSearch để so sánh công bằng. Score = cosine similarity (1 - distance).
+   */
+  async vectorSearch(
+    courseId: string,
+    queryEmbedding: number[],
+    k = 50,
+    scope?: ChunkScope,
+  ): Promise<RetrievedChunk[]> {
+    const vec = `[${queryEmbedding.join(',')}]`;
+    const scopeSql = Prisma.sql`${
+      scope?.lessonId
+        ? Prisma.sql` AND lesson_id = ${scope.lessonId}`
+        : Prisma.empty
+    }${scope?.sectionId ? Prisma.sql` AND section_id = ${scope.sectionId}` : Prisma.empty} AND NOT EXISTS (
+        SELECT 1 FROM lessons ql
+        WHERE ql.id = course_chunks.lesson_id AND ql.type::text = 'quiz'
+      )`;
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        id: string;
+        content: string;
+        section_title: string | null;
+        page_number: number | null;
+        section_id: string | null;
+        lesson_id: string | null;
+        source_type: string;
+        score: number;
+      }>
+    >(Prisma.sql`
+      SELECT id, content, section_title, page_number, section_id, lesson_id,
+             source_type, (1 - (embedding <=> ${vec}::vector))::float AS score
+      FROM course_chunks
+      WHERE course_id = ${courseId} AND embedding IS NOT NULL${scopeSql}
+      ORDER BY embedding <=> ${vec}::vector
+      LIMIT ${k};
+    `);
+    return rows.map((r) => ({
+      id: r.id,
+      content: r.content,
+      sectionTitle: r.section_title,
+      pageNumber: r.page_number,
+      sectionId: r.section_id,
+      lessonId: r.lesson_id,
+      sourceType: r.source_type,
+      score: r.score,
+    }));
+  }
+
   async deleteByLesson(lessonId: string): Promise<void> {
     await this.prisma.courseChunk.deleteMany({ where: { lessonId } });
   }
