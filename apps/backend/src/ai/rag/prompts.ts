@@ -25,6 +25,11 @@ export interface QueryAnalysis {
     | 'other';
   subject: string;
   resolvedQuery: string;
+  /**
+   * 3 biến thể truy hồi (multi-query). variants[0]/[1] là 2 cách diễn đạt lại sát
+   * câu hỏi; variants[2] là câu "step-back" (khái quát/nền tảng hơn) để gom thêm
+   * ngữ cảnh nền — gộp step-back vào đây để không tốn thêm một lần gọi LLM.
+   */
   variants: [string, string, string];
   /** LightRAG dual-level: từ khóa thực thể cụ thể (match graph_entities). */
   lowLevelKeywords: string[];
@@ -62,13 +67,13 @@ You are an assistant for an academic IT/software engineering course. Analyze the
 "variants": exactly 3 search strings to improve retrieval:
   - variants[0]: Vietnamese academic phrasing ("khái niệm X", "định nghĩa X", "cách hoạt động của X")
   - variants[1]: English technical lookup ("X definition", "what is X", "how X works in software engineering")
-  - variants[2]: mixed Vietnamese + English keywords
+  - variants[2]: a "step-back" question — STEP BACK to the broader principle, foundational concept, or big-picture topic behind the question. More general than the original (so it retrieves background context), but on the SAME subject. Vietnamese, phrased as a question. Example: original "cách viết Dockerfile multi-stage" → step-back "nguyên lý build image trong Docker hoạt động thế nào". This one MAY be broader than the original scope.
 
 "lowLevelKeywords": 2-5 SPECIFIC entity keywords — concrete concepts/terms/tools named or implied by the question (e.g. "Dockerfile", "container", "image layer"). These match a knowledge-graph entity index.
 
 "highLevelKeywords": 2-4 BROADER theme/relationship keywords describing what kind of connection or topic the question is about (e.g. "build process", "isolation", "deployment workflow"). These match a knowledge-graph relation index.
 
-All variants must preserve exact scope — no new sub-concepts. Keep each under 15 words.
+variants[0] and variants[1] must preserve exact scope — no new sub-concepts; variants[2] (step-back) may generalize but stays on the same subject. Keep each under 15 words.
 
 Return ONLY valid JSON. No markdown, no code fences, no explanation.`;
 }

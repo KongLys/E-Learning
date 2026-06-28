@@ -372,6 +372,10 @@ export class RaptorService {
       leafChunkIds: string[];
       score: number;
       kind: 'summary' | 'leaf';
+      /** Metadata để dựng citation phía RAG (leaf mới có; summary để null). */
+      sectionId: string | null;
+      lessonId: string | null;
+      pageNumber: number | null;
     }>
   > {
     const SUMMARY_N = 2; // số bản tóm tắt vùng đưa vào ngữ cảnh
@@ -426,6 +430,9 @@ export class RaptorService {
       id: string;
       content: string;
       title: string | null;
+      section_id: string | null;
+      lesson_id: string | null;
+      page_number: number | null;
       score: number;
     }> = [];
     if (candidateLeafIds.length > 0) {
@@ -448,6 +455,7 @@ export class RaptorService {
           LIMIT 100
         )
         SELECT c.id, c.content, c.section_title AS title,
+               c.section_id, c.lesson_id, c.page_number,
                (COALESCE(1.0/(60 + vec.rnk), 0) + COALESCE(1.0/(60 + fts.rnk), 0))::float AS score
         FROM course_chunks c
         LEFT JOIN vec ON vec.id = c.id
@@ -466,6 +474,9 @@ export class RaptorService {
       leafChunkIds: [] as string[],
       score: n.score,
       kind: 'summary' as const,
+      sectionId: null,
+      lessonId: null,
+      pageNumber: null,
     }));
     const leafItems = leaves.map((c) => ({
       id: c.id,
@@ -474,6 +485,9 @@ export class RaptorService {
       leafChunkIds: [c.id],
       score: c.score,
       kind: 'leaf' as const,
+      sectionId: c.section_id,
+      lessonId: c.lesson_id,
+      pageNumber: c.page_number,
     }));
     return [...summaries, ...leafItems];
   }

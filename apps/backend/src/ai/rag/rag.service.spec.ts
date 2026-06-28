@@ -5,7 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { GeminiService } from '../providers/gemini.service';
 import { CohereService } from '../providers/cohere.service';
 import { VectorStoreService } from '../vector/vector-store.service';
-import { GraphRetrieverService } from '../lightrag/graph-retriever.service';
+import { RaptorService } from '../raptor/raptor.service';
 import { NO_CONTEXT_MESSAGE } from './prompts';
 
 const mockGemini = {
@@ -15,10 +15,38 @@ const mockGemini = {
 };
 const mockCohere = { rerank: jest.fn() };
 const mockVector = { hybridSearch: jest.fn() };
-// Mặc định graph trả null → luồng hành xử như vector-only (giữ nguyên kỳ vọng test).
-const mockGraph = { retrieve: jest.fn().mockResolvedValue(null) };
+// Retriever chính: RAPTOR collapsed-tree. Mặc định trả 2 leaf chunk thật.
+const mockRaptor = { collapsedTreeRetrieve: jest.fn() };
 const mockConfig = { get: jest.fn((_k: string, d?: unknown) => d) };
 
+// Query analysis trả JSON hợp lệ với 3 biến thể (variants[2] = step-back).
+const ANALYSIS_JSON = JSON.stringify({
+  intent: 'definition',
+  subject: 'redis',
+  resolvedQuery: 'khái niệm redis',
+  variants: [
+    'khái niệm redis',
+    'redis definition',
+    'nguyên lý lưu trữ key-value hoạt động thế nào',
+  ],
+  lowLevelKeywords: ['redis'],
+  highLevelKeywords: ['lưu trữ key-value'],
+});
+
+/** Một RAPTOR leaf item (chunk thật) — có metadata citation. */
+const raptorLeaf = (id: string) => ({
+  id,
+  title: 'Phần 1',
+  content: `nội dung ${id}`,
+  leafChunkIds: [id],
+  score: 0.5,
+  kind: 'leaf' as const,
+  sectionId: 's1',
+  lessonId: 'l1',
+  pageNumber: 1,
+});
+
+/** Một RetrievedChunk (cho nhánh fallback hybrid). */
 const chunk = (id: string) => ({
   id,
   content: `nội dung ${id}`,
@@ -52,23 +80,27 @@ describe('RagService - relevance gate', () => {
         { provide: GeminiService, useValue: mockGemini },
         { provide: CohereService, useValue: mockCohere },
         { provide: VectorStoreService, useValue: mockVector },
-        { provide: GraphRetrieverService, useValue: mockGraph },
+        { provide: RaptorService, useValue: mockRaptor },
         { provide: ConfigService, useValue: mockConfig },
       ],
     }).compile();
     service = module.get<RagService>(RagService);
     jest.clearAllMocks();
 
-    // queryRewrite (maxOutputTokens 256) → '' ; compress (1024) → mặc định có nội dung
+    // analyze (maxOutputTokens 640) → JSON 3 biến thể; compress (1024) → có nội dung.
     mockGemini.generate.mockImplementation(
       (_prompt: string, opts: { maxOutputTokens?: number }) =>
         Promise.resolve(
-          opts?.maxOutputTokens === 256 ? '' : 'đoạn trích liên quan',
+          opts?.maxOutputTokens === 640 ? ANALYSIS_JSON : 'đoạn trích liên quan',
         ),
     );
     mockGemini.embedBatch.mockImplementation((arr: string[]) =>
       Promise.resolve(arr.map(() => [0.1, 0.2, 0.3])),
     );
+    mockRaptor.collapsedTreeRetrieve.mockResolvedValue([
+      raptorLeaf('c1'),
+      raptorLeaf('c2'),
+    ]);
     mockVector.hybridSearch.mockResolvedValue([chunk('c1'), chunk('c2')]);
     mockGemini.generateStream.mockReturnValue(fakeAnswer());
   });
@@ -85,10 +117,11 @@ describe('RagService - relevance gate', () => {
 
     expect(await collect(res.stream)).toContain('Đáp');
     expect(mockGemini.generateStream).toHaveBeenCalledTimes(1);
+    expect(mockRaptor.collapsedTreeRetrieve).toHaveBeenCalled();
     expect(res.citations).toHaveLength(2);
   });
 
-  it('điểm cao + compression có nội dung ⇒ trả lời bình thường, citation từ mọi chunk rerank', async () => {
+  it('điểm cao + compression có nội dung ⇒ trả lời bình thường, citation từ chunk RAPTOR', async () => {
     mockCohere.rerank.mockResolvedValue([
       { index: 0, relevanceScore: 0.91 },
       { index: 1, relevanceScore: 0.2 },
@@ -104,7 +137,7 @@ describe('RagService - relevance gate', () => {
 
   it('compression rỗng dù có chunk đạt ngưỡng ⇒ "chưa đề cập"', async () => {
     mockCohere.rerank.mockResolvedValue([{ index: 0, relevanceScore: 0.9 }]);
-    mockGemini.generate.mockImplementation(() => Promise.resolve('')); // cả rewrite lẫn compress rỗng
+    mockGemini.generate.mockImplementation(() => Promise.resolve('')); // cả analyze lẫn compress rỗng
 
     const res = await service.ask('course1', 'câu hỏi');
 
@@ -123,5 +156,19 @@ describe('RagService - relevance gate', () => {
 
     expect(mockGemini.generateStream).toHaveBeenCalledTimes(1);
     expect(res.citations.length).toBeGreaterThan(0);
+  });
+
+  it('khóa chưa có cây RAPTOR ⇒ fallback hybrid (không LightRAG)', async () => {
+    mockRaptor.collapsedTreeRetrieve.mockResolvedValue([]); // chưa build cây
+    mockCohere.rerank.mockResolvedValue([
+      { index: 0, relevanceScore: 0.8 },
+      { index: 1, relevanceScore: 0.7 },
+    ]);
+
+    const res = await service.ask('course1', 'câu hỏi');
+
+    expect(mockVector.hybridSearch).toHaveBeenCalled();
+    expect(mockGemini.generateStream).toHaveBeenCalledTimes(1);
+    expect(res.citations).toHaveLength(2);
   });
 });

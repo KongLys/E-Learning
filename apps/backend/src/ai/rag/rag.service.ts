@@ -8,7 +8,7 @@ import {
   RetrievedChunk,
   ChunkScope,
 } from '../vector/vector-store.service';
-import { GraphRetrieverService } from '../lightrag/graph-retriever.service';
+import { RaptorService } from '../raptor/raptor.service';
 import {
   SYSTEM_INSTRUCTION,
   NO_CONTEXT_MESSAGE,
@@ -41,23 +41,25 @@ export class RagService {
   private readonly logger = new Logger(RagService.name);
   private readonly retrieveTop: number;
   private readonly rerankTop: number;
-  private readonly rerankMinScore: number;
-  private readonly lightragEnabled: boolean;
+  private readonly compressTop: number;
+  private readonly raptorNodes: number;
+  private readonly raptorLeaves: number;
 
   constructor(
     private prisma: PrismaService,
     private gemini: GeminiService,
     private cohere: CohereService,
     private vector: VectorStoreService,
-    private graph: GraphRetrieverService,
+    private raptor: RaptorService,
     config: ConfigService,
   ) {
     this.retrieveTop = config.get<number>('RAG_RETRIEVE_TOP', 50);
-    this.rerankTop = config.get<number>('RAG_RERANK_TOP', 5);
-    this.rerankMinScore = config.get<number>('RAG_RERANK_MIN_SCORE', 0.3);
-    // Cờ tắt nhanh nguồn graph (LightRAG) để A/B với baseline thuần vector.
-    this.lightragEnabled =
-      config.get<string>('LIGHTRAG_ENABLED', 'true') !== 'false';
+    // Pipeline thu hẹp dần: retrieve 50 → rerank 10 → compress 5 (khớp benchmark).
+    this.rerankTop = config.get<number>('RAG_RERANK_TOP', 10);
+    this.compressTop = config.get<number>('RAG_COMPRESS_TOP', 5);
+    // Tham số truy hồi RAPTOR collapsed-tree: số node ANN + số leaf chunk drill.
+    this.raptorNodes = config.get<number>('RAG_RAPTOR_NODES', 20);
+    this.raptorLeaves = config.get<number>('RAG_RAPTOR_LEAVES', 50);
   }
 
   async ask(
@@ -66,58 +68,50 @@ export class RagService {
     conversationHistory: string[] = [],
     scope?: ChunkScope,
   ): Promise<AskResult> {
-    // 1. Query analysis — phân tích intent + sinh biến thể
+    // 1. Query analysis — phân tích intent + sinh 3 biến thể truy hồi. variants[2]
+    //    đã là câu "step-back" (khái quát) → gộp step-back vào đây, không tốn thêm
+    //    một lần gọi LLM.
     const analysis = await this.analyzeQuery(query, conversationHistory);
-    const allQueries = unique([
-      analysis.resolvedQuery,
-      ...analysis.variants,
-    ]).slice(0, 4);
+    const queries = unique(analysis.variants).slice(0, 3);
     this.logger.log(
       `[RAG] original: "${query}" | intent: ${analysis.intent} | subject: "${analysis.subject}"`,
     );
     this.logger.log(`[RAG] resolvedQuery: "${analysis.resolvedQuery}"`);
     this.logger.log(
-      `[RAG] search queries:\n${allQueries.map((q, i) => `  [${i}] ${q}`).join('\n')}`,
+      `[RAG] search queries (variants[2]=step-back):\n${queries.map((q, i) => `  [${i}] ${q}`).join('\n')}`,
     );
 
-    // 2. Embed + truy hồi song song: vector+BM25 (nhiều biến thể) VÀ đồ thị LightRAG
-    //    dual-level. Cả hai trả về pool ứng viên chunk → hợp nhất bằng RRF.
-    const embeddings = await this.gemini.embedBatch(allQueries);
-    const [pools, graphResult] = await Promise.all([
-      Promise.all(
-        allQueries.map((q, i) =>
-          this.vector.hybridSearch(
-            courseId,
-            embeddings[i],
-            q,
-            this.retrieveTop,
-            scope,
-          ),
+    // 2. Embed mọi biến thể → truy hồi RAPTOR collapsed-tree theo từng biến thể →
+    //    hợp nhất pool bằng RRF. (Thay cho hybrid+LightRAG cũ — khớp pipeline benchmark.)
+    const embeddings = await this.gemini.embedBatch(queries);
+    let pools: Candidate[][] = [];
+    for (let i = 0; i < queries.length; i++) {
+      const items = await this.raptor.collapsedTreeRetrieve(
+        courseId,
+        embeddings[i],
+        queries[i],
+        this.raptorNodes,
+        scope,
+        this.raptorLeaves,
+      );
+      pools.push(items.map(raptorItemToCandidate));
+    }
+    let fused = reciprocalRankFusion(pools, this.retrieveTop);
+
+    // Fallback: khóa CHƯA có cây RAPTOR → pool rỗng. Chạy hybrid (vector+BM25) trên
+    // cùng tập biến thể, KHÔNG dùng LightRAG.
+    if (fused.length === 0) {
+      this.logger.log('[RAG] no RAPTOR tree → fallback hybrid (no LightRAG)');
+      const hybridPools = await Promise.all(
+        queries.map((q, i) =>
+          this.vector.hybridSearch(courseId, embeddings[i], q, this.retrieveTop, scope),
         ),
-      ),
-      this.lightragEnabled
-        ? this.graph
-            .retrieve(
-              courseId,
-              analysis.lowLevelKeywords,
-              analysis.highLevelKeywords,
-              scope,
-            )
-            .catch((err) => {
-              this.logger.warn(
-                `[RAG] graph retrieve failed, vector-only: ${(err as Error).message}`,
-              );
-              return null;
-            })
-        : Promise.resolve(null),
-    ]);
+      );
+      pools = hybridPools.map((p) => p.map(chunkToCandidate));
+      fused = reciprocalRankFusion(pools, this.retrieveTop);
+    }
 
-    const graphPool = graphResult?.chunks ?? [];
-    const allPools = graphPool.length > 0 ? [...pools, graphPool] : pools;
-    const fused = reciprocalRankFusion(allPools, this.retrieveTop);
-    this.logger.log(
-      `[RAG] fused pool: ${fused.length} chunks (vector pools=${pools.length}, graph chunks=${graphPool.length})`,
-    );
+    this.logger.log(`[RAG] fused pool: ${fused.length} candidates`);
     fused
       .slice(0, 10)
       .forEach((c, i) =>
@@ -136,7 +130,7 @@ export class RagService {
       return noContextResult();
     }
 
-    // 3. Rerank với Cohere → top K (threshold tạm bỏ).
+    // 3. Rerank với Cohere → rerankTop ứng viên.
     const rerankResults = await this.cohere.rerank(
       query,
       fused.map((c) => c.content),
@@ -150,10 +144,12 @@ export class RagService {
     );
     const topK = rerankResults.map((r) => fused[r.index]);
 
-    // 4. Compression — Gemini trích đoạn liên quan
+    // 4. Thu hẹp còn compressTop ứng viên hạng đầu → nén (Gemini trích đoạn liên quan).
+    //    Câu trả lời + citation chỉ dựa trên tập đã nén này.
+    const answerChunks = topK.slice(0, this.compressTop);
     const compressed = await this.compress(
       analysis.resolvedQuery,
-      topK.map((c) => c.content),
+      answerChunks.map((c) => c.content),
     );
 
     this.logger.log(
@@ -165,25 +161,22 @@ export class RagService {
       return noContextResult();
     }
 
-    // Bơm "graph context" (entity + quan hệ) lên đầu ngữ cảnh để model suy luận
-    // multi-hop. Đây là tri thức rút từ chính tài liệu khóa; citation vẫn từ chunk.
-    const finalContext = graphResult?.graphContext
-      ? `[Tri thức quan hệ rút từ tài liệu]\n${graphResult.graphContext}\n\n[Trích đoạn nguồn]\n${compressed}`
-      : compressed;
-
-    // 5. Generate answer
-    const citations: Citation[] = topK.map((c) => ({
-      chunkId: c.id,
-      sectionTitle: c.sectionTitle,
-      pageNumber: c.pageNumber,
-      sectionId: c.sectionId,
-      lessonId: c.lessonId,
-      excerpt: truncateExcerpt(c.content),
-    }));
+    // 5. Generate answer. Citation chỉ lấy từ ứng viên là CHUNK THẬT (RAPTOR leaf /
+    //    hybrid) — item tóm tắt vùng (summary) chỉ làm giàu ngữ cảnh, không trích dẫn.
+    const citations: Citation[] = answerChunks
+      .filter((c) => c.citable)
+      .map((c) => ({
+        chunkId: c.id,
+        sectionTitle: c.sectionTitle,
+        pageNumber: c.pageNumber,
+        sectionId: c.sectionId,
+        lessonId: c.lessonId,
+        excerpt: truncateExcerpt(c.content),
+      }));
     const prompt = buildAnswerPrompt(
       analysis.resolvedQuery,
-      finalContext,
-      topK.map((c, i) => ({
+      compressed,
+      answerChunks.map((c, i) => ({
         index: i,
         sectionTitle: c.sectionTitle,
         pageNumber: c.pageNumber,
@@ -195,7 +188,11 @@ export class RagService {
       temperature: 0.2,
     });
 
-    return { stream, citations, contextChunks: topK };
+    return {
+      stream,
+      citations,
+      contextChunks: answerChunks.map(candidateToRetrievedChunk),
+    };
   }
 
   /**
@@ -358,11 +355,75 @@ export class RagService {
   }
 }
 
+/**
+ * Ứng viên truy hồi đã chuẩn hóa, dùng chung cho RAPTOR (leaf + summary) và hybrid
+ * fallback. `citable` = true khi là CourseChunk thật (RAPTOR leaf / hybrid) → đủ điều
+ * kiện dựng citation; item tóm tắt vùng (summary) có citable=false.
+ */
+interface Candidate {
+  id: string;
+  content: string;
+  sectionTitle: string | null;
+  sectionId: string | null;
+  lessonId: string | null;
+  pageNumber: number | null;
+  score: number;
+  citable: boolean;
+}
+
+function raptorItemToCandidate(it: {
+  id: string;
+  title: string | null;
+  content: string;
+  score: number;
+  kind: 'summary' | 'leaf';
+  sectionId: string | null;
+  lessonId: string | null;
+  pageNumber: number | null;
+}): Candidate {
+  return {
+    id: it.id,
+    content: it.content,
+    sectionTitle: it.title,
+    sectionId: it.sectionId,
+    lessonId: it.lessonId,
+    pageNumber: it.pageNumber,
+    score: it.score,
+    citable: it.kind === 'leaf',
+  };
+}
+
+function chunkToCandidate(c: RetrievedChunk): Candidate {
+  return {
+    id: c.id,
+    content: c.content,
+    sectionTitle: c.sectionTitle,
+    sectionId: c.sectionId,
+    lessonId: c.lessonId,
+    pageNumber: c.pageNumber,
+    score: c.score,
+    citable: true,
+  };
+}
+
+function candidateToRetrievedChunk(c: Candidate): RetrievedChunk {
+  return {
+    id: c.id,
+    content: c.content,
+    sectionTitle: c.sectionTitle,
+    pageNumber: c.pageNumber,
+    sectionId: c.sectionId,
+    lessonId: c.lessonId,
+    sourceType: c.citable ? 'chunk' : 'raptor-summary',
+    score: c.score,
+  };
+}
+
 function reciprocalRankFusion(
-  pools: RetrievedChunk[][],
+  pools: Candidate[][],
   topK: number,
-): RetrievedChunk[] {
-  const scores = new Map<string, { chunk: RetrievedChunk; score: number }>();
+): Candidate[] {
+  const scores = new Map<string, { chunk: Candidate; score: number }>();
   for (const pool of pools) {
     pool.forEach((chunk, rank) => {
       const existing = scores.get(chunk.id);
