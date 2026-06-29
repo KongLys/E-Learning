@@ -1,10 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { FileText, Video, X } from 'lucide-react';
+import { FileText, Video } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { instructorApi } from '@/lib/api/instructor.api';
-import { learnApi } from '@/lib/api/learn.api';
 import { getApiErrorMessage } from '@/lib/api/error';
 import {
   moderationApi,
@@ -18,9 +17,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { showPrompt } from '@/store/dialog.store';
 import { QuizBuilder } from './QuizBuilder';
-import { ReviewQuizUI } from '@/components/learn/ReviewQuizUI';
 import { LESSON_TYPE_META, type LessonType } from './lessonTypeMeta';
-import type { QuizView } from '@/types/quiz';
 
 const PARSE_LABEL: Record<DocumentParseStatus, string> = {
   uploaded: 'Chờ xử lý AI',
@@ -81,9 +78,6 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
   const [docPct, setDocPct] = useState<number | null>(null);
   const [deleteVideoConfirm, setDeleteVideoConfirm] = useState(false);
   const [deleteDocConfirm, setDeleteDocConfirm] = useState(false);
-  const [reviewPreviewOpen, setReviewPreviewOpen] = useState(false);
-
-  const isMediaLesson = lesson.type === 'video' || lesson.type === 'document';
 
   const { data, isLoading } = useQuery({
     queryKey: ['lesson-edit', lesson.id],
@@ -101,7 +95,7 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
   const [description, setDescription] = useState('');
   const [completionMode, setCompletionMode] = useState<'percent_90' | 'ended_autonext'>('percent_90');
   const [contentHtml, setContentHtml] = useState('');
-  const [minReadTimeSec, setMinReadTimeSec] = useState(0);
+  const [minReadTimeMin, setMinReadTimeMin] = useState(0);
   const [hydratedId, setHydratedId] = useState<string | null>(null);
 
   if (detail && hydratedId !== lesson.id) {
@@ -109,7 +103,7 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
     setDescription(detail.description ?? '');
     setCompletionMode(detail.videoAsset?.completionMode ?? 'percent_90');
     setContentHtml(detail.documentAsset?.contentHtml ?? '');
-    setMinReadTimeSec(detail.documentAsset?.minReadTimeSec ?? 0);
+    setMinReadTimeMin(Math.round((detail.documentAsset?.minReadTimeSec ?? 0) / 60));
     setHydratedId(lesson.id);
   }
 
@@ -133,7 +127,7 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
   });
 
   const saveDocConfig = useMutation({
-    mutationFn: () => instructorApi.configDocument(lesson.id, { contentHtml, minReadTimeSec }),
+    mutationFn: () => instructorApi.configDocument(lesson.id, { contentHtml, minReadTimeSec: minReadTimeMin * 60 }),
     onSuccess: () => { setError(''); invalidate(); },
     onError: onErr,
   });
@@ -165,19 +159,6 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
   const appeal = useMutation({
     mutationFn: (reason?: string) => moderationApi.appealLesson(lesson.id, reason),
     onSuccess: () => { setError(''); invalidate(); },
-    onError: onErr,
-  });
-
-  const { data: reviewQuizResp } = useQuery({
-    queryKey: ['review-quiz-edit', lesson.id],
-    queryFn: () => instructorApi.getReviewQuiz(lesson.id),
-    enabled: isMediaLesson,
-  });
-  const reviewQuiz: QuizView | null = reviewQuizResp?.data ?? null;
-
-  const genReviewQuiz = useMutation({
-    mutationFn: () => instructorApi.generateReviewQuiz(lesson.id),
-    onSuccess: () => { setError(''); qc.invalidateQueries({ queryKey: ['review-quiz-edit', lesson.id] }); },
     onError: onErr,
   });
 
@@ -409,12 +390,12 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
           </div>
           {!readOnly && (
           <div>
-            <label className="text-xs text-muted">Thời gian đọc tối thiểu để hoàn thành (giây)</label>
+            <label className="text-xs text-muted">Thời gian đọc tối thiểu để hoàn thành (phút)</label>
             <input
-              type="number"
-              min={0}
-              value={minReadTimeSec}
-              onChange={(e) => setMinReadTimeSec(Math.max(0, Number(e.target.value) || 0))}
+              type="text"
+              inputMode="numeric"
+              value={minReadTimeMin}
+              onChange={(e) => setMinReadTimeMin(Number(e.target.value.replace(/\D/g, '')) || 0)}
               className="w-32 text-sm bg-surface-card rounded-xl px-3 py-2.5 outline-none ring-1 ring-hairline-strong focus:ring-2 focus:ring-sky block"
             />
           </div>
@@ -441,38 +422,6 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
         </section>
       )}
 
-      {/* ===== QUIZ ÔN TẬP (AI) ===== */}
-      {isMediaLesson && (
-        <section className="space-y-3 border-t border-hairline pt-5">
-          <h3 className="text-sm font-semibold text-ink-mute">Quiz ôn tập (AI)</h3>
-          <p className="text-xs text-muted">
-            Sinh câu hỏi trắc nghiệm ôn tập tự động từ nội dung bài học để học viên luyện tập.
-            Không tính vào tiến độ khoá học.
-          </p>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => genReviewQuiz.mutate()}
-              disabled={genReviewQuiz.isPending}
-              className="text-xs bg-berry text-white px-4 py-2 rounded-pill hover:opacity-90 transition-colors disabled:opacity-50"
-            >
-              {genReviewQuiz.isPending
-                ? 'Đang tạo...'
-                : reviewQuiz
-                  ? 'Tạo lại quiz ôn tập'
-                  : 'Tạo quiz ôn tập'}
-            </button>
-            {reviewQuiz && (
-              <button
-                onClick={() => setReviewPreviewOpen(true)}
-                className="text-xs border border-hairline px-4 py-2 rounded-pill hover:bg-canvas-soft"
-              >
-                Làm thử ({reviewQuiz.questions?.length ?? 0} câu)
-              </button>
-            )}
-          </div>
-        </section>
-      )}
-
       {deleteVideoConfirm && (
         <ConfirmDialog
           title="Xóa video?"
@@ -495,35 +444,6 @@ export function LessonContentEditor({ courseId, lesson, courseStatus }: LessonCo
         />
       )}
 
-      {reviewPreviewOpen && reviewQuiz && (
-        <div
-          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 backdrop-blur-sm p-4"
-          onClick={() => setReviewPreviewOpen(false)}
-        >
-          <div
-            className="my-8 w-full max-w-lg rounded-modal bg-surface-card shadow-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-hairline px-6 py-4">
-              <h2 className="text-lg font-bold text-ink">Quiz ôn tập — làm thử</h2>
-              <button
-                onClick={() => setReviewPreviewOpen(false)}
-                className="text-ink-subtle hover:text-ink"
-                aria-label="Đóng"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <div className="px-6 py-5">
-              <ReviewQuizUI
-                quiz={reviewQuiz}
-                submit={(ans) => learnApi.submitReviewQuiz(lesson.id, ans)}
-                onClose={() => setReviewPreviewOpen(false)}
-              />
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

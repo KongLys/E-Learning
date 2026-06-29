@@ -5,11 +5,15 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { getQueueToken } from '@nestjs/bullmq';
 import { CourseService } from './course.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { ModerationService } from '../moderation/moderation.service';
 import { FinalQuizService } from '../final-quiz/final-quiz.service';
+import { RaptorService } from '../ai/raptor/raptor.service';
+import { LESSON_INDEX_QUEUE } from '../ai/processors/lesson-index.processor';
+import { VIDEO_TRANSCRIBE_QUEUE } from '../ai/processors/video-transcribe.processor';
 
 const mockPrisma = {
   course: {
@@ -20,7 +24,7 @@ const mockPrisma = {
     count: jest.fn(),
   },
   section: { count: jest.fn() },
-  lesson: { count: jest.fn() },
+  lesson: { count: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
   documentAsset: { count: jest.fn() },
 };
 const mockStorage = {
@@ -31,6 +35,9 @@ const mockStorage = {
 const mockModeration = { moderateCourse: jest.fn() };
 const mockFinalQuiz = { enqueueForCourse: jest.fn() };
 const mockEvents = { emit: jest.fn() };
+const mockRaptor = { enqueueBuild: jest.fn() };
+const mockLessonIndexQueue = { add: jest.fn() };
+const mockVideoTranscribeQueue = { add: jest.fn() };
 
 describe('CourseService', () => {
   let service: CourseService;
@@ -44,6 +51,15 @@ describe('CourseService', () => {
         { provide: ModerationService, useValue: mockModeration },
         { provide: FinalQuizService, useValue: mockFinalQuiz },
         { provide: EventEmitter2, useValue: mockEvents },
+        { provide: RaptorService, useValue: mockRaptor },
+        {
+          provide: getQueueToken(LESSON_INDEX_QUEUE),
+          useValue: mockLessonIndexQueue,
+        },
+        {
+          provide: getQueueToken(VIDEO_TRANSCRIBE_QUEUE),
+          useValue: mockVideoTranscribeQueue,
+        },
       ],
     }).compile();
     service = module.get<CourseService>(CourseService);

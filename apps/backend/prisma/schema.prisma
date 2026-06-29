@@ -1042,6 +1042,9 @@ model RaptorNode {
   content       String                      @db.Text
   childChunkIds String[]                    @default([]) @map("child_chunk_ids")
   childNodeIds  String[]                    @default([]) @map("child_node_ids")
+  // Hash nội dung nguồn của node (lá: chunk; node tổng: hash các con). Dùng để
+  // dựng cây tăng tiến: node không đổi thì tái dùng, không re-summarize/re-embed.
+  nodeHash      String?                     @map("node_hash")
   tokenCount    Int                         @default(0) @map("token_count")
   metadata      Json                        @default("{}")
   embedding     Unsupported("vector(768)")?

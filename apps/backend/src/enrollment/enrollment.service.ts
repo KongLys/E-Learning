@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
+import { COURSE_ACCESS_STATUSES } from '../common/enrollment-access.const';
 
 @Injectable()
 export class EnrollmentService {
@@ -136,7 +137,7 @@ export class EnrollmentService {
 
   async checkEnrolled(studentId: string, courseId: string): Promise<boolean> {
     const enrollment = await this.prisma.enrollment.findFirst({
-      where: { studentId, courseId, status: 'active' },
+      where: { studentId, courseId, status: { in: COURSE_ACCESS_STATUSES } },
     });
     return !!enrollment;
   }

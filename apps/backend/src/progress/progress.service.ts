@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
+import { COURSE_ACCESS_STATUSES } from '../common/enrollment-access.const';
 import { UpdateProgressDto } from './dto/update-progress.dto';
 
 @Injectable()
@@ -23,7 +24,11 @@ export class ProgressService {
     if (!lesson) throw new NotFoundException('Lesson not found');
 
     const enrollment = await this.prisma.enrollment.findFirst({
-      where: { studentId, courseId: lesson.section.courseId, status: 'active' },
+      where: {
+        studentId,
+        courseId: lesson.section.courseId,
+        status: { in: COURSE_ACCESS_STATUSES },
+      },
     });
     if (!enrollment)
       throw new ForbiddenException('Not enrolled in this course');
@@ -63,7 +68,11 @@ export class ProgressService {
     if (!lesson) throw new NotFoundException('Lesson not found');
 
     const enrollment = await this.prisma.enrollment.findFirst({
-      where: { studentId, courseId: lesson.section.courseId, status: 'active' },
+      where: {
+        studentId,
+        courseId: lesson.section.courseId,
+        status: { in: COURSE_ACCESS_STATUSES },
+      },
     });
     if (!enrollment)
       throw new ForbiddenException('Not enrolled in this course');

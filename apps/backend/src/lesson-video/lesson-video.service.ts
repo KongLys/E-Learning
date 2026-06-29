@@ -9,6 +9,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { createHash } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { COURSE_ACCESS_STATUSES } from '../common/enrollment-access.const';
 import { StorageService } from '../storage/storage.service';
 import { GeminiService } from '../ai/providers/gemini.service';
 import {
@@ -173,7 +174,7 @@ export class LessonVideoService {
     const isOwner = course.instructorId === userId || userRole === 'admin';
     if (!isOwner) {
       const enrollment = await this.prisma.enrollment.findFirst({
-        where: { studentId: userId, courseId: course.id, status: 'active' },
+        where: { studentId: userId, courseId: course.id, status: { in: COURSE_ACCESS_STATUSES } },
       });
       if (!enrollment) {
         throw new ForbiddenException('Not enrolled in this course');

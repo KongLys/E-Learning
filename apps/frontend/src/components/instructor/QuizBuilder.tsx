@@ -166,33 +166,46 @@ export function QuizBuilder({ lessonId, onError }: { lessonId: string; onError: 
       {/* Danh sách câu hỏi */}
       <div className="space-y-2">
         <h3 className="text-sm font-semibold text-ink-mute">Câu hỏi ({questions.length})</h3>
-        {questions.map((q, i) => (
-          <div key={q.id} className="border border-hairline rounded-lg px-3 py-2 text-sm">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <span className="font-medium text-ink">{i + 1}. {q.content}</span>
-                <span className="ml-2 text-xs text-ink-subtle">({typeLabel[(q.questionType ?? 'single') as QType]} · {q.points}đ)</span>
-              </div>
-              {!contentLocked && (
-                <div className="flex shrink-0 items-center gap-2">
-                  <button onClick={() => startEdit(q)} className="text-sky hover:opacity-80 text-xs">Sửa</button>
-                  <button onClick={() => deleteQuestion.mutate(q.id)} className="text-coral hover:opacity-80 text-xs">Xóa</button>
+        {questions.map((q, i) =>
+          editingId === q.id && draft && !contentLocked ? (
+            // Đang sửa → hiện form ngay tại vị trí câu hỏi này
+            <QuestionForm
+              key={q.id}
+              draft={draft}
+              setDraft={setDraft}
+              onSave={onSaveForm}
+              onCancel={closeForm}
+              saving={saving}
+              editing
+            />
+          ) : (
+            <div key={q.id} className="border border-hairline rounded-lg px-3 py-2 text-sm">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <span className="font-medium text-ink">{i + 1}. {q.content}</span>
+                  <span className="ml-2 text-xs text-ink-subtle">({typeLabel[(q.questionType ?? 'single') as QType]} · {q.points}đ)</span>
                 </div>
-              )}
+                {!contentLocked && (
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button onClick={() => startEdit(q)} className="text-sky hover:opacity-80 text-xs">Sửa</button>
+                    <button onClick={() => deleteQuestion.mutate(q.id)} className="text-coral hover:opacity-80 text-xs">Xóa</button>
+                  </div>
+                )}
+              </div>
+              <ul className="mt-1 ml-4 space-y-0.5">
+                {q.options?.map((o) => (
+                  <li key={o.id} className={`flex items-center gap-1 text-xs ${o.isCorrect ? 'text-leaf' : 'text-muted'}`}>
+                    {o.isCorrect ? <Check size={12} className="shrink-0" /> : <Circle size={12} className="shrink-0" />} {o.content}
+                  </li>
+                ))}
+              </ul>
             </div>
-            <ul className="mt-1 ml-4 space-y-0.5">
-              {q.options?.map((o) => (
-                <li key={o.id} className={`flex items-center gap-1 text-xs ${o.isCorrect ? 'text-leaf' : 'text-muted'}`}>
-                  {o.isCorrect ? <Check size={12} className="shrink-0" /> : <Circle size={12} className="shrink-0" />} {o.content}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+          ),
+        )}
       </div>
 
-      {/* Soạn / sửa câu hỏi */}
-      {!contentLocked && (
+      {/* Thêm câu hỏi mới (khi đang sửa câu hỏi sẵn có thì ẩn khối này) */}
+      {!contentLocked && !editingId && (
         draft ? (
           <QuestionForm
             draft={draft}
@@ -200,7 +213,7 @@ export function QuizBuilder({ lessonId, onError }: { lessonId: string; onError: 
             onSave={onSaveForm}
             onCancel={closeForm}
             saving={saving}
-            editing={!!editingId}
+            editing={false}
           />
         ) : (
           <button onClick={() => { setEditingId(null); setDraft(emptyDraft()); }}
@@ -268,12 +281,17 @@ function QuestionForm({
           Đáp án {draft.questionType === 'multiple' ? '(tick các đáp án đúng)' : '(tick đáp án đúng)'}
         </p>
         {draft.options.map((o, i) => (
-          <div key={i} className="flex items-center gap-2">
+          <div key={i} className={`flex items-center gap-2 rounded-lg px-1.5 py-1 ${o.isCorrect ? 'bg-leaf-soft ring-1 ring-leaf/40' : ''}`}>
             <input type={draft.questionType === 'multiple' ? 'checkbox' : 'radio'}
               checked={o.isCorrect} onChange={() => toggleCorrect(i)} />
             <input value={o.content} onChange={(e) => setOptContent(i, e.target.value)}
               disabled={isTF} placeholder={`Đáp án ${i + 1}`}
-              className="flex-1 border border-hairline-strong rounded px-2 py-1 text-sm disabled:bg-surface-strong" />
+              className={`flex-1 border rounded px-2 py-1 text-sm disabled:bg-surface-strong ${o.isCorrect ? 'border-leaf font-medium text-leaf' : 'border-hairline-strong'}`} />
+            {o.isCorrect && (
+              <span className="flex shrink-0 items-center gap-1 rounded-full bg-leaf px-2 py-0.5 text-[11px] font-medium text-white">
+                <Check size={11} /> Đáp án đúng
+              </span>
+            )}
             {!isTF && draft.options.length > 2 && (
               <button onClick={() => removeOption(i)} className="text-coral hover:opacity-80" aria-label="Xóa đáp án"><X size={14} /></button>
             )}

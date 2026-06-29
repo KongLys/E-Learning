@@ -9,10 +9,21 @@ import { randomUUID } from 'crypto';
 import type { Express } from 'express';
 import slugify from 'slugify';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
+import {
+  LESSON_INDEX_QUEUE,
+  IndexLessonJob,
+} from '../ai/processors/lesson-index.processor';
+import {
+  VIDEO_TRANSCRIBE_QUEUE,
+  TranscribeVideoJob,
+} from '../ai/processors/video-transcribe.processor';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { ModerationService } from '../moderation/moderation.service';
 import { FinalQuizService } from '../final-quiz/final-quiz.service';
+import { RaptorService } from '../ai/raptor/raptor.service';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
 import { assertCourseEditable } from '../common/course-editable.util';
@@ -27,7 +38,12 @@ export class CourseService {
     private storage: StorageService,
     private moderation: ModerationService,
     private finalQuiz: FinalQuizService,
+    private raptor: RaptorService,
     private events: EventEmitter2,
+    @InjectQueue(LESSON_INDEX_QUEUE)
+    private lessonIndexQueue: Queue<IndexLessonJob>,
+    @InjectQueue(VIDEO_TRANSCRIBE_QUEUE)
+    private videoTranscribeQueue: Queue<TranscribeVideoJob>,
   ) {}
 
   async createCourse(instructorId: string, dto: CreateCourseDto) {
@@ -137,6 +153,38 @@ export class CourseService {
     });
   }
 
+  /** Đẩy bài học vào hàng đợi vector hóa/kiểm duyệt; lỗi hàng đợi không chặn thao tác. */
+  private async enqueueLessonIndex(lessonId: string) {
+    try {
+      await this.lessonIndexQueue.add(
+        'index',
+        { lessonId },
+        { removeOnComplete: true, removeOnFail: 50 },
+      );
+    } catch (err) {
+      console.error(
+        `[LessonIndex] enqueue failed for ${lessonId}:`,
+        (err as Error).message,
+      );
+    }
+  }
+
+  /** Gọi lại API tạo phụ đề (script) cho video; lỗi hàng đợi không chặn thao tác. */
+  private async enqueueVideoTranscribe(lessonId: string) {
+    try {
+      await this.videoTranscribeQueue.add(
+        'transcribe',
+        { lessonId },
+        { removeOnComplete: true, removeOnFail: 50 },
+      );
+    } catch (err) {
+      console.error(
+        `[VideoTranscribe] enqueue failed for ${lessonId}:`,
+        (err as Error).message,
+      );
+    }
+  }
+
   async submitForReview(courseId: string, userId: string) {
     const course = await this.findOrFail(courseId);
     this.assertOwnerOrAdmin(course, userId, 'instructor');
@@ -165,16 +213,36 @@ export class CourseService {
       );
     }
 
-    // Chặn gửi duyệt khi bài học vẫn đang chờ kiểm duyệt AI
-    const pendingLessonCount = await this.prisma.lesson.count({
+    // Chặn gửi duyệt khi bài học vẫn đang chờ kiểm duyệt AI.
+    // Một số bài có thể kẹt ở 'pending' vì chưa từng được index (vd bài rỗng,
+    // hoặc job index/transcribe lỗi) — chủ động kích hoạt lại để AI đánh giá:
+    //  - Video đã upload nhưng thiếu script (transcribe lỗi/chưa chạy): gọi lại
+    //    API transcribe để lấy script, rồi tự index + kiểm duyệt.
+    //  - Còn lại: enqueue index (bài không có nội dung sẽ được tự duyệt ở processor),
+    //    tránh kẹt vĩnh viễn vì admin không thấy bài có moderatedAt = null.
+    const pendingLessons = await this.prisma.lesson.findMany({
       where: {
         section: { courseId },
         moderationStatus: { in: ['pending', 'appealing'] },
       },
+      select: {
+        id: true,
+        moderatedAt: true,
+        videoAsset: { select: { videoUrl: true, transcriptStatus: true } },
+      },
     });
-    if (pendingLessonCount > 0) {
+    if (pendingLessons.length > 0) {
+      for (const lesson of pendingLessons) {
+        if (lesson.moderatedAt !== null) continue;
+        const video = lesson.videoAsset;
+        if (video?.videoUrl && video.transcriptStatus !== 'ready') {
+          await this.enqueueVideoTranscribe(lesson.id);
+        } else {
+          await this.enqueueLessonIndex(lesson.id);
+        }
+      }
       throw new UnprocessableEntityException(
-        `Khóa học có ${pendingLessonCount} bài học đang chờ kiểm duyệt — vui lòng đợi hệ thống xử lý xong trước khi gửi duyệt`,
+        `Khóa học có ${pendingLessons.length} bài học đang được kiểm duyệt — vui lòng thử lại sau giây lát`,
       );
     }
 
@@ -295,6 +363,17 @@ export class CourseService {
       where: { id: courseId },
       data: { status: 'draft' },
     });
+  }
+
+  /**
+   * Dựng lại cây RAPTOR (trợ lý AI) theo yêu cầu — dùng khi build trước đó lỗi.
+   * `force=true` luôn enqueue lại bất kể cache. Chỉ chủ khóa/admin.
+   */
+  async rebuildRaptor(courseId: string, userId: string, userRole: string) {
+    const course = await this.findOrFail(courseId);
+    this.assertOwnerOrAdmin(course, userId, userRole);
+    const status = await this.raptor.ensureReady(courseId, true);
+    return { status };
   }
 
   async archiveCourse(courseId: string, userId: string, userRole: string) {
@@ -471,6 +550,8 @@ export class CourseService {
           select: { id: true, fullName: true, avatarUrl: true, bio: true },
         },
         category: true,
+        // Trạng thái cây RAPTOR để FE hiện nhãn "AI đang chuẩn bị / sẵn sàng / lỗi".
+        raptorTree: { select: { status: true, errorMsg: true, updatedAt: true } },
         sections: {
           orderBy: { orderIndex: 'asc' },
           include: {

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useParams, usePathname } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { instructorApi } from '@/lib/api/instructor.api';
-import { Check, AlertTriangle } from 'lucide-react';
+import { Check, AlertTriangle, Sparkles, Loader2, ArrowLeft } from 'lucide-react';
 import { notify } from '@/store/dialog.store';
 import { getApiErrorMessage } from '@/lib/api/error';
 
@@ -49,6 +49,12 @@ export default function ManageCourseLayout({ children }: { children: React.React
   const isPublished = status === 'published';
   const isPending = status === 'pending';
 
+  // Trạng thái cây RAPTOR (trợ lý AI) — hiện nhãn "đang chuẩn bị / lỗi + dựng lại".
+  const raptor = data?.raptorTree as { status?: string } | null | undefined;
+  const raptorStatus = raptor?.status;
+  const raptorBuilding = raptorStatus === 'pending' || raptorStatus === 'generating';
+  const raptorFailed = raptorStatus === 'failed';
+
   const submitMutation = useMutation({
     mutationFn: () => instructorApi.submitCourse(id),
     onSuccess: () => {
@@ -67,11 +73,27 @@ export default function ManageCourseLayout({ children }: { children: React.React
     onError: (err) => notify.error(getApiErrorMessage(err, 'Hủy xuất bản thất bại')),
   });
 
+  const rebuildRaptorMutation = useMutation({
+    mutationFn: () => instructorApi.rebuildRaptor(id),
+    onSuccess: () => {
+      notify.success('Đã yêu cầu dựng lại trợ lý AI — chạy nền trong ít phút.');
+      qc.invalidateQueries({ queryKey: ['course-thumbnail', id] });
+    },
+    onError: (err) => notify.error(getApiErrorMessage(err, 'Dựng lại thất bại')),
+  });
+
   return (
     <div className="flex flex-col lg:flex-row gap-6 max-w-6xl mx-auto">
       {/* Editor sidebar */}
-      <aside className="lg:w-64 shrink-0">
+      <aside className="lg:w-64 shrink-0 lg:sticky lg:top-0 lg:self-start">
         <nav className="space-y-5">
+          <Link
+            href="/instructor/courses"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-mute hover:text-sky transition-colors"
+          >
+            <ArrowLeft size={16} />
+            <span>Danh sách khóa học</span>
+          </Link>
           {NAV_GROUPS.map((group) => (
             <div key={group.heading}>
               <p className="text-sm font-bold text-ink mb-2">{group.heading}</p>
@@ -139,6 +161,33 @@ export default function ManageCourseLayout({ children }: { children: React.React
                 {unpublishMutation.isPending ? 'Đang xử lý...' : 'Hủy xuất bản'}
               </button>
             )}
+          </div>
+        )}
+        {/* Trạng thái trợ lý AI (cây RAPTOR) */}
+        {raptorBuilding && (
+          <div className="flex items-center gap-3 rounded-card border border-sky bg-sky-soft px-4 py-3">
+            <Loader2 size={16} className="shrink-0 animate-spin text-sky" />
+            <p className="text-sm font-medium text-sky">
+              Trợ lý AI của khóa đang được chuẩn bị — tính năng hỏi-đáp & tóm tắt sẽ sẵn sàng sau ít phút.
+            </p>
+          </div>
+        )}
+        {raptorFailed && (
+          <div className="flex items-start gap-3 rounded-card border border-coral bg-coral/10 px-4 py-3">
+            <Sparkles size={16} className="mt-0.5 shrink-0 text-coral" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-coral">Trợ lý AI gặp lỗi khi dựng dữ liệu</p>
+              <p className="text-xs text-coral mt-0.5 opacity-80">
+                Khóa vẫn hoạt động bình thường. Bạn có thể dựng lại trợ lý AI.
+              </p>
+            </div>
+            <button
+              onClick={() => rebuildRaptorMutation.mutate()}
+              disabled={rebuildRaptorMutation.isPending}
+              className="shrink-0 rounded-lg bg-coral px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50 transition-colors"
+            >
+              {rebuildRaptorMutation.isPending ? 'Đang gửi...' : 'Dựng lại'}
+            </button>
           </div>
         )}
         <div className="rounded-card border border-hairline bg-surface-card p-6 sm:p-8">{children}</div>

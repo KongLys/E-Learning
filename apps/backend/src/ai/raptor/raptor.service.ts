@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { Prisma } from '@prisma/client';
-import { randomUUID } from 'crypto';
+import { randomUUID, createHash } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { GeminiService } from '../providers/gemini.service';
 import { ChunkScope } from '../vector/vector-store.service';
@@ -40,6 +40,10 @@ interface BuiltNode {
   childChunkIds: string[];
   childNodeIds: string[];
   tokenCount: number;
+  /** Hash nội dung nguồn — để so khớp node cũ và tái dùng khi không đổi. */
+  nodeHash: string;
+  /** true ⇒ node mới/đổi (cần re-summarize đã làm + cần re-embed + ghi DB). */
+  dirty: boolean;
 }
 
 interface LessonGroup {
@@ -144,8 +148,10 @@ export class RaptorService {
       { courseId },
       {
         jobId: `raptor-${courseId}`,
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 8_000 },
+        // attempts cao hơn + backoff 'custom' (phân loại lỗi ở processor): lỗi
+        // quota/hết token chờ lâu (phút), lỗi tạm thời (mạng) backoff mũ ngắn.
+        attempts: 5,
+        backoff: { type: 'custom' },
         removeOnComplete: { count: 100 },
         removeOnFail: { count: 100 },
       },
@@ -186,19 +192,54 @@ export class RaptorService {
     }
     await onProgress?.(25);
 
+    // Dựng cây TĂNG TIẾN: nạp node cũ, chỉ re-summarize/re-embed node có nội dung
+    // nguồn đổi; node không đổi giữ nguyên (id + embedding). So khớp theo "key"
+    // ổn định (level + lessonId/sectionId). Node không có key ổn định (fallback
+    // k-means) luôn coi là mới — chấp nhận dựng lại cho khóa thiếu TOC.
+    const existing = await this.prisma.raptorNode.findMany({
+      where: { courseId },
+      select: {
+        id: true,
+        level: true,
+        sectionId: true,
+        lessonId: true,
+        title: true,
+        content: true,
+        childChunkIds: true,
+        childNodeIds: true,
+        nodeHash: true,
+        tokenCount: true,
+      },
+    });
+    const exByKey = new Map<string, (typeof existing)[number]>();
+    for (const n of existing) {
+      const k = nodeKey(n.level, n.sectionId, n.lessonId);
+      if (k) exByKey.set(k, n);
+    }
+
     let tokenUsage = 0;
+    let reusedCount = 0;
     const allNodes: BuiltNode[] = [];
+    const dirty: BuiltNode[] = [];
 
     // ── Tầng 1: tóm tắt từng bài học ──
     const level1: BuiltNode[] = [];
     for (const g of groups) {
+      const hash = hashLeaf(g.pathLabel, g.chunkIds, g.contents);
+      const key = g.lessonId ? nodeKey(1, g.sectionId, g.lessonId) : null;
+      const prev = key ? exByKey.get(key) : undefined;
+      if (prev && prev.nodeHash === hash && prev.content) {
+        level1.push(reuseNode(prev));
+        reusedCount++;
+        continue;
+      }
       const { title, content, tokens } = await this.summarizeGroup(
         g.pathLabel,
         g.contents,
       );
       tokenUsage += tokens;
-      level1.push({
-        id: randomUUID(),
+      const node: BuiltNode = {
+        id: prev?.id ?? randomUUID(),
         courseId,
         sectionId: g.sectionId,
         lessonId: g.lessonId,
@@ -208,7 +249,11 @@ export class RaptorService {
         childChunkIds: g.chunkIds,
         childNodeIds: [],
         tokenCount: Math.ceil(content.length / 3.5),
-      });
+        nodeHash: hash,
+        dirty: true,
+      };
+      level1.push(node);
+      dirty.push(node);
     }
     allNodes.push(...level1);
     await onProgress?.(55);
@@ -228,6 +273,15 @@ export class RaptorService {
     const level2: BuiltNode[] = [];
     for (const [sectionId, nodes] of bySection) {
       const label = sectionLabel(nodes[0].title, nodes);
+      const childNodeIds = nodes.map((n) => n.id);
+      const hash = hashParent(`section:${label}`, nodes);
+      const key = nodeKey(2, sectionId, null)!;
+      const prev = exByKey.get(key);
+      if (prev && prev.nodeHash === hash && prev.content) {
+        level2.push(reuseNode(prev));
+        reusedCount++;
+        continue;
+      }
       let title: string | null;
       let content: string;
       if (nodes.length === 1) {
@@ -243,8 +297,8 @@ export class RaptorService {
         content = res.content;
         tokenUsage += res.tokens;
       }
-      level2.push({
-        id: randomUUID(),
+      const node: BuiltNode = {
+        id: prev?.id ?? randomUUID(),
         courseId,
         sectionId,
         lessonId: null,
@@ -252,9 +306,13 @@ export class RaptorService {
         title,
         content,
         childChunkIds: [],
-        childNodeIds: nodes.map((n) => n.id),
+        childNodeIds,
         tokenCount: Math.ceil(content.length / 3.5),
-      });
+        nodeHash: hash,
+        dirty: true,
+      };
+      level2.push(node);
+      dirty.push(node);
     }
     allNodes.push(...level2);
     await onProgress?.(70);
@@ -262,48 +320,67 @@ export class RaptorService {
     // ── Tầng 3: gốc khóa (gom node tầng 2 + node tầng 1 mồ côi) ──
     const rootChildren = [...level2, ...looseLevel1];
     if (rootChildren.length > 0) {
-      let title: string | null = course.title;
-      let content: string;
-      if (rootChildren.length === 1) {
-        content = rootChildren[0].content;
+      const childNodeIds = rootChildren.map((n) => n.id);
+      const hash = hashParent(`root:${course.title}`, rootChildren);
+      const key = nodeKey(3, null, null)!;
+      const prev = exByKey.get(key);
+      if (prev && prev.nodeHash === hash && prev.content) {
+        allNodes.push(reuseNode(prev));
+        reusedCount++;
       } else {
-        const res = await this.summarizeGroup(
-          course.title,
-          rootChildren.map((n) => n.content),
-        );
-        title = res.title ?? course.title;
-        content = res.content;
-        tokenUsage += res.tokens;
+        let title: string | null = course.title;
+        let content: string;
+        if (rootChildren.length === 1) {
+          content = rootChildren[0].content;
+        } else {
+          const res = await this.summarizeGroup(
+            course.title,
+            rootChildren.map((n) => n.content),
+          );
+          title = res.title ?? course.title;
+          content = res.content;
+          tokenUsage += res.tokens;
+        }
+        const node: BuiltNode = {
+          id: prev?.id ?? randomUUID(),
+          courseId,
+          sectionId: null,
+          lessonId: null,
+          level: 3,
+          title,
+          content,
+          childChunkIds: [],
+          childNodeIds,
+          tokenCount: Math.ceil(content.length / 3.5),
+          nodeHash: hash,
+          dirty: true,
+        };
+        allNodes.push(node);
+        dirty.push(node);
       }
-      allNodes.push({
-        id: randomUUID(),
-        courseId,
-        sectionId: null,
-        lessonId: null,
-        level: 3,
-        title,
-        content,
-        childChunkIds: [],
-        childNodeIds: rootChildren.map((n) => n.id),
-        tokenCount: Math.ceil(content.length / 3.5),
-      });
     }
     await onProgress?.(80);
 
-    // ── Embed toàn bộ node + lưu (swap nguyên tử) ──
-    const embeddings = await this.gemini.embedBatch(
-      allNodes.map((n) => n.content),
-    );
-    await this.persistNodes(courseId, allNodes, embeddings);
+    // ── Embed CHỈ node mới/đổi + ghi diff (xóa node thừa, upsert node dirty) ──
+    const embeddings = await this.gemini.embedBatch(dirty.map((n) => n.content));
+    await this.persistNodes(courseId, allNodes, dirty, embeddings);
 
+    // sourceHash giữ làm fast-path "có gì đổi không" ở ensureReady.
+    const srcHash = await this.sourceHash(courseId);
     await this.prisma.courseRaptorTree.update({
       where: { courseId },
-      data: { status: 'ready', tokenUsage, errorMsg: null },
+      data: {
+        status: 'ready',
+        tokenUsage,
+        errorMsg: null,
+        ...(srcHash ? { sourceHash: srcHash } : {}),
+      },
     });
     await onProgress?.(100);
     this.logger.log(
-      `RAPTOR ready for course ${courseId}: ${allNodes.length} nodes (` +
-        `${level1.length} bài / ${level2.length} phần), ~${tokenUsage} tokens`,
+      `RAPTOR ready for course ${courseId}: ${allNodes.length} nodes ` +
+        `(${level1.length} bài / ${level2.length} phần), ${dirty.length} đổi / ` +
+        `${reusedCount} tái dùng, ~${tokenUsage} tokens`,
     );
   }
 
@@ -729,32 +806,61 @@ export class RaptorService {
     };
   }
 
-  /** Xóa node cũ + chèn node mới trong một transaction (tránh đọc dở dang). */
+  /**
+   * Ghi cây theo DIFF trong một transaction (tăng tiến):
+   *  - Xóa node có id KHÔNG còn trong tập mong muốn (bài/phần bị xóa, node fallback cũ).
+   *  - Upsert (INSERT … ON CONFLICT id) các node mới/đổi kèm embedding mới.
+   *  - Node tái dùng: bỏ qua (giữ nguyên hàng + embedding cũ).
+   */
   private async persistNodes(
     courseId: string,
-    nodes: BuiltNode[],
+    desired: BuiltNode[],
+    dirty: BuiltNode[],
     embeddings: number[][],
   ): Promise<void> {
+    const desiredIds = desired.map((n) => n.id);
+    const embById = new Map<string, number[]>();
+    dirty.forEach((n, i) => embById.set(n.id, embeddings[i] ?? []));
+
     await this.prisma.$transaction(async (tx) => {
-      await tx.raptorNode.deleteMany({ where: { courseId } });
+      // Xóa node thừa (không còn trong cây mới). desiredIds luôn ≥ 1 (có ít nhất
+      // 1 node tầng 1) nên notIn an toàn; vẫn guard rỗng cho chắc.
+      if (desiredIds.length === 0) {
+        await tx.raptorNode.deleteMany({ where: { courseId } });
+      } else {
+        await tx.raptorNode.deleteMany({
+          where: { courseId, id: { notIn: desiredIds } },
+        });
+      }
+
       const BATCH = 50;
-      for (let i = 0; i < nodes.length; i += BATCH) {
-        const slice = nodes.slice(i, i + BATCH);
-        const values = slice.map((n, j) => {
-          const emb = embeddings[i + j] ?? [];
-          const vec = `[${emb.join(',')}]`;
+      for (let i = 0; i < dirty.length; i += BATCH) {
+        const slice = dirty.slice(i, i + BATCH);
+        const values = slice.map((n) => {
+          const vec = `[${(embById.get(n.id) ?? []).join(',')}]`;
           return Prisma.sql`(
             ${n.id}, ${n.courseId}, ${n.sectionId}, ${n.lessonId}, ${n.level},
             ${n.title}, ${n.content},
             ${sqlTextArray(n.childChunkIds)}, ${sqlTextArray(n.childNodeIds)},
-            ${n.tokenCount}, '{}'::jsonb, ${vec}::vector
+            ${n.tokenCount}, ${n.nodeHash}, '{}'::jsonb, ${vec}::vector
           )`;
         });
         await tx.$executeRaw(Prisma.sql`
           INSERT INTO raptor_nodes
             (id, course_id, section_id, lesson_id, level, title, content,
-             child_chunk_ids, child_node_ids, token_count, metadata, embedding)
+             child_chunk_ids, child_node_ids, token_count, node_hash, metadata, embedding)
           VALUES ${Prisma.join(values)}
+          ON CONFLICT (id) DO UPDATE SET
+            section_id      = EXCLUDED.section_id,
+            lesson_id       = EXCLUDED.lesson_id,
+            level           = EXCLUDED.level,
+            title           = EXCLUDED.title,
+            content         = EXCLUDED.content,
+            child_chunk_ids = EXCLUDED.child_chunk_ids,
+            child_node_ids  = EXCLUDED.child_node_ids,
+            token_count     = EXCLUDED.token_count,
+            node_hash       = EXCLUDED.node_hash,
+            embedding       = EXCLUDED.embedding
         `);
       }
     });
@@ -762,6 +868,71 @@ export class RaptorService {
 }
 
 // ─── Pure helpers ───────────────────────────────────────────────────────────────
+
+/** Key ổn định để so khớp node giữa các lần dựng (tầng + section/lesson). */
+function nodeKey(
+  level: number,
+  sectionId: string | null,
+  lessonId: string | null,
+): string | null {
+  if (level === 1) return lessonId ? `1:${lessonId}` : null;
+  if (level === 2) return sectionId ? `2:${sectionId}` : null;
+  if (level === 3) return '3:';
+  return null;
+}
+
+/** Hash node lá (tầng 1): nhãn đường dẫn + danh sách chunk + nội dung. */
+function hashLeaf(
+  pathLabel: string,
+  chunkIds: string[],
+  contents: string[],
+): string {
+  const h = createHash('sha1');
+  h.update(pathLabel);
+  h.update(' ');
+  h.update(chunkIds.join('|'));
+  h.update(' ');
+  h.update(contents.join(' '));
+  return h.digest('hex');
+}
+
+/** Hash node tổng (tầng 2/3): nhãn + hash các con (đổi con ⇒ đổi cha). */
+function hashParent(label: string, children: BuiltNode[]): string {
+  const h = createHash('sha1');
+  h.update(label);
+  h.update(' ');
+  h.update(children.map((c) => c.nodeHash).join('|'));
+  return h.digest('hex');
+}
+
+/** Dựng BuiltNode "tái dùng" từ node DB cũ (không re-summarize/re-embed). */
+function reuseNode(prev: {
+  id: string;
+  level: number;
+  sectionId: string | null;
+  lessonId: string | null;
+  title: string | null;
+  content: string;
+  childChunkIds: string[];
+  childNodeIds: string[];
+  nodeHash: string | null;
+  tokenCount: number;
+}): BuiltNode {
+  return {
+    id: prev.id,
+    courseId: '',
+    sectionId: prev.sectionId,
+    lessonId: prev.lessonId,
+    level: prev.level,
+    title: prev.title,
+    content: prev.content,
+    childChunkIds: prev.childChunkIds,
+    childNodeIds: prev.childNodeIds,
+    tokenCount: prev.tokenCount,
+    nodeHash: prev.nodeHash ?? '',
+    dirty: false,
+  };
+}
 
 function sqlTextArray(ids: string[]): Prisma.Sql {
   if (ids.length === 0) return Prisma.sql`ARRAY[]::text[]`;

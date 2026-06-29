@@ -137,4 +137,14 @@ export class CourseController {
   ) {
     return this.courseService.getCourseForManage(id, user.userId, user.role);
   }
+
+  /** Dựng lại cây RAPTOR khi build trước lỗi (chủ khóa/admin). */
+  @HttpCode(202)
+  @Post('courses/:id/raptor/rebuild')
+  rebuildRaptor(
+    @CurrentUser() user: { userId: string; role: string },
+    @Param('id') id: string,
+  ) {
+    return this.courseService.rebuildRaptor(id, user.userId, user.role);
+  }
 }

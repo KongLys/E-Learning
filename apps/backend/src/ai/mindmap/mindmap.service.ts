@@ -378,28 +378,53 @@ export class MindmapService {
 
       const { prompt, chars } = buildBatchPrompt(batch);
       tokenUsage += Math.ceil(chars / 3.5);
-      let parsed: Record<number, GroupSummary> = {};
+      const { parsed, tokens } = await this.summarizeBatch(prompt);
+      tokenUsage += tokens;
+
+      for (const { index, group } of batch) {
+        const local = index - batch[0].index;
+        const s = parsed[local];
+        // Gemini đôi khi "trôi" sang ngôn ngữ khác (hay gặp tiếng Trung) cho cả
+        // batch dù đã yêu cầu tiếng Việt → loại bỏ tóm tắt dính CJK, dùng heading.
+        summaries[index] = s && !summaryHasCJK(s) ? s : fallbackSummary(group);
+      }
+    }
+
+    return { summaries, tokenUsage };
+  }
+
+  /**
+   * Gọi LLM cho 1 batch, retry tối đa 1 lần nếu kết quả lẫn ký tự CJK
+   * (tiếng Trung/Nhật/Hàn) — dấu hiệu model bỏ qua yêu cầu tiếng Việt.
+   */
+  private async summarizeBatch(
+    prompt: string,
+  ): Promise<{ parsed: Record<number, GroupSummary>; tokens: number }> {
+    let parsed: Record<number, GroupSummary> = {};
+    let tokens = 0;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const p = attempt === 0 ? prompt : `${prompt}\n\n${RETRY_VI_REMINDER}`;
       try {
-        const raw = await this.gemini.generate(prompt, {
+        const raw = await this.gemini.generate(p, {
           temperature: 0.2,
           maxOutputTokens: 2048,
           systemInstruction: SUMMARY_SYSTEM,
         });
-        tokenUsage += Math.ceil(raw.length / 3.5);
+        tokens += Math.ceil(raw.length / 3.5);
         parsed = parseSummaryArray(raw);
       } catch (err) {
         this.logger.warn(
           `Summary batch failed, using heading fallback: ${(err as Error).message}`,
         );
+        return { parsed: {}, tokens };
       }
-
-      for (const { index, group } of batch) {
-        const local = index - batch[0].index;
-        summaries[index] = parsed[local] ?? fallbackSummary(group);
-      }
+      // Đạt yêu cầu tiếng Việt → dừng; còn CJK thì thử lại lần cuối.
+      if (!Object.values(parsed).some(summaryHasCJK)) break;
+      this.logger.warn(
+        'Mindmap summary trả về ký tự CJK (không phải tiếng Việt) — retry batch',
+      );
     }
-
-    return { summaries, tokenUsage };
+    return { parsed, tokens };
   }
 }
 
@@ -407,17 +432,42 @@ export class MindmapService {
 
 const SUMMARY_SYSTEM =
   'Bạn là trợ lý tạo sơ đồ tư duy từ tài liệu học (lĩnh vực CNTT). ' +
-  'Tóm tắt mỗi phần thành một node ngắn gọn, giữ nguyên thuật ngữ kỹ thuật, bằng tiếng Việt. ' +
+  'Tóm tắt mỗi phần thành một node ngắn gọn. ' +
+  'BẮT BUỘC: toàn bộ văn bản đầu ra (title, summary, main_points, keywords) phải VIẾT BẰNG TIẾNG VIỆT. ' +
+  'Nếu tài liệu nguồn ở ngôn ngữ khác (vd tiếng Anh), hãy DỊCH nội dung sang tiếng Việt; ' +
+  'chỉ giữ nguyên thuật ngữ kỹ thuật/tên riêng/định danh code không có từ tương đương (vd "array", "pointer", "REST API"). ' +
+  'Tuyệt đối không viết câu/cụm mô tả bằng tiếng Anh. ' +
   'Chỉ trả về DUY NHẤT một mảng JSON hợp lệ, không kèm giải thích hay markdown. ' +
   UNTRUSTED_DATA_RULE;
+
+/** Nhắc nhở thêm khi retry vì model đã trả về ngôn ngữ khác (vd tiếng Trung). */
+const RETRY_VI_REMINDER =
+  'LƯU Ý QUAN TRỌNG: Lần trước bạn đã trả lời SAI ngôn ngữ. ' +
+  'Bắt buộc viết TOÀN BỘ title, summary, main_points, keywords BẰNG TIẾNG VIỆT. ' +
+  'TUYỆT ĐỐI KHÔNG dùng tiếng Trung/Nhật/Hàn hay bất kỳ ngôn ngữ nào khác ngoài tiếng Việt ' +
+  '(chỉ giữ nguyên thuật ngữ kỹ thuật/tên riêng bằng chữ Latin).';
+
+/** Han / Hiragana / Katakana / Hangul → dấu hiệu model trôi sang CJK. */
+const CJK_RE =
+  /[぀-ヿ㐀-䶿一-鿿豈-﫿가-힯]/;
+
+/** True nếu bất kỳ trường nào của tóm tắt chứa ký tự CJK. */
+function summaryHasCJK(s: GroupSummary): boolean {
+  return (
+    (!!s.title && CJK_RE.test(s.title)) ||
+    (!!s.summary && CJK_RE.test(s.summary)) ||
+    (s.main_points?.some((p) => CJK_RE.test(p)) ?? false) ||
+    (s.keywords?.some((k) => CJK_RE.test(k)) ?? false)
+  );
+}
 
 function buildBatchPrompt(batch: { index: number; group: ContentGroup }[]): {
   prompt: string;
   chars: number;
 } {
   const parts: string[] = [
-    'Tóm tắt các phần dưới đây. Trả về mảng JSON, mỗi phần tử đúng dạng:',
-    '{"id": <số>, "title": "<tiêu đề ≤8 từ>", "summary": "<≤25 từ>", "main_points": ["<≤5 ý, mỗi ý ≤12 từ>"], "keywords": ["<≤6 từ khóa>"]}',
+    'Tóm tắt các phần dưới đây BẰNG TIẾNG VIỆT (dịch sang tiếng Việt nếu nguồn là ngôn ngữ khác). Trả về mảng JSON, mỗi phần tử đúng dạng:',
+    '{"id": <số>, "title": "<tiêu đề tiếng Việt ≤8 từ>", "summary": "<tiếng Việt ≤25 từ>", "main_points": ["<tiếng Việt, ≤5 ý, mỗi ý ≤12 từ>"], "keywords": ["<≤6 từ khóa>"]}',
     '',
   ];
   let chars = 0;

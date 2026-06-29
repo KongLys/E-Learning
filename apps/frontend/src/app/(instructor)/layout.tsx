@@ -205,7 +205,7 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
   if (!user || (user.role !== 'instructor' && user.role !== 'admin')) return null;
 
   return (
-    <div className="flex min-h-screen bg-canvas">
+    <div className="flex h-screen overflow-hidden bg-canvas">
       <InstructorSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-12 bg-surface-card border-b border-hairline flex items-center justify-between px-4 sm:px-6 shrink-0">

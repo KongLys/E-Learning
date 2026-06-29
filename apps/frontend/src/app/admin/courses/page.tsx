@@ -13,6 +13,7 @@ import type { CourseSummary, AdminCourseDetail, SectionSummary, LessonSummary } 
 import {
   FileText, PenLine, X, ChevronDown, ChevronLeft, ChevronRight,
   Video, File as FileIcon, CheckCircle, Clock, AlertCircle, XCircle,
+  HelpCircle, Circle,
 } from 'lucide-react';
 
 type Tab = 'pending' | 'all';
@@ -110,6 +111,84 @@ function AdminDocViewer({ lesson }: { lesson: LessonSummary }) {
   );
 }
 
+// ─── Quiz viewer (questions + correct answers) ────────────────────────────────
+
+interface AdminQuizOption { id: string; content: string; isCorrect: boolean }
+interface AdminQuizQuestion {
+  id: string;
+  content: string;
+  questionType?: string;
+  points?: number;
+  explanation?: string | null;
+  options: AdminQuizOption[];
+}
+interface AdminQuizData {
+  passingScore?: number;
+  questions: AdminQuizQuestion[];
+}
+
+const QTYPE_LABEL: Record<string, string> = {
+  single: 'Chọn một',
+  multiple: 'Chọn nhiều',
+  true_false: 'Đúng / Sai',
+};
+
+function AdminQuizViewer({ lessonId }: { lessonId: string }) {
+  const { data, isLoading } = useQuery<AdminQuizData>({
+    queryKey: ['admin-lesson-quiz', lessonId],
+    queryFn: async () => {
+      const { apiClient } = await import('@/lib/api/axios');
+      const res = await apiClient.get(`/lessons/${lessonId}/quiz`);
+      return res.data as AdminQuizData;
+    },
+  });
+
+  if (isLoading) return <p className="text-sm text-gray-400">Đang tải bài kiểm tra…</p>;
+  if (!data || (data.questions?.length ?? 0) === 0) return <p className="text-sm text-gray-400">Chưa có câu hỏi</p>;
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-gray-500">
+        Điểm đạt: <span className="font-medium text-gray-700">{data.passingScore ?? 0}%</span>
+        <span className="mx-1.5">·</span>
+        {data.questions.length} câu hỏi
+      </p>
+      <ol className="space-y-3">
+        {data.questions.map((q, qi) => (
+          <li key={q.id} className="border rounded-lg bg-white p-3 space-y-2">
+            <div className="flex items-start gap-2 text-sm">
+              <span className="font-medium text-gray-500 flex-shrink-0">{qi + 1}.</span>
+              <div className="flex-1">
+                <span className="font-medium text-gray-800">{q.content}</span>
+                <span className="ml-2 text-xs text-gray-400">
+                  ({QTYPE_LABEL[q.questionType ?? 'single'] ?? q.questionType} · {q.points ?? 1}đ)
+                </span>
+              </div>
+            </div>
+            <ul className="space-y-1 pl-6">
+              {q.options.map((o) => (
+                <li
+                  key={o.id}
+                  className={`flex items-center gap-1.5 text-sm ${o.isCorrect ? 'text-green-700 font-medium' : 'text-gray-600'}`}
+                >
+                  {o.isCorrect ? <CheckCircle size={13} className="flex-shrink-0" /> : <Circle size={13} className="flex-shrink-0 text-gray-300" />}
+                  <span>{o.content}</span>
+                </li>
+              ))}
+            </ul>
+            {q.explanation && (
+              <div className="flex items-start gap-1.5 text-xs text-blue-700 bg-blue-50 rounded p-2 ml-6">
+                <HelpCircle size={12} className="mt-0.5 flex-shrink-0" />
+                <span>{q.explanation}</span>
+              </div>
+            )}
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 // ─── Lesson row (expandable) ─────────────────────────────────────────────────
 
 function LessonRow({
@@ -163,6 +242,7 @@ function LessonRow({
           )}
           {lesson.type === 'video' && <AdminVideoPlayer lessonId={lesson.id} />}
           {lesson.type === 'document' && <AdminDocViewer lesson={lesson} />}
+          {lesson.type === 'quiz' && <AdminQuizViewer lessonId={lesson.id} />}
           {needsAction && onApprove && (
             <div className="flex gap-2 pt-1 border-t border-gray-200">
               <button

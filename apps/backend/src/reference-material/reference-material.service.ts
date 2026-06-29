@@ -9,6 +9,7 @@ import { createReadStream } from 'fs';
 import { unlink } from 'fs/promises';
 import type { Express } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
+import { COURSE_ACCESS_STATUSES } from '../common/enrollment-access.const';
 import { StorageService } from '../storage/storage.service';
 import { CreateReferenceMaterialDto } from './dto/create-reference-material.dto';
 
@@ -250,7 +251,7 @@ export class ReferenceMaterialService {
     if (!course) throw new NotFoundException('Course not found');
     if (userRole === 'admin' || course.instructorId === userId) return;
     const enrollment = await this.prisma.enrollment.findFirst({
-      where: { studentId: userId, courseId, status: 'active' },
+      where: { studentId: userId, courseId, status: { in: COURSE_ACCESS_STATUSES } },
     });
     if (!enrollment)
       throw new ForbiddenException('Not enrolled in this course');

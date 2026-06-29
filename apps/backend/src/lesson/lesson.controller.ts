@@ -24,7 +24,7 @@ import { CreateQuestionDto } from './dto/create-question.dto';
 import { DocumentConfigDto } from './dto/document-config.dto';
 import { VideoConfigDto } from './dto/video-config.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { Public } from '../auth/decorators/public.decorator';
+import { OptionalAuth } from '../auth/decorators/optional-auth.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 
 // Disk-backed multer storage: large uploads stream to a temp file instead of
@@ -184,7 +184,7 @@ export class LessonController {
     return this.quizService.configQuiz(id, u.userId, u.role, dto);
   }
 
-  @Public()
+  @OptionalAuth()
   @Get('lessons/:id/quiz')
   getQuiz(
     @CurrentUser() u: { userId: string; role: string },

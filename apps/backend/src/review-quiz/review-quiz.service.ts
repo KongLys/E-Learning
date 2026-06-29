@@ -6,6 +6,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { COURSE_ACCESS_STATUSES } from '../common/enrollment-access.const';
 import { QuizGenerationService } from '../ai/quiz/quiz-generation.service';
 import { RaptorService } from '../ai/raptor/raptor.service';
 import { SubmitReviewAttemptDto } from './dto/submit-review-attempt.dto';
@@ -182,7 +183,7 @@ export class ReviewQuizService {
     if (course.instructorId === userId || userRole === 'admin') return;
 
     const enrollment = await this.prisma.enrollment.findFirst({
-      where: { studentId: userId, courseId, status: 'active' },
+      where: { studentId: userId, courseId, status: { in: COURSE_ACCESS_STATUSES } },
     });
     if (!enrollment) {
       throw new ForbiddenException('Not enrolled in this course');
@@ -215,7 +216,7 @@ export class ReviewQuizService {
     if (isOwner) return lesson;
 
     const enrollment = await this.prisma.enrollment.findFirst({
-      where: { studentId: userId, courseId: course.id, status: 'active' },
+      where: { studentId: userId, courseId: course.id, status: { in: COURSE_ACCESS_STATUSES } },
     });
     if (!enrollment) {
       throw new ForbiddenException('Not enrolled in this course');

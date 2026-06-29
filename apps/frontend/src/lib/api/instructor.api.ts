@@ -12,6 +12,7 @@ export const instructorApi = {
   publishCourse: (id: string) => apiClient.patch(`/courses/${id}/publish`),
   submitCourse: (id: string) => apiClient.post(`/courses/${id}/submit`),
   unpublishCourse: (id: string) => apiClient.post(`/courses/${id}/unpublish`),
+  rebuildRaptor: (id: string) => apiClient.post(`/courses/${id}/raptor/rebuild`),
   deleteCourse: (id: string) => apiClient.delete(`/courses/${id}`),
   getCourseById: (id: string) => apiClient.get(`/courses/${id}/manage`),
   // Bật/tắt bài kiểm tra cuối khóa (mặc định bật)

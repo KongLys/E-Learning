@@ -18,7 +18,7 @@ export class QuizOptionDto {
   isCorrect: boolean;
 
   @IsInt()
-  @Min(1)
+  @Min(0)
   orderIndex: number;
 }
 
@@ -30,7 +30,7 @@ export class CreateQuestionDto {
   questionType: 'single' | 'multiple' | 'true_false';
 
   @IsInt()
-  @Min(1)
+  @Min(0)
   orderIndex: number;
 
   @IsOptional()

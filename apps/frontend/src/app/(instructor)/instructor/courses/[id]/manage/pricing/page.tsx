@@ -49,30 +49,41 @@ function PricingForm({ courseId, initial }: { courseId: string; initial: CourseP
         </p>
       </header>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 max-w-lg">
+      <div className="grid grid-cols-1 gap-4 max-w-lg">
         <div>
           <label className="block text-sm font-medium mb-1">Giá (VND)</label>
           <input
-            type="number"
-            min={0}
-            value={price}
-            onChange={(e) => setPrice(Number(e.target.value))}
+            type="text"
+            inputMode="numeric"
+            value={price === 0 ? '' : String(price)}
+            onChange={(e) => {
+              const digits = e.target.value.replace(/\D/g, '');
+              setPrice(digits === '' ? 0 : Number(digits));
+            }}
+            placeholder="0"
             className={inputClass}
           />
           <p className="mt-1 text-xs text-muted">{price > 0 ? formatVND(price) : 'Miễn phí'}</p>
         </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Giá khuyến mãi (VND)</label>
-          <input
-            type="number"
-            min={0}
-            value={discountPrice}
-            onChange={(e) => setDiscountPrice(e.target.value === '' ? '' : Number(e.target.value))}
-            className={inputClass}
-            placeholder="Tùy chọn"
-          />
-          {invalidDiscount && <p className="mt-1 text-xs text-semantic-error">Giá khuyến mãi phải nhỏ hơn giá gốc</p>}
-        </div>
+        {/* Tạm ẩn ô Giá khuyến mãi — chưa nối vào luồng hiển thị/thanh toán cho học viên.
+            Bật lại bằng cách đổi `false` thành `true`. */}
+        {false && (
+          <div>
+            <label className="block text-sm font-medium mb-1">Giá khuyến mãi (VND)</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={discountPrice === '' ? '' : String(discountPrice)}
+              onChange={(e) => {
+                const digits = e.target.value.replace(/\D/g, '');
+                setDiscountPrice(digits === '' ? '' : Number(digits));
+              }}
+              className={inputClass}
+              placeholder="Tùy chọn"
+            />
+            {invalidDiscount && <p className="mt-1 text-xs text-semantic-error">Giá khuyến mãi phải nhỏ hơn giá gốc</p>}
+          </div>
+        )}
       </div>
 
       <div className="flex items-center gap-3 pt-2">

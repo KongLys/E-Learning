@@ -172,4 +172,33 @@ export class NotificationListener {
     );
     this.gateway.pushToUser(event.ownerId, notif);
   }
+
+  /**
+   * Cây RAPTOR (trợ lý AI khóa học) dựng lỗi hẳn sau khi đã hết số lần retry tự
+   * động. Khóa vẫn xuất bản (không chặn người học) nhưng báo giảng viên + admin
+   * để vào dựng lại thủ công.
+   */
+  @OnEvent('raptor.build.failed')
+  async onRaptorBuildFailed(event: { courseId: string; message: string }) {
+    const course = await this.prisma.course.findUnique({
+      where: { id: event.courseId },
+      select: { title: true, instructorId: true },
+    });
+    if (!course) return;
+    const admins = await this.prisma.user.findMany({
+      where: { role: 'admin' },
+      select: { id: true },
+    });
+    const targets = [...new Set([course.instructorId, ...admins.map((a) => a.id)])];
+    for (const userId of targets) {
+      const notif = await this.notifService.create(
+        userId,
+        'raptor_failed',
+        'Trợ lý AI khóa học gặp lỗi',
+        `Hệ thống chưa dựng được dữ liệu AI cho khóa "${course.title}". Khóa vẫn xuất bản bình thường; vui lòng vào trang quản lý khóa để dựng lại.`,
+        `/instructor/courses/${event.courseId}`,
+      );
+      this.gateway.pushToUser(userId, notif);
+    }
+  }
 }

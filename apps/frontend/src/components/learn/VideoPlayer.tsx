@@ -43,6 +43,12 @@ export function VideoPlayer({ lessonId, videoUrl, initialPositionSec = 0, cues =
 
   useProgress(lessonId, () => videoRef.current?.currentTime ?? 0);
 
+  // Vị trí seek ban đầu đọc qua ref để prop đổi (do progress refetch) KHÔNG
+  // kích hoạt lại effect nạp nguồn — tránh reload `video.src` làm dừng phát
+  // giữa chừng mà không bắn sự kiện `pause` (lệch UI isPlaying).
+  const initialPosRef = useRef(initialPositionSec);
+  useEffect(() => { initialPosRef.current = initialPositionSec; }, [initialPositionSec]);
+
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !videoUrl) return;
@@ -56,25 +62,28 @@ export function VideoPlayer({ lessonId, videoUrl, initialPositionSec = 0, cues =
       hls.loadSource(videoUrl);
       hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        if (initialPositionSec > 0) video.currentTime = initialPositionSec;
+        if (initialPosRef.current > 0) video.currentTime = initialPosRef.current;
       });
     } else if (isHls && video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = videoUrl;
       video.addEventListener('loadedmetadata', () => {
-        if (initialPositionSec > 0) video.currentTime = initialPositionSec;
+        if (initialPosRef.current > 0) video.currentTime = initialPosRef.current;
       }, { once: true });
     } else {
       // Plain MP4/WebM — native video avoids CORS issues with presigned URLs
       video.src = videoUrl;
-      if (initialPositionSec > 0) {
-        video.addEventListener('loadedmetadata', () => {
-          video.currentTime = initialPositionSec;
-        }, { once: true });
-      }
+      video.addEventListener('loadedmetadata', () => {
+        if (initialPosRef.current > 0) video.currentTime = initialPosRef.current;
+      }, { once: true });
     }
 
     return () => { hls?.destroy(); };
-  }, [videoUrl, initialPositionSec]);
+  }, [videoUrl]);
+
+  // Giữ callback mới nhất trong ref để effect listener gắn 1 lần (deps []),
+  // không bị tháo/gắn lại mỗi khi parent re-render (callback đổi identity).
+  const cbRef = useRef({ onTimeUpdate, onProgress, onEnded });
+  useEffect(() => { cbRef.current = { onTimeUpdate, onProgress, onEnded }; });
 
   useEffect(() => {
     const video = videoRef.current;
@@ -82,13 +91,13 @@ export function VideoPlayer({ lessonId, videoUrl, initialPositionSec = 0, cues =
 
     const onTimeUpd = () => {
       setCurrentTime(video.currentTime);
-      onTimeUpdate?.(video.currentTime);
-      onProgress?.(video.currentTime, video.duration || 0);
+      cbRef.current.onTimeUpdate?.(video.currentTime);
+      cbRef.current.onProgress?.(video.currentTime, video.duration || 0);
     };
     const onDuration = () => setDuration(video.duration);
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
-    const onEnd = () => onEnded?.();
+    const onEnd = () => cbRef.current.onEnded?.();
 
     video.addEventListener('timeupdate', onTimeUpd);
     video.addEventListener('durationchange', onDuration);
@@ -99,7 +108,7 @@ export function VideoPlayer({ lessonId, videoUrl, initialPositionSec = 0, cues =
     const handleKey = (e: KeyboardEvent) => {
       if (e.code === 'Space' && e.target === document.body) {
         e.preventDefault();
-        if (isPlaying) video.pause(); else video.play();
+        if (video.paused) video.play(); else video.pause();
       }
       if (e.code === 'ArrowLeft') video.currentTime = Math.max(0, video.currentTime - 10);
       if (e.code === 'ArrowRight') video.currentTime = Math.min(video.duration, video.currentTime + 10);
@@ -114,7 +123,7 @@ export function VideoPlayer({ lessonId, videoUrl, initialPositionSec = 0, cues =
       video.removeEventListener('ended', onEnd);
       document.removeEventListener('keydown', handleKey);
     };
-  }, [isPlaying, onTimeUpdate, onProgress, onEnded]);
+  }, []);
 
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60);

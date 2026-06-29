@@ -5,6 +5,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { COURSE_ACCESS_STATUSES } from '../common/enrollment-access.const';
 import { ProgressService } from '../progress/progress.service';
 import { SubmitAttemptDto } from './dto/submit-attempt.dto';
 
@@ -29,7 +30,7 @@ export class QuizAttemptService {
       where: {
         studentId,
         courseId: quiz.lesson.section.courseId,
-        status: 'active',
+        status: { in: COURSE_ACCESS_STATUSES },
       },
     });
     if (!enrollment)

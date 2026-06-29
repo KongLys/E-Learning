@@ -8,6 +8,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { OnEvent } from '@nestjs/event-emitter';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
+import { COURSE_ACCESS_STATUSES } from '../common/enrollment-access.const';
 import { StorageService } from '../storage/storage.service';
 import { CreateLessonDto } from './dto/create-lesson.dto';
 import { UpdateLessonDto } from './dto/update-lesson.dto';
@@ -244,7 +245,7 @@ export class LessonService {
         videoAsset: true,
         documentAsset: true,
         quizLesson: true,
-        section: { select: { course: { select: { id: true, title: true, instructorId: true } } } },
+        section: { select: { course: { select: { id: true, title: true, instructorId: true, status: true } } } },
       },
     });
     if (!lesson) throw new NotFoundException('Lesson not found');
@@ -264,7 +265,7 @@ export class LessonService {
           where: {
             studentId: userId,
             courseId: section!.courseId,
-            status: 'active',
+            status: { in: COURSE_ACCESS_STATUSES },
           },
         });
         if (!enrolled)
@@ -329,7 +330,7 @@ export class LessonService {
 
   async isEnrolled(userId: string, courseId: string): Promise<boolean> {
     const enrollment = await this.prisma.enrollment.findFirst({
-      where: { studentId: userId, courseId, status: 'active' },
+      where: { studentId: userId, courseId, status: { in: COURSE_ACCESS_STATUSES } },
     });
     return !!enrollment;
   }

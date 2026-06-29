@@ -168,6 +168,29 @@ export class LessonIndexProcessor extends WorkerHost {
             data: { chunkCount: 0 },
           });
         }
+        // Video đã upload nhưng chưa có script (transcribe lỗi/chưa chạy): KHÔNG
+        // auto-approve — nội dung video chưa từng được kiểm duyệt. Để bài ở
+        // 'pending'; submitForReview sẽ gọi lại API transcribe để lấy script rồi
+        // index + kiểm duyệt lại. Nếu auto-approve ở đây, script về sau sẽ được
+        // vector hóa mà bỏ qua kiểm duyệt.
+        const videoPendingScript =
+          !!lesson.videoAsset?.videoUrl &&
+          lesson.videoAsset.transcriptStatus !== 'ready';
+
+        // Bài thực sự không có nội dung index được → không có gì để kiểm duyệt.
+        // Đưa về trạng thái terminal 'approved' để không kẹt vĩnh viễn ở 'pending'
+        // (nếu không, giảng viên sẽ bị chặn gửi duyệt nhưng admin không thấy bài).
+        if (lesson.moderationStatus === 'pending' && !videoPendingScript) {
+          await this.prisma.lesson.update({
+            where: { id: lessonId },
+            data: {
+              moderationStatus: 'approved',
+              moderationLabel: 'it',
+              moderationReason: null,
+              moderatedAt: new Date(),
+            },
+          });
+        }
         this.logger.log(
           `Lesson ${lessonId} has no indexable content — cleared chunks only`,
         );

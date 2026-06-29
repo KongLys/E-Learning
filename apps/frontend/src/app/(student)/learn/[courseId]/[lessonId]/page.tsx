@@ -18,7 +18,7 @@ import { SafeHtml } from '@/components/common/SafeHtml';
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { Award, Check, ChevronDown, ChevronLeft, Clock, FileText, Film, Headphones, Loader2, Menu, MessageSquare, Network, Sparkles } from 'lucide-react';
+import { AlertTriangle, Award, Check, ChevronDown, ChevronLeft, Clock, FileText, Film, Headphones, Loader2, Menu, MessageSquare, Network, Sparkles } from 'lucide-react';
 
 // Popup chúc mừng + chứng chỉ — chỉ tải khi cần (kéo theo trình tạo PDF).
 const CourseCompletionCelebration = dynamic(
@@ -269,6 +269,7 @@ export default function LearnPage() {
   if (!lesson) return <div className="p-8 text-center text-gray-500">Bài học không tìm thấy</div>;
 
   const initialPos = lessonProgress.find((lp: { lessonId: string; lastPositionSec?: number }) => lp.lessonId === lessonId)?.lastPositionSec ?? 0;
+  const lessonCompleted = lessonProgress.find((lp: { lessonId: string; completed?: boolean }) => lp.lessonId === lessonId)?.completed ?? false;
   const videoCompletionMode: 'percent_90' | 'ended_autonext' = lesson.videoAsset?.completionMode ?? 'percent_90';
   const docReadEnough = readSec >= minReadTime;
 
@@ -279,6 +280,10 @@ export default function LearnPage() {
 
   const notePositionType = lesson.type === 'video' ? 'video_timestamp' : lesson.type === 'document' ? 'document_page' : 'none';
   const courseTitle: string | undefined = lesson?.section?.course?.title;
+  // Khóa bị rút về nháp để cập nhật — học viên đã ghi danh vẫn học được nhưng cần
+  // biết nội dung đang được sửa.
+  const courseStatus: string | undefined = lesson?.section?.course?.status;
+  const courseUpdating = !!courseStatus && courseStatus !== 'published';
   const saveNote = () => { setTab('notes'); setNoteAddSignal((n) => n + 1); };
   const transcript = transcriptData?.data;
   const cues = transcript?.cues ?? [];
@@ -331,6 +336,16 @@ export default function LearnPage() {
           </button>
         )}
       </header>
+
+      {/* Khóa đang được cập nhật nội dung (đã rút về nháp) */}
+      {courseUpdating && (
+        <div className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800 shrink-0">
+          <AlertTriangle size={15} className="shrink-0" />
+          <span>
+            Khóa học hiện đang được cập nhật nội dung. Vui lòng liên hệ giảng viên để biết thông tin chi tiết.
+          </span>
+        </div>
+      )}
 
       <div className="flex flex-1 overflow-hidden">
         {/* Course outline (left) */}
@@ -418,7 +433,11 @@ export default function LearnPage() {
                     docScrolled ? 'lg:translate-x-6' : 'lg:translate-x-0'
                   }`}
                 >
-                  {minReadTime > 0 && !docReadEnough ? (
+                  {lessonCompleted ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-4 py-2.5 text-sm font-semibold text-green-700 ring-1 ring-green-200">
+                      <Check size={16} /> Đã hoàn thành
+                    </span>
+                  ) : minReadTime > 0 && !docReadEnough ? (
                     <div className="flex flex-col items-center gap-1" title="Thời gian đọc còn lại">
                       <ReadTimerRing remaining={Math.max(minReadTime - readSec, 0)} progress={readSec / minReadTime} />
                       <span className="text-[11px] text-gray-400">Thời gian đọc</span>

@@ -1,12 +1,14 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { ArrowLeft, ChevronDown } from 'lucide-react';
+import { ArrowLeft, ChevronDown, Plus } from 'lucide-react';
 import { instructorApi } from '@/lib/api/instructor.api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { LessonContentEditor } from '@/components/instructor/LessonContentEditor';
+import { AddLessonModal } from '@/components/instructor/AddLessonModal';
 import { LessonTypeIcon, type LessonType } from '@/components/instructor/lessonTypeMeta';
 
 interface CurriculumLesson {
@@ -22,10 +24,18 @@ interface CurriculumSection {
 
 export default function CurriculumDetailPage() {
   const { id, lessonId } = useParams<{ id: string; lessonId: string }>();
+  const qc = useQueryClient();
+  const [addLessonForSection, setAddLessonForSection] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['course-edit', id],
     queryFn: () => instructorApi.getSections(id),
+  });
+
+  const addLessonMutation = useMutation({
+    mutationFn: ({ sectionId, ...dto }: { sectionId: string; title: string; type: LessonType; description: string }) =>
+      instructorApi.addLesson(sectionId, dto),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['course-edit', id] }),
   });
 
   const { data: courseData } = useQuery({
@@ -93,6 +103,13 @@ export default function CurriculumDetailPage() {
                     );
                   })}
                 </ul>
+                <button
+                  onClick={() => setAddLessonForSection(section.id)}
+                  className="flex w-full items-center gap-1.5 border-t border-hairline px-4 py-2.5 text-xs font-medium text-sky hover:bg-sky-soft"
+                >
+                  <Plus size={14} />
+                  Thêm bài học
+                </button>
               </details>
             ))
           )}
@@ -113,6 +130,17 @@ export default function CurriculumDetailPage() {
           )}
         </div>
       </main>
+
+      {addLessonForSection && (
+        <AddLessonModal
+          sectionTitle={sections.find((s) => s.id === addLessonForSection)?.title}
+          isPending={addLessonMutation.isPending}
+          onClose={() => setAddLessonForSection(null)}
+          onSubmit={(dto) =>
+            addLessonMutation.mutateAsync({ sectionId: addLessonForSection, ...dto })
+          }
+        />
+      )}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { COURSE_ACCESS_STATUSES } from '../common/enrollment-access.const';
 import { CreateNoteDto, PositionType } from './dto/create-note.dto';
 import { UpdateNoteDto } from './dto/update-note.dto';
 
@@ -22,7 +23,11 @@ export class NoteService {
     if (!lesson) throw new NotFoundException('Lesson not found');
 
     const enrolled = await this.prisma.enrollment.findFirst({
-      where: { studentId, courseId: lesson.section.courseId, status: 'active' },
+      where: {
+        studentId,
+        courseId: lesson.section.courseId,
+        status: { in: COURSE_ACCESS_STATUSES },
+      },
     });
     if (!enrolled) throw new ForbiddenException('Not enrolled in this course');
 
@@ -46,7 +51,11 @@ export class NoteService {
     if (!lesson) throw new NotFoundException('Lesson not found');
 
     const enrolled = await this.prisma.enrollment.findFirst({
-      where: { studentId, courseId: lesson.section.courseId, status: 'active' },
+      where: {
+        studentId,
+        courseId: lesson.section.courseId,
+        status: { in: COURSE_ACCESS_STATUSES },
+      },
     });
     if (!enrolled) throw new ForbiddenException('Not enrolled in this course');
 
@@ -58,7 +67,7 @@ export class NoteService {
 
   async getNotesByCourse(studentId: string, courseId: string) {
     const enrolled = await this.prisma.enrollment.findFirst({
-      where: { studentId, courseId, status: 'active' },
+      where: { studentId, courseId, status: { in: COURSE_ACCESS_STATUSES } },
     });
     if (!enrolled) throw new ForbiddenException('Not enrolled in this course');
 

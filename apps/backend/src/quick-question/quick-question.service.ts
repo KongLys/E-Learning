@@ -5,6 +5,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { COURSE_ACCESS_STATUSES } from '../common/enrollment-access.const';
 import { CreateQuickQuestionDto } from './dto/create-question.dto';
 import { CreateReplyDto } from './dto/create-reply.dto';
 import { PositionType } from '../note/dto/create-note.dto';
@@ -21,7 +22,11 @@ export class QuickQuestionService {
     if (!lesson) throw new NotFoundException('Lesson not found');
 
     const enrolled = await this.prisma.enrollment.findFirst({
-      where: { studentId, courseId: lesson.section.courseId, status: 'active' },
+      where: {
+        studentId,
+        courseId: lesson.section.courseId,
+        status: { in: COURSE_ACCESS_STATUSES },
+      },
     });
     if (!enrolled) throw new ForbiddenException('Not enrolled in this course');
 
@@ -203,7 +208,7 @@ export class QuickQuestionService {
       where: {
         studentId: userId,
         courseId: question.lesson.section.courseId,
-        status: 'active',
+        status: { in: COURSE_ACCESS_STATUSES },
       },
     });
     if (!isInstructor && !enrolled)
