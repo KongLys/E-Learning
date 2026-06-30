@@ -212,6 +212,9 @@ model Course {
   totalStudents    Int          @default(0) @map("total_students")
   totalLessons     Int          @default(0) @map("total_lessons")
   totalDurationSec Int          @default(0) @map("total_duration_sec")
+  // Tiến độ học đề xuất do giảng viên đặt (dùng để nhắc học viên trễ tiến độ).
+  recommendedWeeks        Int?   @map("recommended_weeks")
+  recommendedHoursPerWeek Float? @map("recommended_hours_per_week")
   createdAt        DateTime     @default(now()) @map("created_at")
   publishedAt      DateTime?    @map("published_at")
 
@@ -325,6 +328,14 @@ model VideoAsset {
   transcriptError  String? @map("transcript_error")
   cuesJson         Json    @default("[]") @map("cues_json") // [{ startSec, endSec, text }]
   segmentsJson     Json    @default("[]") @map("segments_json") // [{ startSec, endSec, title, summary }]
+
+  // Phụ đề song ngữ chỉ để HIỂN THỊ (người học chuyển EN/VI trong trình phát).
+  // cuesJson/segmentsJson ở trên VẪN là bản GỐC (transcriptLang) và là nguồn DUY NHẤT
+  // để embed/chunking — KHÔNG bao giờ đưa các cột *Vi/*En này vào vector store.
+  cuesViJson       Json    @default("[]") @map("cues_vi_json")
+  cuesEnJson       Json    @default("[]") @map("cues_en_json")
+  segmentsViJson   Json    @default("[]") @map("segments_vi_json")
+  segmentsEnJson   Json    @default("[]") @map("segments_en_json")
   // "percent_90" = xem đủ 90% thời lượng là hoàn thành
   // "ended_autonext" = phải xem hết video, tự động qua bài kế
 
@@ -577,6 +588,8 @@ model Enrollment {
   progressPercent Float        @default(0) @map("progress_percent")
   lastLessonId    String?      @map("last_lesson_id")
   status          EnrollStatus @default(active)
+  // Lần gần nhất gửi email nhắc trễ tiến độ (chống gửi lặp).
+  lastReminderAt  DateTime?    @map("last_reminder_at")
 
   student        User             @relation(fields: [studentId], references: [id])
   course         Course           @relation(fields: [courseId], references: [id])

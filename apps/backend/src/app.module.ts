@@ -60,6 +60,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
         SMTP_PASS: Joi.string().allow('').default(''),
         MAIL_FROM: Joi.string().allow('').default(''),
         OTP_TTL_SECONDS: Joi.number().default(600),
+        FRONTEND_URL: Joi.string().default('http://localhost:3000'),
         GOOGLE_CLIENT_ID: Joi.string().allow('').default(''),
         R2_ENDPOINT: Joi.string().required(),
         R2_REGION: Joi.string().default('auto'),

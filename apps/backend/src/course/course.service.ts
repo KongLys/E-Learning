@@ -64,6 +64,8 @@ export class CourseService {
         objectives: dto.objectives ?? [],
         targetAudience: dto.targetAudience ?? [],
         requirements: dto.requirements ?? [],
+        recommendedWeeks: dto.recommendedWeeks,
+        recommendedHoursPerWeek: dto.recommendedHoursPerWeek,
       },
     });
     await this.moderation.moderateCourse(
@@ -114,6 +116,12 @@ export class CourseService {
         }),
         ...(dto.congratulationsMessage !== undefined && {
           congratulationsMessage: dto.congratulationsMessage,
+        }),
+        ...(dto.recommendedWeeks !== undefined && {
+          recommendedWeeks: dto.recommendedWeeks,
+        }),
+        ...(dto.recommendedHoursPerWeek !== undefined && {
+          recommendedHoursPerWeek: dto.recommendedHoursPerWeek,
         }),
       },
     });

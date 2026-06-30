@@ -5,7 +5,14 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../storage/storage.service';
 import { AssemblyAiService } from '../media/assemblyai.service';
-import { TranscriptCue } from '../providers/gemini.service';
+import {
+  SubtitleLang,
+  TranscriptTranslateService,
+} from '../media/transcript-translate.service';
+import {
+  TranscriptCue,
+  TranscriptChapter,
+} from '../providers/gemini.service';
 import { LESSON_INDEX_QUEUE, IndexLessonJob } from './lesson-index.processor';
 
 export const VIDEO_TRANSCRIBE_QUEUE = 'video-transcription';
@@ -29,6 +36,7 @@ export class VideoTranscribeProcessor extends WorkerHost {
     private prisma: PrismaService,
     private storage: StorageService,
     private assemblyai: AssemblyAiService,
+    private translate: TranscriptTranslateService,
     @InjectQueue(LESSON_INDEX_QUEUE)
     private lessonIndexQueue: Queue<IndexLessonJob>,
   ) {
@@ -58,6 +66,16 @@ export class VideoTranscribeProcessor extends WorkerHost {
       const mediaUrl = await this.storage.getSignedUrl(key, 60 * 60);
       const result = await this.assemblyai.transcribeMedia(mediaUrl);
 
+      // Phụ đề song ngữ để HIỂN THỊ: luôn dựng đủ track Việt + Anh. Track trùng
+      // ngôn ngữ gốc dùng thẳng bản gốc (khỏi gọi LLM); track còn lại được dịch.
+      // cuesJson/segmentsJson VẪN giữ bản gốc — nguồn duy nhất để embed.
+      const { cuesVi, cuesEn, segmentsVi, segmentsEn } =
+        await this.buildBilingualTracks(
+          result.language,
+          result.cues,
+          result.chapters,
+        );
+
       await this.prisma.videoAsset.update({
         where: { lessonId },
         data: {
@@ -67,6 +85,10 @@ export class VideoTranscribeProcessor extends WorkerHost {
           transcript: this.toVtt(result.cues),
           cuesJson: result.cues as unknown as Prisma.InputJsonValue,
           segmentsJson: result.chapters as unknown as Prisma.InputJsonValue,
+          cuesViJson: cuesVi as unknown as Prisma.InputJsonValue,
+          cuesEnJson: cuesEn as unknown as Prisma.InputJsonValue,
+          segmentsViJson: segmentsVi as unknown as Prisma.InputJsonValue,
+          segmentsEnJson: segmentsEn as unknown as Prisma.InputJsonValue,
           // Duration trước đây luôn = 0 (chưa từng được điền) — lấy từ media.
           ...(result.durationSec > 0
             ? { durationSec: result.durationSec }
@@ -112,6 +134,40 @@ export class VideoTranscribeProcessor extends WorkerHost {
         .catch(() => undefined);
       throw err;
     }
+  }
+
+  /**
+   * Dựng đủ 2 track phụ đề (Việt + Anh) từ kết quả gốc. Track cùng ngôn ngữ gốc
+   * dùng thẳng bản gốc; track còn lại được dịch (best-effort, lỗi → giữ bản gốc).
+   */
+  private async buildBilingualTracks(
+    language: string,
+    cues: TranscriptCue[],
+    chapters: TranscriptChapter[],
+  ): Promise<{
+    cuesVi: TranscriptCue[];
+    cuesEn: TranscriptCue[];
+    segmentsVi: TranscriptChapter[];
+    segmentsEn: TranscriptChapter[];
+  }> {
+    const base = (language ?? '').toLowerCase().split(/[-_]/)[0];
+
+    const cuesFor = (target: SubtitleLang): Promise<TranscriptCue[]> =>
+      base === target
+        ? Promise.resolve(cues)
+        : this.translate.translateCues(cues, target, language);
+    const segmentsFor = (target: SubtitleLang): Promise<TranscriptChapter[]> =>
+      base === target
+        ? Promise.resolve(chapters)
+        : this.translate.translateChapters(chapters, target, language);
+
+    const [cuesVi, cuesEn, segmentsVi, segmentsEn] = await Promise.all([
+      cuesFor('vi'),
+      cuesFor('en'),
+      segmentsFor('vi'),
+      segmentsFor('en'),
+    ]);
+    return { cuesVi, cuesEn, segmentsVi, segmentsEn };
   }
 
   /** Đồng bộ totalLessons/totalDurationSec của khóa học (mirror LessonService.updateCourseStats). */

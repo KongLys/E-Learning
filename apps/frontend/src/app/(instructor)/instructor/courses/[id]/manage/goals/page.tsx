@@ -13,6 +13,8 @@ interface CourseGoals {
   objectives?: string[];
   requirements?: string[];
   targetAudience?: string[];
+  recommendedWeeks?: number | null;
+  recommendedHoursPerWeek?: number | null;
 }
 
 function GoalsForm({ courseId, initial }: { courseId: string; initial: CourseGoals }) {
@@ -20,10 +22,30 @@ function GoalsForm({ courseId, initial }: { courseId: string; initial: CourseGoa
   const [objectives, setObjectives] = useState<string[]>(initial.objectives ?? []);
   const [requirements, setRequirements] = useState<string[]>(initial.requirements ?? []);
   const [targetAudience, setTargetAudience] = useState<string[]>(initial.targetAudience ?? []);
+  const [recommendedWeeks, setRecommendedWeeks] = useState<string>(
+    initial.recommendedWeeks != null ? String(initial.recommendedWeeks) : '',
+  );
+  const [recommendedHoursPerWeek, setRecommendedHoursPerWeek] = useState<string>(
+    initial.recommendedHoursPerWeek != null ? String(initial.recommendedHoursPerWeek) : '',
+  );
   const [saved, setSaved] = useState(false);
 
+  const weeksNum = Number(recommendedWeeks);
+  const hoursNum = Number(recommendedHoursPerWeek);
+  const totalHours =
+    recommendedWeeks && recommendedHoursPerWeek && weeksNum > 0 && hoursNum > 0
+      ? weeksNum * hoursNum
+      : null;
+
   const saveMutation = useMutation({
-    mutationFn: () => instructorApi.updateCourse(courseId, { objectives, requirements, targetAudience }),
+    mutationFn: () =>
+      instructorApi.updateCourse(courseId, {
+        objectives,
+        requirements,
+        targetAudience,
+        recommendedWeeks: recommendedWeeks ? weeksNum : null,
+        recommendedHoursPerWeek: recommendedHoursPerWeek ? hoursNum : null,
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['course-manage', courseId] });
       setSaved(true);
@@ -64,6 +86,43 @@ function GoalsForm({ courseId, initial }: { courseId: string; initial: CourseGoa
         items={targetAudience}
         onChange={setTargetAudience}
       />
+
+      <div className="border-t border-hairline pt-6">
+        <h2 className="text-lg font-semibold text-ink">Thời lượng học đề xuất</h2>
+        <p className="mt-1 text-sm text-muted">
+          Lộ trình học gợi ý cho học viên. Hệ thống dùng thông tin này để tự động nhắc nhở qua email những học viên đang học chậm hơn tiến độ đề xuất.
+        </p>
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <label className="block">
+            <span className="text-sm font-medium text-ink">Số tuần đề xuất</span>
+            <input
+              type="number"
+              min={1}
+              value={recommendedWeeks}
+              onChange={(e) => setRecommendedWeeks(e.target.value)}
+              placeholder="Ví dụ: 10"
+              className="mt-1 w-full rounded-md border border-hairline px-3 py-2 text-sm text-ink focus:border-sky focus:outline-none"
+            />
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium text-ink">Số giờ học mỗi tuần</span>
+            <input
+              type="number"
+              min={0}
+              step="0.5"
+              value={recommendedHoursPerWeek}
+              onChange={(e) => setRecommendedHoursPerWeek(e.target.value)}
+              placeholder="Ví dụ: 10"
+              className="mt-1 w-full rounded-md border border-hairline px-3 py-2 text-sm text-ink focus:border-sky focus:outline-none"
+            />
+          </label>
+        </div>
+        {totalHours != null && (
+          <p className="mt-3 text-sm text-muted">
+            Tổng thời gian học đề xuất: <strong className="text-ink">{totalHours} giờ</strong>
+          </p>
+        )}
+      </div>
 
       <div className="flex items-center gap-3 pt-2">
         <button

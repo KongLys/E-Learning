@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { StorageModule } from '../storage/storage.module';
 import { GeminiService } from './providers/gemini.service';
 import { AssemblyAiService } from './media/assemblyai.service';
+import { TranscriptTranslateService } from './media/transcript-translate.service';
 import { GoogleTtsService } from './media/google-tts.service';
 import { RemotionRenderService } from './media/remotion-render.service';
 import { CohereService } from './providers/cohere.service';
@@ -73,6 +74,7 @@ import { ModerationModule } from '../moderation/moderation.module';
   providers: [
     GeminiService,
     AssemblyAiService,
+    TranscriptTranslateService,
     GoogleTtsService,
     RemotionRenderService,
     CohereService,

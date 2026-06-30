@@ -55,4 +55,50 @@ export class MailService {
       html,
     });
   }
+
+  /**
+   * Nhắc học viên đang trễ tiến độ so với lộ trình đề xuất của khóa học,
+   * khuyến khích quay lại học tiếp.
+   */
+  async sendProgressReminderEmail(
+    to: string,
+    params: {
+      studentName: string;
+      courseTitle: string;
+      courseUrl: string;
+      progressPercent: number;
+      expectedPercent: number;
+    },
+  ): Promise<void> {
+    if (!this.transporter) {
+      throw new Error('Dịch vụ gửi email chưa được cấu hình (SMTP).');
+    }
+
+    const { studentName, courseTitle, courseUrl } = params;
+    const progress = Math.round(params.progressPercent);
+    const expected = Math.round(params.expectedPercent);
+
+    const html = `
+      <div style="font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#1f2937">
+        <h2 style="margin:0 0 16px">Tiếp tục hành trình học của bạn nhé!</h2>
+        <p style="margin:0 0 12px">Chào ${studentName},</p>
+        <p style="margin:0 0 12px">Chúng tôi nhận thấy bạn đang học chậm hơn lộ trình đề xuất của khóa học <strong>${courseTitle}</strong>. Đừng để khoảng cách ngày một xa nhé!</p>
+        <p style="margin:0 0 4px">Tiến độ hiện tại của bạn: <strong style="color:#0ea5e9">${progress}%</strong></p>
+        <p style="margin:0 0 16px">Mức nên đạt được tới hiện tại: <strong>${expected}%</strong></p>
+        <p style="margin:0 0 20px">Chỉ cần dành ra một chút thời gian mỗi ngày là bạn sẽ sớm bắt kịp lộ trình.</p>
+        <p style="text-align:center;margin:0 0 20px">
+          <a href="${courseUrl}" style="display:inline-block;background:#0ea5e9;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:700">Tiếp tục học ngay</a>
+        </p>
+        <p style="margin:0;color:#6b7280;font-size:13px">Nếu bạn đã tạm dừng khóa học này có chủ đích, hãy bỏ qua email này.</p>
+      </div>
+    `;
+
+    await this.transporter.sendMail({
+      from: this.from,
+      to,
+      subject: `Nhắc nhở: tiếp tục khóa học "${courseTitle}"`,
+      text: `Chào ${studentName}, bạn đang học chậm hơn lộ trình đề xuất của khóa học "${courseTitle}". Tiến độ hiện tại ${progress}% (nên đạt khoảng ${expected}%). Quay lại học tiếp tại: ${courseUrl}`,
+      html,
+    });
+  }
 }

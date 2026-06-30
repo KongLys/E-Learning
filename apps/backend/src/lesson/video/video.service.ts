@@ -91,6 +91,10 @@ export class VideoService {
         transcriptLang: null,
         cuesJson: [],
         segmentsJson: [],
+        cuesViJson: [],
+        cuesEnJson: [],
+        segmentsViJson: [],
+        segmentsEnJson: [],
       },
       create: {
         lessonId,
@@ -153,6 +157,10 @@ export class VideoService {
         transcriptLang: null,
         cuesJson: [],
         segmentsJson: [],
+        cuesViJson: [],
+        cuesEnJson: [],
+        segmentsViJson: [],
+        segmentsEnJson: [],
       },
     });
 
@@ -242,8 +250,14 @@ export class VideoService {
     return {
       status: asset?.transcriptStatus ?? 'none',
       lang: asset?.transcriptLang ?? null,
+      // cues/segments = bản GỐC (giữ tương thích ngược + là bản được embed).
       cues: (asset?.cuesJson as unknown) ?? [],
       segments: (asset?.segmentsJson as unknown) ?? [],
+      // Phụ đề song ngữ để hiển thị (người học chuyển EN/VI trong trình phát).
+      cuesVi: (asset?.cuesViJson as unknown) ?? [],
+      cuesEn: (asset?.cuesEnJson as unknown) ?? [],
+      segmentsVi: (asset?.segmentsViJson as unknown) ?? [],
+      segmentsEn: (asset?.segmentsEnJson as unknown) ?? [],
     };
   }
 }

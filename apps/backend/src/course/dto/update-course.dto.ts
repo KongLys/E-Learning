@@ -1,6 +1,7 @@
 import {
   IsArray,
   IsIn,
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
@@ -67,4 +68,14 @@ export class UpdateCourseDto {
   @IsOptional()
   @IsString()
   congratulationsMessage?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  recommendedWeeks?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  recommendedHoursPerWeek?: number;
 }

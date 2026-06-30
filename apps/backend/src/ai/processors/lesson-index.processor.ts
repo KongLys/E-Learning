@@ -326,6 +326,10 @@ export class LessonIndexProcessor extends WorkerHost {
    * Mỗi chương (segmentsJson) thành một heading "## tên chương" + dòng tóm tắt
    * sẵn có, kèm phần transcript (cuesJson) rơi trong khung thời gian của chương.
    * Không có chương thì fallback dùng heading bài + toàn bộ lời thoại.
+   *
+   * QUAN TRỌNG: chỉ dùng cuesJson/segmentsJson (bản GỐC) để embed. Phụ đề song
+   * ngữ cuesViJson/cuesEnJson chỉ phục vụ hiển thị — TUYỆT ĐỐI không đưa vào đây,
+   * nếu không vector store sẽ có 2 bản cùng ngữ nghĩa làm nhiễu retrieval.
    */
   private buildVideoMarkdown(
     video:

@@ -37,6 +37,7 @@ export default function LearnPage() {
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const [aiPanelWidth, setAiPanelWidth] = useState(400);
   const [noteAddSignal, setNoteAddSignal] = useState(0);
+  const [subtitleLang, setSubtitleLang] = useState<'vi' | 'en'>('vi');
   // Đã cuộn khỏi đầu trang → đẩy widget thời gian/hoàn thành trượt sang phải.
   const [docScrolled, setDocScrolled] = useState(false);
   const videoTimeRef = useRef(0);
@@ -286,8 +287,16 @@ export default function LearnPage() {
   const courseUpdating = !!courseStatus && courseStatus !== 'published';
   const saveNote = () => { setTab('notes'); setNoteAddSignal((n) => n + 1); };
   const transcript = transcriptData?.data;
-  const cues = transcript?.cues ?? [];
-  const chapters = transcript?.segments ?? [];
+  // Phụ đề song ngữ: chọn track theo subtitleLang, fallback về bản gốc nếu rỗng.
+  const cuesVi = transcript?.cuesVi ?? [];
+  const cuesEn = transcript?.cuesEn ?? [];
+  const segmentsVi = transcript?.segmentsVi ?? [];
+  const segmentsEn = transcript?.segmentsEn ?? [];
+  const hasBothSubtitles = cuesVi.length > 0 && cuesEn.length > 0;
+  const cuesSel = subtitleLang === 'vi' ? cuesVi : cuesEn;
+  const chaptersSel = subtitleLang === 'vi' ? segmentsVi : segmentsEn;
+  const cues = cuesSel.length > 0 ? cuesSel : (transcript?.cues ?? []);
+  const chapters = chaptersSel.length > 0 ? chaptersSel : (transcript?.segments ?? []);
   const transcriptStatus: string = transcript?.status ?? 'none';
   const TABS: [typeof tab, string][] = [['content', 'Nội dung'], ['notes', 'Ghi chú'], ['questions', 'Hỏi đáp']];
 
