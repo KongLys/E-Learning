@@ -13,7 +13,7 @@ import { FINAL_QUIZ_QUEUE, GenerateFinalQuizJob } from './final-quiz.queue';
 
 const FINAL_QUIZ_SECTION_TITLE = 'Kiểm tra cuối khóa';
 const FINAL_QUIZ_LESSON_TITLE = 'Bài kiểm tra cuối khóa';
-const TARGET_QUESTIONS = 30;
+const TARGET_QUESTIONS = 15;
 const MIN_SOURCE_CHARS = 200;
 
 interface FinalQuizSlot {
@@ -23,7 +23,7 @@ interface FinalQuizSlot {
 
 /**
  * Bài kiểm tra cuối khóa: 1 Lesson (isFinalQuiz) + QuizLesson dùng chung hạ tầng
- * quiz chấm điểm. Nếu giảng viên không tự soạn, AI sinh ~30 câu bao quát toàn bộ
+ * quiz chấm điểm. Nếu giảng viên không tự soạn, AI sinh ~15 câu bao quát toàn bộ
  * khóa (phân bổ theo từng chương). Tự sinh khi khóa được duyệt xuất bản.
  */
 @Injectable()
@@ -300,7 +300,7 @@ export class FinalQuizService {
       }
     }
 
-    // Round-robin để mọi chương được đại diện đều, cắt ở mục tiêu ~30 câu.
+    // Round-robin để mọi chương được đại diện đều, cắt ở mục tiêu ~15 câu.
     const result: GeneratedQuestion[] = [];
     let idx = 0;
     while (result.length < TARGET_QUESTIONS && bySection.some((a) => a.length)) {

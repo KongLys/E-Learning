@@ -526,7 +526,7 @@ export default function CourseCurriculumPage() {
             </div>
             <p className="mt-1 text-xs text-muted">
               Luôn nằm ở cuối khóa và chiếm <strong>10% tiến độ</strong>. Nếu bạn không tự soạn,
-              hệ thống sẽ tự tạo bằng AI (~30 câu bao quát các chương) khi khóa được duyệt xuất bản.
+              hệ thống sẽ tự tạo bằng AI (~15 câu bao quát các chương) khi khóa được duyệt xuất bản.
             </p>
 
             {finalQuizEnabled && finalQuizLesson && (

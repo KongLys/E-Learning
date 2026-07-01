@@ -11,6 +11,7 @@ import { ErrorMessage } from '@/components/common/ErrorMessage';
 interface SectionLessonLite {
   id: string;
   orderIndex: number;
+  isFinalQuiz?: boolean;
 }
 interface SectionLite {
   lessons?: SectionLessonLite[];
@@ -46,9 +47,12 @@ export default function LearnCoursePage() {
     if (sectionsLoading || !sectionsData) return;
 
     const sections: SectionLite[] = sectionsData ?? [];
+    // Backend đã trả sections/lessons đúng thứ tự (bài kiểm tra cuối khóa luôn ở
+    // cuối). Giữ nguyên thứ tự đó và bỏ qua bài final quiz để lần đầu vào khóa
+    // luôn mở bài học đầu tiên, không nhảy vào quiz kiểm tra cuối khóa.
     const firstLesson = sections
       .flatMap((s) => s.lessons ?? [])
-      .sort((a, b) => a.orderIndex - b.orderIndex)[0];
+      .find((l) => !l.isFinalQuiz);
 
     if (firstLesson) {
       router.replace(`/learn/${courseId}/${firstLesson.id}`);
